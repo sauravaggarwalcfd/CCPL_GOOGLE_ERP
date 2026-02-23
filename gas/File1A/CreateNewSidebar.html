@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Google Sans', Roboto, Arial, sans-serif;
+      font-size: 13px;
+      color: #333;
+      padding: 16px;
+      background: #fafafa;
+    }
+    .header {
+      background: #CC0000;
+      color: white;
+      padding: 12px 16px;
+      margin: -16px -16px 16px -16px;
+      font-size: 15px;
+      font-weight: 500;
+    }
+    .header small {
+      display: block;
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 4px;
+    }
+    .info-bar {
+      background: #FFF3E0;
+      border-left: 3px solid #F39C12;
+      padding: 8px 12px;
+      margin-bottom: 16px;
+      font-size: 12px;
+      border-radius: 0 4px 4px 0;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #555;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-bottom: 4px;
+    }
+    .form-group .desc {
+      font-size: 10px;
+      color: #999;
+      margin-bottom: 4px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      outline: none;
+      border-color: #CC0000;
+      box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.1);
+    }
+    .form-group textarea { resize: vertical; min-height: 60px; }
+    .form-group .required::after {
+      content: ' *';
+      color: #CC0000;
+    }
+    .divider { border-top: 1px solid #eee; margin: 16px 0; }
+    .btn {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #CC0000; color: white; }
+    .btn-primary:hover { background: #AA0000; }
+    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+    .btn-secondary { background: #f0f0f0; color: #333; }
+    .btn-secondary:hover { background: #ddd; }
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      margin-top: 16px;
+    }
+    .loading { text-align: center; padding: 40px; color: #999; }
+    .success-msg {
+      background: #E8F5E9;
+      border: 1px solid #27AE60;
+      color: #27AE60;
+      padding: 12px;
+      border-radius: 4px;
+      text-align: center;
+      display: none;
+      margin-top: 16px;
+    }
+    .success-msg.show { display: block; }
+    .error-msg {
+      background: #FFEBEE;
+      border: 1px solid #CC0000;
+      color: #CC0000;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      display: none;
+      margin-top: 8px;
+    }
+    .error-msg.show { display: block; }
+    #formContainer { display: none; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ➕ Create New Record
+    <small id="headerSheetName">Loading...</small>
+  </div>
+
+  <div class="info-bar">
+    Fill in the required fields to create a new record. The code will be auto-generated.
+  </div>
+
+  <div id="loadingState" class="loading">Loading form fields...</div>
+
+  <div id="formContainer"></div>
+
+  <div id="successMsg" class="success-msg">
+    ✅ Record created! Code: <strong id="newCodeDisplay"></strong>
+  </div>
+
+  <div id="errorMsg" class="error-msg"></div>
+
+  <div class="divider"></div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
+    <button class="btn btn-primary" id="createBtn" onclick="createRecord()" disabled>
+      ✅ Create Record
+    </button>
+  </div>
+
+  <script>
+    var targetSheet = '';
+    var formFields = [];
+
+    // Get sheet name from URL parameter or server
+    function init(sheetName) {
+      targetSheet = sheetName;
+      document.getElementById('headerSheetName').textContent = 'New ' + sheetName + ' record';
+
+      google.script.run
+        .withSuccessHandler(renderForm)
+        .withFailureHandler(showError)
+        .getSheetHeaders(sheetName);
+    }
+
+    function renderForm(fields) {
+      formFields = fields;
+      var container = document.getElementById('formContainer');
+      container.innerHTML = '';
+
+      if (!fields || fields.length === 0) {
+        container.innerHTML = '<div class="loading">No editable fields found.</div>';
+        return;
+      }
+
+      fields.forEach(function(field) {
+        var group = document.createElement('div');
+        group.className = 'form-group';
+
+        var label = document.createElement('label');
+        var isRequired = field.header.indexOf('⚠') !== -1;
+        if (isRequired) {
+          label.className = 'required';
+        }
+        label.textContent = field.header.replace(/[→⟷⚠🔑#←∑]/g, '').trim();
+        group.appendChild(label);
+
+        if (field.description) {
+          var desc = document.createElement('div');
+          desc.className = 'desc';
+          desc.textContent = field.description;
+          group.appendChild(desc);
+        }
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.id = 'field_' + field.col;
+        input.setAttribute('data-col', field.col);
+        input.setAttribute('data-header', field.header);
+        if (isRequired) input.required = true;
+        input.placeholder = field.description || 'Enter value';
+        group.appendChild(input);
+
+        container.appendChild(group);
+      });
+
+      document.getElementById('loadingState').style.display = 'none';
+      container.style.display = 'block';
+      document.getElementById('createBtn').disabled = false;
+    }
+
+    function createRecord() {
+      var btn = document.getElementById('createBtn');
+      btn.disabled = true;
+      btn.textContent = 'Creating...';
+
+      var formData = {};
+      formFields.forEach(function(field) {
+        var input = document.getElementById('field_' + field.col);
+        if (input) {
+          formData[field.header] = input.value;
+        }
+      });
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.code) {
+            document.getElementById('newCodeDisplay').textContent = result.code;
+            document.getElementById('successMsg').classList.add('show');
+            document.getElementById('formContainer').style.display = 'none';
+            btn.textContent = 'Done!';
+
+            // Close after 2 seconds
+            setTimeout(function() {
+              google.script.host.close();
+            }, 2000);
+          } else {
+            showError('Failed to create record.');
+            btn.disabled = false;
+            btn.textContent = '✅ Create Record';
+          }
+        })
+        .withFailureHandler(function(err) {
+          showError(err.message || 'Error creating record.');
+          btn.disabled = false;
+          btn.textContent = '✅ Create Record';
+        })
+        .createNewFKRecord(targetSheet, formData);
+    }
+
+    function showError(msg) {
+      var el = document.getElementById('errorMsg');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(function() { el.classList.remove('show'); }, 5000);
+    }
+
+    // Initialize with sheet name passed from server
+    // The calling GAS function should pass the sheet name via template
+    // For now, try to get it from a global
+    if (typeof SIDEBAR_SHEET_NAME !== 'undefined') {
+      init(SIDEBAR_SHEET_NAME);
+    }
+  </script>
+</body>
+</html>
