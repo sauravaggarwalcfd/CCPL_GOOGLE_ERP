@@ -41,6 +41,13 @@ var CACHE_TTL = 21600;
 var PROP_CHUNK_SIZE = 8000;
 
 /**
+ * CacheService has a ~100 KB per-value limit.  Values larger than this
+ * threshold are split into chunks stored under _CHUNK_0, _CHUNK_1, etc.
+ * A meta key stores the chunk count for reassembly.
+ */
+var CACHE_CHUNK_SIZE = 90000;
+
+/**
  * All local (FILE 1A) master sheets whose data feeds FK dropdowns,
  * attribute lookups, and other in-file references.  These are loaded
  * into Layer 1 on onOpen().
@@ -99,6 +106,10 @@ var CROSS_FILE_1C_SHEETS = [
  *
  * Called from onOpen() so that all FK dropdown data is pre-warmed and
  * available in < 0.5 sec for the entire editing session.
+ *
+ * Sheets whose JSON exceeds the CacheService per-value limit (~100 KB)
+ * are stored using chunked keys (_CHUNK_0, _CHUNK_1, ...) with a meta
+ * key recording the chunk count.
  */
 function cacheAllMasters() {
   var cache = CacheService.getScriptCache();
@@ -112,14 +123,13 @@ function cacheAllMasters() {
       if (data && data.length > 0) {
         var key = CACHE_PREFIX + sheetName;
         var json = JSON.stringify(data);
-        // CacheService.putAll has a 100 KB total limit per call.
-        // Individual values are limited to ~100 KB.  For very large
-        // sheets we fall back to a single put().
-        if (json.length < 90000) {
+
+        if (json.length < CACHE_CHUNK_SIZE) {
+          // Small enough for batch write
           cachePayload[key] = json;
         } else {
-          // Store individually to avoid putAll size overflow
-          cache.put(key, json, CACHE_TTL);
+          // Too large for a single CacheService value — use chunking
+          setCacheDataChunked_(cache, key, json);
         }
       }
     } catch (e) {
@@ -131,6 +141,66 @@ function cacheAllMasters() {
   if (Object.keys(cachePayload).length > 0) {
     cache.putAll(cachePayload, CACHE_TTL);
   }
+}
+
+
+/**
+ * Stores a large JSON string in CacheService using chunked keys.
+ * Creates: KEY_CHUNKS = chunkCount, KEY_CHUNK_0, KEY_CHUNK_1, ...
+ *
+ * @param {GoogleAppsScript.Cache.Cache} cache  CacheService instance.
+ * @param {string} key   Base cache key.
+ * @param {string} json  The JSON string to store.
+ * @private
+ */
+function setCacheDataChunked_(cache, key, json) {
+  var chunks = [];
+  for (var offset = 0; offset < json.length; offset += CACHE_CHUNK_SIZE) {
+    chunks.push(json.substring(offset, offset + CACHE_CHUNK_SIZE));
+  }
+
+  var payload = {};
+  payload[key + '_CHUNKS'] = String(chunks.length);
+  for (var i = 0; i < chunks.length; i++) {
+    payload[key + '_CHUNK_' + i] = chunks[i];
+  }
+
+  // Write all chunks in batch calls (putAll has 100 KB total limit,
+  // so we write chunks individually if there are many)
+  if (chunks.length <= 2) {
+    cache.putAll(payload, CACHE_TTL);
+  } else {
+    for (var k in payload) {
+      cache.put(k, payload[k], CACHE_TTL);
+    }
+  }
+  Logger.log('cacheAllMasters — chunked ' + key + ' into ' + chunks.length + ' parts (' + json.length + ' chars)');
+}
+
+
+/**
+ * Reads a chunked value from CacheService.
+ * Returns null if no chunks exist for the key.
+ *
+ * @param {GoogleAppsScript.Cache.Cache} cache  CacheService instance.
+ * @param {string} key  Base cache key.
+ * @return {string|null}  Reassembled JSON string, or null.
+ * @private
+ */
+function getCacheDataChunked_(cache, key) {
+  var countStr = cache.get(key + '_CHUNKS');
+  if (!countStr) return null;
+
+  var count = parseInt(countStr, 10);
+  if (isNaN(count) || count <= 0) return null;
+
+  var assembled = '';
+  for (var i = 0; i < count; i++) {
+    var part = cache.get(key + '_CHUNK_' + i);
+    if (part === null) return null; // Incomplete — a chunk expired
+    assembled += part;
+  }
+  return assembled;
 }
 
 
@@ -157,6 +227,16 @@ function getCachedData(sheetName, optFileId) {
       return JSON.parse(cached);
     } catch (e) {
       Logger.log('getCachedData L1 parse error for ' + sheetName + ': ' + e.message);
+    }
+  }
+
+  // --- Layer 1 chunked: CacheService (large sheets stored in chunks) ---
+  var chunked = getCacheDataChunked_(cache, key);
+  if (chunked) {
+    try {
+      return JSON.parse(chunked);
+    } catch (e) {
+      Logger.log('getCachedData L1 chunked parse error for ' + sheetName + ': ' + e.message);
     }
   }
 
@@ -376,10 +456,22 @@ function clearPropertyChunks_(props, key) {
 function invalidateCache(sheetName) {
   if (!sheetName) return;
 
-  // Layer 1 — CacheService
+  // Layer 1 — CacheService (single key + chunked keys)
   try {
     var cache = CacheService.getScriptCache();
-    cache.remove(CACHE_PREFIX + sheetName);
+    var key = CACHE_PREFIX + sheetName;
+    cache.remove(key);
+
+    // Also clear any chunked entries
+    var countStr = cache.get(key + '_CHUNKS');
+    if (countStr) {
+      var count = parseInt(countStr, 10);
+      var chunkKeys = [key + '_CHUNKS'];
+      for (var i = 0; i < count; i++) {
+        chunkKeys.push(key + '_CHUNK_' + i);
+      }
+      cache.removeAll(chunkKeys);
+    }
   } catch (e) {
     Logger.log('invalidateCache L1 error for ' + sheetName + ': ' + e.message);
   }
