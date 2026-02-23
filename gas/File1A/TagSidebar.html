@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <!-- Google Material Design Lite -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.red-indigo.min.css">
+
+  <style>
+    /* =====================================================================
+     * CCPL ERP — Tag Management Sidebar (Chip Panel)
+     * Width: 300px (standard GAS sidebar)
+     * Theme: Header #CC0000, chip toggle buttons
+     * ===================================================================== */
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #333333;
+      background: #FAFAFA;
+      width: 300px;
+      overflow-x: hidden;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
+      background: #CC0000;
+      color: #FFFFFF;
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .sidebar-header h3 {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 0 0 4px 0;
+    }
+
+    .sidebar-header .context-info {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    /* --- Content area --- */
+    .sidebar-content {
+      padding: 16px;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #888888;
+      margin-bottom: 8px;
+    }
+
+    /* --- Chip container --- */
+    .chip-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 20px;
+      min-height: 40px;
+    }
+
+    /* --- Chip / toggle button --- */
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 14px;
+      border-radius: 16px;
+      border: 1px solid #E0E0E0;
+      background: #FFFFFF;
+      color: #555555;
+      font-size: 12px;
+      font-weight: 400;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+    }
+
+    .tag-chip:hover {
+      border-color: #CC0000;
+      color: #CC0000;
+      background: #FFF5F5;
+    }
+
+    .tag-chip.active {
+      background: #CC0000;
+      color: #FFFFFF;
+      border-color: #CC0000;
+      font-weight: 500;
+    }
+
+    .tag-chip.active:hover {
+      background: #B00000;
+      border-color: #B00000;
+      color: #FFFFFF;
+    }
+
+    .tag-chip .chip-remove {
+      margin-left: 6px;
+      font-size: 14px;
+      line-height: 1;
+      opacity: 0.7;
+    }
+
+    .tag-chip.active .chip-remove:hover {
+      opacity: 1;
+    }
+
+    .tag-chip .chip-code {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 10px;
+      opacity: 0.7;
+      margin-left: 4px;
+    }
+
+    /* --- Empty state --- */
+    .empty-state {
+      text-align: center;
+      padding: 24px 16px;
+      color: #AAAAAA;
+      font-size: 12px;
+    }
+
+    .empty-state .material-icons {
+      font-size: 36px;
+      color: #DDDDDD;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    /* --- Divider --- */
+    .section-divider {
+      border: none;
+      border-top: 1px solid #E0E0E0;
+      margin: 16px 0;
+    }
+
+    /* --- Add New Tag form --- */
+    .add-tag-section {
+      margin-top: 4px;
+    }
+
+    .add-tag-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 1px dashed #CCCCCC;
+      border-radius: 16px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: #888888;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .add-tag-btn:hover {
+      border-color: #CC0000;
+      color: #CC0000;
+    }
+
+    .add-tag-btn .material-icons {
+      font-size: 16px;
+    }
+
+    /* --- Inline form --- */
+    .inline-form {
+      display: none;
+      background: #FFFFFF;
+      border: 1px solid #E0E0E0;
+      border-radius: 8px;
+      padding: 12px;
+      margin-top: 8px;
+    }
+
+    .inline-form.visible {
+      display: block;
+    }
+
+    .inline-form label {
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      color: #666666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+      margin-top: 8px;
+    }
+
+    .inline-form label:first-child {
+      margin-top: 0;
+    }
+
+    .inline-form input[type="text"] {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #E0E0E0;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .inline-form input[type="text"]:focus {
+      border-color: #CC0000;
+    }
+
+    .inline-form .form-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .inline-form .form-actions button {
+      padding: 6px 16px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-create-tag {
+      background: #CC0000;
+      color: #FFFFFF;
+    }
+
+    .btn-create-tag:hover {
+      background: #B00000;
+    }
+
+    .btn-cancel-tag {
+      background: #F5F5F5;
+      color: #666666;
+      border: 1px solid #E0E0E0;
+    }
+
+    .btn-cancel-tag:hover {
+      background: #EEEEEE;
+    }
+
+    /* --- Search / filter --- */
+    .search-box {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .search-box .material-icons {
+      position: absolute;
+      left: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 18px;
+      color: #AAAAAA;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 8px 10px 8px 32px;
+      border: 1px solid #E0E0E0;
+      border-radius: 4px;
+      font-size: 12px;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .search-box input:focus {
+      border-color: #CC0000;
+    }
+
+    /* --- Footer / buttons --- */
+    .sidebar-footer {
+      position: sticky;
+      bottom: 0;
+      background: #FFFFFF;
+      border-top: 1px solid #E0E0E0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .selected-count {
+      font-size: 12px;
+      color: #888888;
+    }
+
+    .footer-buttons {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s;
+    }
+
+    .btn-cancel {
+      background: #F5F5F5;
+      color: #666666;
+      border: 1px solid #E0E0E0;
+    }
+
+    .btn-cancel:hover {
+      background: #EEEEEE;
+    }
+
+    .btn-save {
+      background: #CC0000;
+      color: #FFFFFF;
+    }
+
+    .btn-save:hover {
+      background: #B00000;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* --- Status message --- */
+    .status-msg {
+      text-align: center;
+      padding: 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      margin: 8px 0;
+      display: none;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: #FFEBEE;
+      color: #C62828;
+    }
+
+    /* --- Loading spinner --- */
+    .loading {
+      text-align: center;
+      padding: 40px 16px;
+      color: #888888;
+    }
+
+    .spinner {
+      border: 3px solid #F0F0F0;
+      border-top: 3px solid #CC0000;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <div class="sidebar-header">
+    <h3>Manage Tags</h3>
+    <div class="context-info">
+      <span id="headerSheetName"></span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="sidebar-content">
+
+    <!-- Loading state -->
+    <div id="loadingState" class="loading">
+      <div class="spinner"></div>
+      Loading tags...
+    </div>
+
+    <!-- Main content (hidden until loaded) -->
+    <div id="mainContent" style="display:none;">
+
+      <!-- Search -->
+      <div class="search-box">
+        <span class="material-icons">search</span>
+        <input type="text" id="tagSearch" placeholder="Search tags..." oninput="filterChips()">
+      </div>
+
+      <!-- Active tags section -->
+      <div class="section-label">Selected Tags</div>
+      <div class="chip-container" id="activeChips">
+        <div class="empty-state" id="noActiveMsg">
+          <span class="material-icons">label_off</span>
+          No tags selected
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Available tags section -->
+      <div class="section-label">Available Tags</div>
+      <div class="chip-container" id="availableChips">
+        <div class="empty-state" id="noAvailableMsg" style="display:none;">
+          <span class="material-icons">sell</span>
+          No matching tags found
+        </div>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- Add new tag -->
+      <div class="add-tag-section">
+        <button class="add-tag-btn" onclick="toggleNewTagForm()">
+          <span class="material-icons">add</span>
+          Add New Tag
+        </button>
+
+        <div class="inline-form" id="newTagForm">
+          <label for="newTagName">Tag Name</label>
+          <input type="text" id="newTagName" placeholder="e.g. Sustainable">
+
+          <label for="newTagAppliesTo">Applies To</label>
+          <input type="text" id="newTagAppliesTo" placeholder="e.g. TRIM_MASTER" readonly>
+
+          <div class="form-actions">
+            <button class="btn-cancel-tag" onclick="toggleNewTagForm()">Cancel</button>
+            <button class="btn-create-tag" onclick="createNewTag()">Create</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Status message -->
+    <div id="statusMsg" class="status-msg"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <span class="selected-count" id="selectedCount">0 selected</span>
+    <div class="footer-buttons">
+      <button class="btn btn-cancel" onclick="handleCancel()">Cancel</button>
+      <button class="btn btn-save" id="btnSave" onclick="handleSave()">Save</button>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // Tag Sidebar — Client-Side Logic
+    // =========================================================================
+
+    /**
+     * State: All tags from TAG_MASTER filtered by "Applies To"
+     * Each tag: { code: 'TAG-001', name: 'Sustainable', appliesTo: 'TRIM_MASTER' }
+     */
+    var allTags      = [];
+    var selectedCodes = [];    // Currently selected tag codes
+    var masterSheet   = '';    // Current master sheet name (e.g. 'TRIM_MASTER')
+    var targetCell    = '';    // Cell reference for the tags column
+
+    // -----------------------------------------------------------------------
+    // Initialization — called by server via template or on load
+    // -----------------------------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load initial data from server
+      google.script.run
+        .withSuccessHandler(onDataLoaded)
+        .withFailureHandler(onDataError)
+        .getTagSidebarData();
+    });
+
+    /**
+     * Callback: receives initial data from server.
+     *
+     * @param {Object} data
+     *   {string}   data.masterSheet   - Current master sheet name
+     *   {string}   data.currentTags   - Comma-separated tag codes currently in the cell
+     *   {Object[]} data.allTags       - All TAG_MASTER rows filtered by Applies To
+     *   {string}   data.targetCell    - A1 reference of the tags cell
+     */
+    function onDataLoaded(data) {
+      if (!data) {
+        showStatus('Failed to load tag data.', 'error');
+        return;
+      }
+
+      masterSheet = data.masterSheet || '';
+      targetCell  = data.targetCell || '';
+      allTags     = data.allTags || [];
+
+      // Parse current tags from the cell
+      var currentTagStr = (data.currentTags || '').trim();
+      if (currentTagStr) {
+        selectedCodes = currentTagStr.split(',').map(function(c) { return c.trim(); }).filter(Boolean);
+      } else {
+        selectedCodes = [];
+      }
+
+      // Update header
+      document.getElementById('headerSheetName').textContent = masterSheet;
+
+      // Set "Applies To" field in the new tag form
+      document.getElementById('newTagAppliesTo').value = masterSheet;
+
+      // Hide loading, show content
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+
+      renderChips();
+    }
+
+    function onDataError(err) {
+      document.getElementById('loadingState').style.display = 'none';
+      showStatus('Error loading tags: ' + (err.message || err), 'error');
+    }
+
+    // -----------------------------------------------------------------------
+    // Render chips
+    // -----------------------------------------------------------------------
+
+    function renderChips() {
+      renderActiveChips();
+      renderAvailableChips();
+      updateSelectedCount();
+    }
+
+    function renderActiveChips() {
+      var container = document.getElementById('activeChips');
+      var noMsg     = document.getElementById('noActiveMsg');
+      container.innerHTML = '';
+
+      var activeTags = allTags.filter(function(t) {
+        return selectedCodes.indexOf(t.code) !== -1;
+      });
+
+      if (activeTags.length === 0) {
+        container.appendChild(noMsg);
+        noMsg.style.display = 'block';
+        return;
+      }
+
+      noMsg.style.display = 'none';
+
+      activeTags.forEach(function(tag) {
+        var chip = createChipElement(tag, true);
+        container.appendChild(chip);
+      });
+    }
+
+    function renderAvailableChips() {
+      var container = document.getElementById('availableChips');
+      var noMsg     = document.getElementById('noAvailableMsg');
+      container.innerHTML = '';
+
+      var searchTerm = (document.getElementById('tagSearch').value || '').trim().toLowerCase();
+
+      var available = allTags.filter(function(t) {
+        // Not already selected
+        if (selectedCodes.indexOf(t.code) !== -1) return false;
+        // Match search
+        if (searchTerm) {
+          return t.name.toLowerCase().indexOf(searchTerm) !== -1 ||
+                 t.code.toLowerCase().indexOf(searchTerm) !== -1;
+        }
+        return true;
+      });
+
+      if (available.length === 0) {
+        container.appendChild(noMsg);
+        noMsg.style.display = 'block';
+        return;
+      }
+
+      noMsg.style.display = 'none';
+
+      available.forEach(function(tag) {
+        var chip = createChipElement(tag, false);
+        container.appendChild(chip);
+      });
+    }
+
+    function createChipElement(tag, isActive) {
+      var chip = document.createElement('span');
+      chip.className = 'tag-chip' + (isActive ? ' active' : '');
+      chip.setAttribute('data-code', tag.code);
+
+      var label = escapeHtml(tag.name);
+      var code  = '<span class="chip-code">' + escapeHtml(tag.code) + '</span>';
+
+      if (isActive) {
+        chip.innerHTML = label + code + '<span class="chip-remove material-icons">close</span>';
+      } else {
+        chip.innerHTML = label + code;
+      }
+
+      chip.onclick = function() {
+        toggleTag(tag.code);
+      };
+
+      return chip;
+    }
+
+    // -----------------------------------------------------------------------
+    // Toggle tag on/off
+    // -----------------------------------------------------------------------
+
+    function toggleTag(code) {
+      var idx = selectedCodes.indexOf(code);
+      if (idx !== -1) {
+        // Remove
+        selectedCodes.splice(idx, 1);
+      } else {
+        // Add
+        selectedCodes.push(code);
+      }
+
+      renderChips();
+    }
+
+    // -----------------------------------------------------------------------
+    // Search filter
+    // -----------------------------------------------------------------------
+
+    function filterChips() {
+      renderAvailableChips();
+    }
+
+    // -----------------------------------------------------------------------
+    // Add New Tag
+    // -----------------------------------------------------------------------
+
+    function toggleNewTagForm() {
+      var form = document.getElementById('newTagForm');
+      form.classList.toggle('visible');
+      if (form.classList.contains('visible')) {
+        document.getElementById('newTagName').value = '';
+        document.getElementById('newTagName').focus();
+      }
+    }
+
+    function createNewTag() {
+      var name = (document.getElementById('newTagName').value || '').trim();
+      if (!name) {
+        showStatus('Please enter a tag name.', 'error');
+        return;
+      }
+
+      var appliesTo = masterSheet;
+
+      // Check for duplicates
+      for (var i = 0; i < allTags.length; i++) {
+        if (allTags[i].name.toLowerCase() === name.toLowerCase()) {
+          showStatus('Tag "' + name + '" already exists.', 'error');
+          return;
+        }
+      }
+
+      showStatus('Creating tag...', 'success');
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            // Add the new tag to our local state
+            var newTag = {
+              code:      result.code,
+              name:      result.name || name,
+              appliesTo: appliesTo
+            };
+            allTags.push(newTag);
+
+            // Auto-select the new tag
+            selectedCodes.push(newTag.code);
+
+            // Hide form, re-render
+            toggleNewTagForm();
+            renderChips();
+            showStatus('Tag "' + name + '" created.', 'success');
+          } else {
+            showStatus((result && result.message) || 'Failed to create tag.', 'error');
+          }
+        })
+        .withFailureHandler(function(err) {
+          showStatus('Error: ' + (err.message || err), 'error');
+        })
+        .createNewTag(name, appliesTo);
+    }
+
+    // -----------------------------------------------------------------------
+    // Save / Cancel
+    // -----------------------------------------------------------------------
+
+    function handleSave() {
+      var codesStr = selectedCodes.join(', ');
+
+      document.getElementById('btnSave').disabled = true;
+      document.getElementById('btnSave').textContent = 'Saving...';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result && result.success) {
+            showStatus('Tags saved.', 'success');
+            setTimeout(function() {
+              google.script.host.close();
+            }, 800);
+          } else {
+            showStatus((result && result.message) || 'Failed to save tags.', 'error');
+            document.getElementById('btnSave').disabled = false;
+            document.getElementById('btnSave').textContent = 'Save';
+          }
+        })
+        .withFailureHandler(function(err) {
+          showStatus('Error: ' + (err.message || err), 'error');
+          document.getElementById('btnSave').disabled = false;
+          document.getElementById('btnSave').textContent = 'Save';
+        })
+        .saveTagSelection(codesStr);
+    }
+
+    function handleCancel() {
+      google.script.host.close();
+    }
+
+    // -----------------------------------------------------------------------
+    // Utility functions
+    // -----------------------------------------------------------------------
+
+    function updateSelectedCount() {
+      var el = document.getElementById('selectedCount');
+      el.textContent = selectedCodes.length + ' selected';
+    }
+
+    function showStatus(message, type) {
+      var el = document.getElementById('statusMsg');
+      el.textContent = message;
+      el.className = 'status-msg ' + type;
+
+      // Auto-hide after 4 seconds
+      if (type === 'success') {
+        setTimeout(function() {
+          el.className = 'status-msg';
+        }, 4000);
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+  </script>
+
+</body>
+</html>

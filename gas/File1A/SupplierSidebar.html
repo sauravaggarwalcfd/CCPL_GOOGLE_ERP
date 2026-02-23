@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+
+  <!-- Google Material Design Lite (CSS only, lightweight for GAS sidebars) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.red-indigo.min.css">
+
+  <style>
+    /* =====================================================================
+     * CCPL ERP — Supplier Selection Sidebar
+     * Width: 300px (standard GAS sidebar)
+     * Theme: Header #CC0000, dark accents
+     * ===================================================================== */
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #333333;
+      background: #FAFAFA;
+      width: 300px;
+      overflow-x: hidden;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
+      background: #CC0000;
+      color: #FFFFFF;
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .sidebar-header h3 {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 0 0 4px 0;
+    }
+
+    .sidebar-header .item-info {
+      font-size: 12px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .sidebar-header .item-code {
+      font-weight: 500;
+      font-family: 'Roboto Mono', monospace;
+    }
+
+    /* --- Content area --- */
+    .sidebar-content {
+      padding: 12px;
+    }
+
+    .supplier-count {
+      font-size: 12px;
+      color: #666666;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #E0E0E0;
+    }
+
+    /* --- No suppliers message --- */
+    .no-suppliers {
+      text-align: center;
+      padding: 40px 16px;
+      color: #999999;
+    }
+
+    .no-suppliers .material-icons {
+      font-size: 48px;
+      color: #CCCCCC;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    /* --- Supplier card --- */
+    .supplier-card {
+      background: #FFFFFF;
+      border: 1px solid #E0E0E0;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      position: relative;
+    }
+
+    .supplier-card:hover {
+      border-color: #CC0000;
+      box-shadow: 0 1px 4px rgba(204, 0, 0, 0.15);
+    }
+
+    .supplier-card.selected {
+      border-color: #CC0000;
+      border-width: 2px;
+      background: #FFF5F5;
+      box-shadow: 0 2px 6px rgba(204, 0, 0, 0.2);
+    }
+
+    .supplier-card.backup-supplier {
+      border-left: 3px solid #FF9800;
+    }
+
+    /* --- Radio + supplier name row --- */
+    .supplier-row-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .supplier-row-header input[type="radio"] {
+      margin-right: 8px;
+      accent-color: #CC0000;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+
+    .supplier-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: #1A1A2E;
+      flex-grow: 1;
+      line-height: 1.3;
+    }
+
+    .supplier-code-badge {
+      font-size: 10px;
+      font-family: 'Roboto Mono', monospace;
+      color: #666666;
+      background: #F0F0F0;
+      padding: 2px 6px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      margin-left: 4px;
+    }
+
+    /* --- Priority badge --- */
+    .priority-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-bottom: 8px;
+    }
+
+    .priority-primary {
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+
+    .priority-secondary {
+      background: #E3F2FD;
+      color: #1565C0;
+    }
+
+    .priority-backup {
+      background: #FFF3E0;
+      color: #E65100;
+    }
+
+    .priority-approved {
+      background: #F3E5F5;
+      color: #7B1FA2;
+    }
+
+    /* --- Backup warning --- */
+    .backup-warning {
+      display: flex;
+      align-items: center;
+      background: #FFF8E1;
+      border: 1px solid #FFE082;
+      border-radius: 3px;
+      padding: 4px 8px;
+      margin-bottom: 8px;
+      font-size: 11px;
+      color: #F57F17;
+    }
+
+    .backup-warning .material-icons {
+      font-size: 16px;
+      margin-right: 4px;
+    }
+
+    /* --- Detail grid --- */
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 12px;
+      font-size: 12px;
+    }
+
+    .detail-label {
+      color: #888888;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .detail-value {
+      font-weight: 500;
+      color: #333333;
+      margin-bottom: 4px;
+    }
+
+    .detail-value.price-highlight {
+      color: #CC0000;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .detail-value.gst-total {
+      color: #1A1A2E;
+      font-weight: 600;
+    }
+
+    /* --- Footer / buttons --- */
+    .sidebar-footer {
+      position: sticky;
+      bottom: 0;
+      background: #FFFFFF;
+      border-top: 1px solid #E0E0E0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .btn {
+      padding: 8px 20px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-cancel {
+      background: #F5F5F5;
+      color: #666666;
+      border: 1px solid #E0E0E0;
+    }
+
+    .btn-cancel:hover:not(:disabled) {
+      background: #EEEEEE;
+    }
+
+    .btn-confirm {
+      background: #CC0000;
+      color: #FFFFFF;
+    }
+
+    .btn-confirm:hover:not(:disabled) {
+      background: #B00000;
+    }
+
+    /* --- Loading spinner --- */
+    .loading {
+      text-align: center;
+      padding: 40px 16px;
+      color: #888888;
+    }
+
+    .spinner {
+      border: 3px solid #F0F0F0;
+      border-top: 3px solid #CC0000;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* --- Status message --- */
+    .status-msg {
+      text-align: center;
+      padding: 8px;
+      font-size: 12px;
+      border-radius: 4px;
+      margin: 8px 0;
+      display: none;
+    }
+
+    .status-msg.success {
+      display: block;
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: #FFEBEE;
+      color: #C62828;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Header -->
+  <div class="sidebar-header">
+    <h3>Select Supplier</h3>
+    <div class="item-info">
+      <span class="item-code" id="headerItemCode"></span><br>
+      <span id="headerItemName"></span>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="sidebar-content">
+
+    <!-- Loading state -->
+    <div id="loadingState" class="loading">
+      <div class="spinner"></div>
+      Loading suppliers...
+    </div>
+
+    <!-- No suppliers state -->
+    <div id="noSuppliersState" class="no-suppliers" style="display:none;">
+      <span class="material-icons">person_off</span>
+      No active suppliers found<br>for this item.
+    </div>
+
+    <!-- Supplier list -->
+    <div id="supplierList" style="display:none;">
+      <div class="supplier-count" id="supplierCount"></div>
+      <div id="supplierCards"></div>
+    </div>
+
+    <!-- Status message -->
+    <div id="statusMsg" class="status-msg"></div>
+  </div>
+
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <button class="btn btn-cancel" id="btnCancel" onclick="handleCancel()">Cancel</button>
+    <button class="btn btn-confirm" id="btnConfirm" onclick="handleConfirm()" disabled>Confirm</button>
+  </div>
+
+  <script>
+    // =========================================================================
+    // Supplier Sidebar — Client-Side Logic
+    // =========================================================================
+
+    /** Template data injected from Module8_ISR.gs */
+    var templateData = JSON.parse(<?= data ?>);
+
+    var itemCode   = templateData.itemCode || '';
+    var itemName   = templateData.itemName || '';
+    var suppliers  = templateData.suppliers || [];
+    var selectedSupplierIndex = -1;
+
+    // -----------------------------------------------------------------------
+    // Initialization
+    // -----------------------------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', function() {
+      init();
+    });
+
+    function init() {
+      // Set header info
+      document.getElementById('headerItemCode').textContent = itemCode;
+      document.getElementById('headerItemName').textContent = itemName || '(Item name not available)';
+
+      // Hide loading
+      document.getElementById('loadingState').style.display = 'none';
+
+      if (suppliers.length === 0) {
+        document.getElementById('noSuppliersState').style.display = 'block';
+        return;
+      }
+
+      // Show supplier list
+      document.getElementById('supplierList').style.display = 'block';
+      document.getElementById('supplierCount').textContent =
+        suppliers.length + ' supplier' + (suppliers.length !== 1 ? 's' : '') + ' found';
+
+      renderSupplierCards();
+    }
+
+    // -----------------------------------------------------------------------
+    // Render supplier cards
+    // -----------------------------------------------------------------------
+
+    function renderSupplierCards() {
+      var container = document.getElementById('supplierCards');
+      container.innerHTML = '';
+
+      for (var i = 0; i < suppliers.length; i++) {
+        var s = suppliers[i];
+        var isPrimary = (s.priority === 'Primary');
+        var isBackup  = (s.priority === 'Backup');
+
+        var card = document.createElement('div');
+        card.className = 'supplier-card' +
+                         (isBackup ? ' backup-supplier' : '') +
+                         (isPrimary ? ' selected' : '');
+        card.setAttribute('data-index', i);
+        card.onclick = (function(idx) {
+          return function() { selectSupplier(idx); };
+        })(i);
+
+        // Priority badge class
+        var priorityClass = 'priority-' + s.priority.toLowerCase();
+
+        // Format currency
+        var unitPriceStr  = formatCurrency(s.unitPrice);
+        var inclGSTStr    = formatCurrency(s.priceInclGST);
+
+        var html = '';
+
+        // Radio + name + code
+        html += '<div class="supplier-row-header">';
+        html += '  <input type="radio" name="supplierRadio" value="' + i + '"' +
+                    (isPrimary ? ' checked' : '') + ' onclick="event.stopPropagation(); selectSupplier(' + i + ');">';
+        html += '  <span class="supplier-name">' + escapeHtml(s.supplierName) + '</span>';
+        html += '  <span class="supplier-code-badge">' + escapeHtml(s.supplierCode) + '</span>';
+        html += '</div>';
+
+        // Priority badge
+        html += '<span class="priority-badge ' + priorityClass + '">' + escapeHtml(s.priority) + '</span>';
+
+        // Backup warning
+        if (isBackup) {
+          html += '<div class="backup-warning">';
+          html += '  <span class="material-icons">warning</span>';
+          html += '  Emergency supplier only';
+          html += '</div>';
+        }
+
+        // Detail grid
+        html += '<div class="detail-grid">';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">Unit Price</div>';
+        html += '    <div class="detail-value price-highlight">' + unitPriceStr + '</div>';
+        html += '  </div>';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">GST %</div>';
+        html += '    <div class="detail-value">' + s.gstPercent + '%</div>';
+        html += '  </div>';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">Price incl GST</div>';
+        html += '    <div class="detail-value gst-total">' + inclGSTStr + '</div>';
+        html += '  </div>';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">Lead Time</div>';
+        html += '    <div class="detail-value">' + s.leadTime + ' days</div>';
+        html += '  </div>';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">MOQ</div>';
+        html += '    <div class="detail-value">' + s.moq + ' ' + escapeHtml(s.uom) + '</div>';
+        html += '  </div>';
+
+        html += '  <div>';
+        html += '    <div class="detail-label">UOM</div>';
+        html += '    <div class="detail-value">' + escapeHtml(s.uom) + '</div>';
+        html += '  </div>';
+
+        html += '</div>'; // end detail-grid
+
+        card.innerHTML = html;
+        container.appendChild(card);
+
+        // Pre-select Primary supplier
+        if (isPrimary && selectedSupplierIndex === -1) {
+          selectedSupplierIndex = i;
+        }
+      }
+
+      // Enable confirm button if a supplier is pre-selected
+      if (selectedSupplierIndex >= 0) {
+        document.getElementById('btnConfirm').disabled = false;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Selection handling
+    // -----------------------------------------------------------------------
+
+    function selectSupplier(index) {
+      // Deselect all cards
+      var cards = document.querySelectorAll('.supplier-card');
+      for (var i = 0; i < cards.length; i++) {
+        cards[i].classList.remove('selected');
+      }
+
+      // Deselect all radios
+      var radios = document.querySelectorAll('input[name="supplierRadio"]');
+      for (var i = 0; i < radios.length; i++) {
+        radios[i].checked = false;
+      }
+
+      // Select the clicked card
+      var targetCard = document.querySelector('.supplier-card[data-index="' + index + '"]');
+      if (targetCard) {
+        targetCard.classList.add('selected');
+      }
+
+      var targetRadio = document.querySelector('input[name="supplierRadio"][value="' + index + '"]');
+      if (targetRadio) {
+        targetRadio.checked = true;
+      }
+
+      selectedSupplierIndex = index;
+      document.getElementById('btnConfirm').disabled = false;
+    }
+
+    // -----------------------------------------------------------------------
+    // Confirm / Cancel
+    // -----------------------------------------------------------------------
+
+    function handleConfirm() {
+      if (selectedSupplierIndex < 0 || selectedSupplierIndex >= suppliers.length) {
+        showStatus('Please select a supplier.', 'error');
+        return;
+      }
+
+      var s = suppliers[selectedSupplierIndex];
+
+      // Disable buttons during submission
+      document.getElementById('btnConfirm').disabled = true;
+      document.getElementById('btnCancel').disabled = true;
+      document.getElementById('btnConfirm').textContent = 'Saving...';
+
+      var selectionData = {
+        rateCode:         s.rateCode,
+        itemCode:         s.itemCode,
+        supplierCode:     s.supplierCode,
+        supplierName:     s.supplierName,
+        supplierItemName: s.supplierItemName,
+        supplierItemCode: s.supplierItemCode,
+        unitPrice:        s.unitPrice,
+        gstPercent:       s.gstPercent,
+        priceInclGST:     s.priceInclGST,
+        uom:              s.uom,
+        moq:              s.moq,
+        leadTime:         s.leadTime,
+        priority:         s.priority
+      };
+
+      google.script.run
+        .withSuccessHandler(onConfirmSuccess)
+        .withFailureHandler(onConfirmFailure)
+        .confirmSupplierSelection(selectionData);
+    }
+
+    function onConfirmSuccess(result) {
+      if (result && result.success) {
+        showStatus(result.message || 'Supplier selected.', 'success');
+        setTimeout(function() {
+          google.script.host.close();
+        }, 1200);
+      } else {
+        showStatus((result && result.message) || 'Unknown error.', 'error');
+        document.getElementById('btnConfirm').disabled = false;
+        document.getElementById('btnCancel').disabled = false;
+        document.getElementById('btnConfirm').textContent = 'Confirm';
+      }
+    }
+
+    function onConfirmFailure(err) {
+      showStatus('Error: ' + (err.message || err), 'error');
+      document.getElementById('btnConfirm').disabled = false;
+      document.getElementById('btnCancel').disabled = false;
+      document.getElementById('btnConfirm').textContent = 'Confirm';
+    }
+
+    function handleCancel() {
+      google.script.host.close();
+    }
+
+    // -----------------------------------------------------------------------
+    // Utility functions
+    // -----------------------------------------------------------------------
+
+    function showStatus(message, type) {
+      var el = document.getElementById('statusMsg');
+      el.textContent = message;
+      el.className = 'status-msg ' + type;
+    }
+
+    function formatCurrency(value) {
+      var num = parseFloat(value) || 0;
+      return '\u20B9' + num.toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
+    }
+  </script>
+
+</body>
+</html>
