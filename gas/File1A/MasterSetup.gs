@@ -2,10 +2,11 @@
  * ============================================================
  * CONFIDENCE CLOTHING — ERP MASTER SETUP
  * ============================================================
- * One-click setup for ALL 3 Google Sheet files:
- *   FILE 1A: Items Master   (22 sheets)
- *   FILE 1B: Factory Master  (18 sheets)
- *   FILE 1C: Finance Master  (6 sheets)
+ * One-click setup for ALL 4 Google Sheet files:
+ *   FILE 1A: Items Master      (22 sheets)
+ *   FILE 1B: Factory Master    (23 sheets)
+ *   FILE 1C: Finance Master    (6 sheets)
+ *   FILE 2:  Procurement Master (5 sheets)
  *
  * Deletes ALL old sheets, then creates fresh sheets with
  * headers, descriptions, formatting, data validation, and
@@ -14,16 +15,17 @@
  */
 
 /* ───────────────────────────────────────────────────────────
-   MASTER SETUP — Run this to set up ALL 3 files at once
+   MASTER SETUP — Run this to set up ALL 4 files at once
    ─────────────────────────────────────────────────────────── */
 function masterSetupAll() {
   var ui = SpreadsheetApp.getUi();
   var result = ui.alert(
-    '⚙ MASTER SETUP — All 3 Files',
+    '⚙ MASTER SETUP — All 4 Files',
     'This will DELETE all existing sheets and create fresh sheets in:\n\n' +
     '• FILE 1A (Items Master) — 22 sheets\n' +
-    '• FILE 1B (Factory Master) — 18 sheets\n' +
-    '• FILE 1C (Finance Master) — 6 sheets\n\n' +
+    '• FILE 1B (Factory Master) — 23 sheets\n' +
+    '• FILE 1C (Finance Master) — 6 sheets\n' +
+    '• FILE 2  (Procurement Master) — 5 sheets\n\n' +
     '⚠ ALL existing data will be lost!\n\n' +
     'Continue?',
     ui.ButtonSet.YES_NO
@@ -33,7 +35,7 @@ function masterSetupAll() {
   var startTime = new Date();
   Logger.log('=== MASTER SETUP START: ' + startTime.toISOString() + ' ===');
 
-  // Setup FILE 1C first (Finance — referenced by 1A and 1B)
+  // Setup FILE 1C first (Finance — referenced by 1A, 1B, and F2)
   try {
     Logger.log('--- Setting up FILE 1C (Finance Master) ---');
     var ss1C = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1C);
@@ -61,7 +63,7 @@ function masterSetupAll() {
     return;
   }
 
-  // Setup FILE 1A last (Items — references 1B and 1C)
+  // Setup FILE 1A (Items — references 1B and 1C)
   try {
     Logger.log('--- Setting up FILE 1A (Items Master) ---');
     var ss1A = SpreadsheetApp.getActiveSpreadsheet();
@@ -75,12 +77,27 @@ function masterSetupAll() {
     return;
   }
 
+  // Setup FILE 2 last (Procurement — references 1B and 1C)
+  try {
+    Logger.log('--- Setting up FILE 2 (Procurement Master) ---');
+    var ss2 = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_2);
+    deleteAllOldSheets_(ss2);
+    setupAllSheets_F2(ss2);
+    SpreadsheetApp.flush();
+    Logger.log('FILE 2 setup complete.');
+  } catch (err) {
+    Logger.log('ERROR setting up FILE 2: ' + err.message);
+    ui.alert('Error setting up FILE 2: ' + err.message);
+    return;
+  }
+
   var elapsed = ((new Date() - startTime) / 1000).toFixed(1);
   var msg = 'MASTER SETUP COMPLETE!\n\n' +
     '• FILE 1A: 22 sheets created\n' +
-    '• FILE 1B: 18 sheets created\n' +
-    '• FILE 1C: 6 sheets created\n\n' +
-    'Total: 46 sheets in ' + elapsed + ' seconds.';
+    '• FILE 1B: 23 sheets created\n' +
+    '• FILE 1C: 6 sheets created\n' +
+    '• FILE 2:  5 sheets created\n\n' +
+    'Total: 56 sheets in ' + elapsed + ' seconds.';
   Logger.log(msg);
   ui.alert(msg);
 }
@@ -101,7 +118,7 @@ function setupFile1B_Only() {
   deleteAllOldSheets_(ss);
   setupAllSheets_1B(ss);
   SpreadsheetApp.flush();
-  SpreadsheetApp.getUi().alert('FILE 1B setup complete — 18 sheets created.');
+  SpreadsheetApp.getUi().alert('FILE 1B setup complete — 23 sheets created.');
 }
 
 function setupFile1C_Only() {
@@ -110,6 +127,14 @@ function setupFile1C_Only() {
   setupAllSheets_1C(ss);
   SpreadsheetApp.flush();
   SpreadsheetApp.getUi().alert('FILE 1C setup complete — 6 sheets created.');
+}
+
+function setupFile2_Only() {
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_2);
+  deleteAllOldSheets_(ss);
+  setupAllSheets_F2(ss);
+  SpreadsheetApp.flush();
+  SpreadsheetApp.getUi().alert('FILE 2 setup complete — 5 sheets created.');
 }
 
 /* ───────────────────────────────────────────────────────────

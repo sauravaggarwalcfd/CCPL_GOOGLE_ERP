@@ -1,0 +1,1117 @@
+<script>
+/* ============================================================
+   CC ERP — Client-Side JavaScript
+   Vanilla JS + DOM — Matches SheetSetup_F2.gs column structure
+   ============================================================ */
+
+// ─── GLOBAL STATE ────────────────────────────────────────────
+var APP = {
+  user: null, modules: [], lists: {}, lookups: {},
+  preferences: {}, activeModule: 'dashboard', activePage: 'dashboard',
+  poList: [], grnList: [], currentPO: null, currentGRN: null,
+  unsavedChanges: false, heartbeatInterval: null, notifications: []
+};
+
+// ─── INIT ────────────────────────────────────────────────────
+function initApp() {
+  google.script.run
+    .withSuccessHandler(onBootstrapSuccess)
+    .withFailureHandler(onBootstrapError)
+    .getUIBootstrap();
+}
+
+function onBootstrapSuccess(data) {
+  APP.user = data.user;
+  APP.modules = data.modules;
+  APP.lists = data.lists;
+  APP.lookups = data.lookups;
+  APP.preferences = data.preferences;
+
+  if (data.preferences.theme) {
+    applyThemeMode(data.preferences.theme.mode || 'light');
+    applyAccent(data.preferences.theme.accent || 'orange');
+  }
+
+  renderSidebar();
+  updateUserInfo();
+  updateStatusBar('Ready', true);
+  navigateTo('dashboard', 'dashboard');
+  sendHeartbeat();
+  APP.heartbeatInterval = setInterval(sendHeartbeat, 30000);
+  loadNotifications();
+  document.addEventListener('keydown', handleKeyboard);
+}
+
+function onBootstrapError(err) {
+  $('contentArea').innerHTML =
+    '<div class="card p-4 text-center"><h3 style="color:var(--danger);">Failed to load ERP</h3>' +
+    '<p class="text-muted mt-2">' + (err.message || 'Unknown error') + '</p>' +
+    '<button class="btn btn-primary mt-4" onclick="initApp()">Retry</button></div>';
+  updateStatusBar('Connection error', false);
+}
+
+// ─── SIDEBAR ─────────────────────────────────────────────────
+function renderSidebar() {
+  var nav = $('sidebarNav');
+  var html = '';
+  // Add dashboard first
+  var dashActive = APP.activeModule === 'dashboard' ? ' active' : '';
+  html += '<div class="nav-item' + dashActive + '" onclick="navigateTo(\'dashboard\',\'dashboard\')">' +
+    '<span class="nav-icon">&#x1F4CA;</span><span>Dashboard</span></div>';
+
+  // Procurement sub-pages
+  var procActive = APP.activeModule === 'procurement' ? ' active' : '';
+  html += '<div class="nav-item' + procActive + '" onclick="navigateTo(\'procurement\',\'po_list\')">' +
+    '<span class="nav-icon">&#x1F4E6;</span><span>Procurement</span></div>';
+
+  // Other modules
+  for (var i = 0; i < APP.modules.length; i++) {
+    var m = APP.modules[i];
+    if (m.id === 'procurement' || m.id === 'dashboard') continue;
+    var active = m.id === APP.activeModule ? ' active' : '';
+    html += '<div class="nav-item' + active + '" onclick="onModuleClick(\'' + m.id + '\')">' +
+      '<span class="nav-icon">' + getModuleIcon(m.id) + '</span><span>' + m.name + '</span></div>';
+  }
+  nav.innerHTML = html;
+}
+
+function getModuleIcon(id) {
+  var icons = {
+    procurement:'&#x1F4E6;', production:'&#x1F3ED;', inventory:'&#x1F4E6;',
+    quality:'&#x1F6E1;', sales:'&#x1F4C8;', finance:'&#x20B9;',
+    masters:'&#x1F5C4;', dashboard:'&#x1F4CA;'
+  };
+  return icons[id] || '&#x25CF;';
+}
+
+function onModuleClick(moduleId) {
+  if (APP.unsavedChanges && !confirm('You have unsaved changes. Discard?')) return;
+  APP.unsavedChanges = false;
+  APP.activeModule = moduleId;
+  renderSidebar();
+  setPageTitle(moduleId.charAt(0).toUpperCase() + moduleId.slice(1));
+  $('contentArea').innerHTML =
+    '<div class="card p-4 text-center text-muted"><p>Module "' + moduleId + '" is under development.</p></div>';
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────
+function navigateTo(module, page, params) {
+  if (APP.unsavedChanges && !confirm('Unsaved changes. Discard?')) return;
+  APP.unsavedChanges = false;
+  APP.activeModule = module;
+  APP.activePage = page;
+  renderSidebar();
+
+  if (module === 'dashboard') renderDashboard();
+  else if (module === 'procurement') {
+    if (page === 'po_list')       loadPOList();
+    else if (page === 'po_form')  renderPOForm(params);
+    else if (page === 'grn_list') loadGRNList();
+    else if (page === 'grn_form') renderGRNForm(params);
+  }
+}
+
+function setPageTitle(t) { $('pageTitle').textContent = t; }
+
+// ═══════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+function renderDashboard() {
+  setPageTitle('Dashboard');
+  var content = $('contentArea');
+
+  // Summary cards
+  var html = '<div class="grid grid-4 mb-4">';
+  html += dashCard('&#x1F4CB;', 'Purchase Orders', APP.poList.length || '-', 'var(--accent)');
+  html += dashCard('&#x1F4E5;', 'GRN Entries', APP.grnList.length || '-', 'var(--success)');
+  html += dashCard('&#x23F3;', 'Pending Approval', '-', 'var(--warning)');
+  html += dashCard('&#x1F464;', APP.user ? APP.user.name : 'User', APP.user ? APP.user.role : '-', 'var(--info)');
+  html += '</div>';
+
+  // Quick Actions
+  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">Quick Actions</span></div>' +
+    '<div class="flex gap-2">' +
+    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'po_form\')">+ New PO</button>' +
+    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'grn_form\')">+ New GRN</button>' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">View PO List</button>' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">View GRN List</button>' +
+    '</div></div>';
+
+  // Recent POs
+  html += '<div class="grid grid-2">';
+  html += '<div class="card"><div class="card-header"><span class="card-title">Recent Purchase Orders</span></div>';
+  html += '<div id="dashRecentPO" class="text-center text-muted p-2">Loading...</div></div>';
+  html += '<div class="card"><div class="card-header"><span class="card-title">Recent GRNs</span></div>';
+  html += '<div id="dashRecentGRN" class="text-center text-muted p-2">Loading...</div></div>';
+  html += '</div>';
+
+  content.innerHTML = html;
+
+  // Load recent data
+  google.script.run.withSuccessHandler(function(data) {
+    APP.poList = data || [];
+    var el = $('dashRecentPO');
+    if (!el) return;
+    if (data.length === 0) { el.innerHTML = '<span class="text-muted">No POs yet</span>'; return; }
+    var t = '<table class="data-table"><thead><tr><th>PO Number</th><th>Supplier</th><th>Status</th><th>Total</th></tr></thead><tbody>';
+    var max = Math.min(data.length, 5);
+    for (var i = 0; i < max; i++) {
+      var p = data[i];
+      t += '<tr class="clickable" onclick="navigateTo(\'procurement\',\'po_form\',{poCode:\'' + esc(p['# PO Number']||'') + '\'})">' +
+        '<td class="font-mono text-accent">' + esc(p['# PO Number']||'') + '</td>' +
+        '<td>' + esc(p['\u2190 Supplier Name']||'') + '</td>' +
+        '<td>' + statusBadge(p['Status']||'Draft') + '</td>' +
+        '<td class="text-right font-mono">' + fmtCur(p['\u2211 Grand Total']||'') + '</td></tr>';
+    }
+    t += '</tbody></table>';
+    el.innerHTML = t;
+
+    // Count pending
+    var pending = 0;
+    for (var j = 0; j < data.length; j++) { if ((data[j]['Status']||'') === 'Submitted') pending++; }
+    var pc = document.querySelector('.dash-card-pending');
+    if (pc) pc.textContent = pending;
+  }).getPOList();
+
+  google.script.run.withSuccessHandler(function(data) {
+    APP.grnList = data || [];
+    var el = $('dashRecentGRN');
+    if (!el) return;
+    if (data.length === 0) { el.innerHTML = '<span class="text-muted">No GRNs yet</span>'; return; }
+    var t = '<table class="data-table"><thead><tr><th>GRN Number</th><th>PO</th><th>Supplier</th><th>Status</th></tr></thead><tbody>';
+    var max = Math.min(data.length, 5);
+    for (var i = 0; i < max; i++) {
+      var g = data[i];
+      t += '<tr class="clickable" onclick="navigateTo(\'procurement\',\'grn_form\',{grnCode:\'' + esc(g['# GRN Number']||'') + '\'})">' +
+        '<td class="font-mono text-accent">' + esc(g['# GRN Number']||'') + '</td>' +
+        '<td class="font-mono">' + esc(g['\u2192 PO Number']||'') + '</td>' +
+        '<td>' + esc(g['\u2190 Supplier Name']||'') + '</td>' +
+        '<td>' + statusBadge(g['Status']||'Draft') + '</td></tr>';
+    }
+    t += '</tbody></table>';
+    el.innerHTML = t;
+  }).getGRNList();
+}
+
+function dashCard(icon, title, value, color) {
+  var cls = title === 'Pending Approval' ? ' dash-card-pending' : '';
+  return '<div class="card" style="border-top:3px solid ' + color + ';">' +
+    '<div class="flex items-center gap-2 mb-2"><span style="font-size:20px;">' + icon + '</span>' +
+    '<span class="text-sm text-muted">' + title + '</span></div>' +
+    '<div class="font-bold' + cls + '" style="font-size:24px;">' + value + '</div></div>';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  PO LIST — Matches PO_MASTER (21 cols)
+// ═══════════════════════════════════════════════════════════════
+function loadPOList() {
+  setPageTitle('Purchase Orders');
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(d) { APP.poList = d || []; renderPOList(); })
+    .withFailureHandler(function(e) { showError('Failed to load POs: ' + e.message); })
+    .getPOList();
+}
+
+function renderPOList() {
+  var content = $('contentArea');
+  var html = '<div class="card">' +
+    '<div class="card-header"><div class="flex items-center gap-2">' +
+    '<span class="card-title">Purchase Orders (' + APP.poList.length + ')</span></div>' +
+    '<div class="flex gap-2">' +
+    '<div class="search-bar"><input type="text" id="poSearch" placeholder="Search POs..." oninput="filterTable(\'poTable\',this.value)"></div>' +
+    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'po_form\')">+ New PO</button>' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">GRN List</button>' +
+    '<button class="btn" onclick="navigateTo(\'dashboard\',\'dashboard\')">Dashboard</button></div></div>';
+
+  // Table headers matching PO_MASTER columns
+  html += '<div style="overflow-x:auto;"><table class="data-table" id="poTable"><thead><tr>' +
+    '<th>PO Number</th><th>PO Date</th><th>Season</th><th>PO Type</th>' +
+    '<th>Supplier</th><th>Currency</th><th>Delivery Date</th>' +
+    '<th>Total Lines</th><th class="text-right">Grand Total</th>' +
+    '<th>Status</th><th>GRN Status</th><th>Created By</th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < APP.poList.length; i++) {
+    var po = APP.poList[i];
+    html += '<tr class="clickable" onclick="openPO(\'' + esc(po['# PO Number']||'') + '\')">' +
+      '<td class="font-mono text-accent">' + esc(po['# PO Number']||'') + '</td>' +
+      '<td>' + fmtDate(po['\u26A0 PO Date']||'') + '</td>' +
+      '<td>' + esc(po['Season']||'') + '</td>' +
+      '<td>' + esc(po['PO Type']||'') + '</td>' +
+      '<td class="truncate" style="max-width:160px;">' + esc(po['\u2190 Supplier Name']||'') + '</td>' +
+      '<td>' + esc(po['Currency']||'') + '</td>' +
+      '<td>' + fmtDate(po['Delivery Date']||'') + '</td>' +
+      '<td class="text-center">' + (po['\u2211 Total Lines']||'-') + '</td>' +
+      '<td class="text-right font-mono">' + fmtCur(po['\u2211 Grand Total']||'') + '</td>' +
+      '<td>' + statusBadge(po['Status']||'Draft') + '</td>' +
+      '<td>' + (po['GRN Status'] ? statusBadge(po['GRN Status']) : '-') + '</td>' +
+      '<td class="text-xs">' + esc(po['Created By']||'') + '</td></tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  content.innerHTML = html;
+}
+
+function openPO(poCode) { navigateTo('procurement', 'po_form', { poCode: poCode }); }
+
+// ═══════════════════════════════════════════════════════════════
+//  PO FORM — All 21 PO_MASTER columns
+// ═══════════════════════════════════════════════════════════════
+function renderPOForm(params) {
+  params = params || {};
+  var isEdit = !!params.poCode;
+  setPageTitle(isEdit ? 'Edit PO: ' + params.poCode : 'New Purchase Order');
+
+  if (isEdit) {
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(data) {
+        APP.currentPO = data;
+        buildPOForm(data.po || {}, data.lines || [], params.poCode);
+      })
+      .withFailureHandler(function(err) { showError('Failed to load PO: ' + err.message); })
+      .getPODetail(params.poCode);
+  } else {
+    APP.currentPO = null;
+    buildPOForm({}, [], '');
+  }
+}
+
+function buildPOForm(po, lines, poCode) {
+  var suppliers = APP.lookups.suppliers || [];
+  var payTerms = APP.lookups.paymentTerms || [];
+  var content = $('contentArea');
+
+  // ── Action Bar ──
+  var html = '<div class="flex gap-2 mb-4 flex-wrap">' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">&larr; Back to List</button>' +
+    '<button class="btn btn-primary" onclick="savePOForm()">Save PO</button>';
+  if (poCode && po['Status'] === 'Draft')
+    html += '<button class="btn" style="background:var(--info);color:#fff;" onclick="submitPOAction(\'' + esc(poCode) + '\')">Submit for Approval</button>';
+  if (poCode && (po['Status'] === 'Submitted' || po['Status'] === 'Under Review'))
+    html += '<button class="btn" style="background:var(--success);color:#fff;" onclick="approvePOAction(\'' + esc(poCode) + '\')">Approve</button>';
+  if (poCode && po['Status'] !== 'Cancelled')
+    html += '<button class="btn" style="background:var(--danger);color:#fff;" onclick="cancelPOAction(\'' + esc(poCode) + '\')">Cancel PO</button>';
+  if (poCode) {
+    html += '<button class="btn" onclick="exportPO(\'' + esc(poCode) + '\',\'pdf\')">Export PDF</button>';
+    html += '<button class="btn" onclick="exportPO(\'' + esc(poCode) + '\',\'sheets\')">Export Sheets</button>';
+  }
+  html += '</div>';
+
+  // ── PO Header Card (matching PO_MASTER 21 cols) ──
+  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">PO Details</span>';
+  if (poCode) html += '<span class="badge badge-submitted font-mono">' + esc(poCode) + '</span>';
+  html += '</div>';
+
+  // Row 1: Core fields
+  html += '<div class="grid grid-4">';
+  html += fieldDate('\u26A0 PO Date', 'poDate', po['\u26A0 PO Date'] || todayISO());
+  html += fieldSelect('Season', 'poSeason', listOpts(APP.lists.seasonList), po['Season'] || '');
+  html += fieldSelect('PO Type', 'poType', listOpts(APP.lists.poTypeList), po['PO Type'] || '');
+  html += fieldSelect('Currency', 'poCurrency', listOpts(APP.lists.currencyList), po['Currency'] || 'INR');
+  html += '</div>';
+
+  // Row 2: Supplier + Payment
+  html += '<div class="grid grid-4">';
+  html += fieldSelect('\u2192 Supplier Code', 'poSupplier',
+    suppliers.map(function(s) { return { value: s.code, label: s.code + ' - ' + s.name }; }),
+    po['\u2192 Supplier Code'] || '');
+  html += fieldReadonly('\u2190 Supplier Name', po['\u2190 Supplier Name'] || '(auto)');
+  html += fieldSelect('\u2192 Payment Terms', 'poPayTerms',
+    payTerms.map(function(pt) { return { value: pt.code, label: pt.code + ' - ' + pt.name }; }),
+    po['\u2192 Payment Terms'] || '');
+  html += fieldReadonly('\u2190 Payment Terms Name', po['\u2190 Payment Terms Name'] || '(auto)');
+  html += '</div>';
+
+  // Row 3: Dates & Address
+  html += '<div class="grid grid-4">';
+  html += fieldDate('Delivery Date', 'poDeliveryDate', po['Delivery Date'] || '');
+  html += fieldText('Delivery Address', 'poDeliveryAddr', po['Delivery Address'] || '');
+  html += fieldText('Remarks', 'poRemarks', po['Remarks'] || '');
+  html += fieldText('Physical PO Image', 'poPOImage', po['Physical PO Image'] || '');
+  html += '</div>';
+
+  // Row 4: Status + Auto fields
+  html += '<div class="grid grid-4">';
+  html += fieldSelect('Status', 'poStatus', listOpts(APP.lists.poStatusList), po['Status'] || 'Draft');
+  html += fieldReadonly('GRN Status', po['GRN Status'] || 'None');
+  html += fieldReadonly('Created By', po['Created By'] || (APP.user ? APP.user.email : ''));
+  html += fieldReadonly('Created Date', fmtDate(po['Created Date'] || ''));
+  html += '</div>';
+
+  // Row 5: Totals (auto-calculated, read-only)
+  html += '<div class="grid grid-4" style="background:var(--bg-secondary);padding:12px;border-radius:var(--radius-md);margin-top:8px;">';
+  html += fieldReadonly('\u2211 Total Lines', '<span id="poTotalLines">' + (po['\u2211 Total Lines']||'0') + '</span>');
+  html += fieldReadonly('\u2211 Base Value', '<span id="poBaseValue" class="font-mono">' + fmtCur(po['\u2211 Base Value']||0) + '</span>');
+  html += fieldReadonly('\u2211 Total GST', '<span id="poTotalGST" class="font-mono">' + fmtCur(po['\u2211 Total GST']||0) + '</span>');
+  html += fieldReadonly('\u2211 Grand Total', '<span id="poGrandTotal" class="font-mono font-bold text-accent" style="font-size:16px;">' + fmtCur(po['\u2211 Grand Total']||0) + '</span>');
+  html += '</div>';
+
+  html += '</div>'; // end card
+
+  // ── Line Items Card (matching PO_LINE_ITEMS 20 cols) ──
+  html += '<div class="card"><div class="card-header"><span class="card-title">PO Line Items</span>' +
+    '<button class="btn btn-sm btn-primary" onclick="addPOLine()">+ Add Line</button></div>';
+
+  html += '<div style="overflow-x:auto;"><table class="data-table" id="poLineTable"><thead><tr>' +
+    '<th>#</th><th>Item Master</th><th>Item Code</th><th>Item Name</th><th>UOM</th>' +
+    '<th>HSN</th><th>GST%</th><th>Qty</th><th>Unit Price</th><th>Disc%</th>' +
+    '<th>Base Value</th><th>Line GST</th><th>Line Total</th>' +
+    '<th>Received</th><th>Pending</th><th>Line Status</th><th>Notes</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < lines.length; i++) {
+    html += renderPOLineRow(i, lines[i]);
+  }
+  html += '</tbody></table></div></div>';
+
+  content.innerHTML = html;
+  content.dataset.poCode = poCode || '';
+  recalcPOTotals();
+}
+
+function renderPOLineRow(idx, ln) {
+  ln = ln || {};
+  var itemMaster = ln['Item Master'] || '';
+  var itemCode   = ln['\u2192 Item Code'] || '';
+  var itemName   = ln['\u2190 Item Name'] || '';
+  var uom        = ln['\u2190 UOM'] || '';
+  var hsn        = ln['\u2190 HSN Code'] || '';
+  var gst        = ln['\u2190 GST %'] || '';
+  var qty        = ln['\u26A0 Quantity'] || '';
+  var price      = ln['\u26A0 Unit Price'] || '';
+  var disc       = ln['Discount %'] || '0';
+  var baseVal    = ln['\u2211 Line Base Value'] || '';
+  var lineGst    = ln['\u2211 Line GST'] || '';
+  var lineTotal  = ln['\u2211 Line Total'] || '';
+  var recvQty    = ln['\u2190 Received Qty'] || '0';
+  var pendQty    = ln['\u2211 Pending Qty'] || '';
+  var lineStatus = ln['Line Status'] || '';
+  var notes      = ln['Notes'] || '';
+
+  return '<tr data-line="' + idx + '">' +
+    '<td>' + (idx+1) + '</td>' +
+    '<td>' + selInline('itemMaster', APP.lists.itemMasterList||[], itemMaster, '100px') + '</td>' +
+    '<td>' + inp('itemCode', itemCode, '110px', 'font-mono') + '</td>' +
+    '<td>' + inp('itemName', itemName, '150px', '') + '</td>' +
+    '<td>' + inp('uom', uom, '55px', '', true) + '</td>' +
+    '<td>' + inp('hsn', hsn, '70px', 'font-mono', true) + '</td>' +
+    '<td>' + inp('gst', gst, '50px', 'text-right', true) + '</td>' +
+    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + qty + '" data-field="qty" oninput="recalcPOTotals()"></td>' +
+    '<td><input class="form-input text-right" type="number" step="0.01" style="width:80px;" value="' + price + '" data-field="price" oninput="recalcPOTotals()"></td>' +
+    '<td><input class="form-input text-right" type="number" step="0.01" style="width:55px;" value="' + disc + '" data-field="disc" oninput="recalcPOTotals()"></td>' +
+    '<td class="text-right font-mono ln-base">' + fmtCur(baseVal) + '</td>' +
+    '<td class="text-right font-mono ln-gst">' + fmtCur(lineGst) + '</td>' +
+    '<td class="text-right font-mono font-bold ln-total">' + fmtCur(lineTotal) + '</td>' +
+    '<td class="text-center">' + recvQty + '</td>' +
+    '<td class="text-center">' + (pendQty||'-') + '</td>' +
+    '<td>' + (lineStatus ? statusBadge(lineStatus) : '-') + '</td>' +
+    '<td>' + inp('notes', notes, '100px', '') + '</td>' +
+    '<td><button class="btn btn-sm btn-danger" onclick="removePOLine(' + idx + ')">&#x2715;</button></td></tr>';
+}
+
+function addPOLine() {
+  var tbody = document.querySelector('#poLineTable tbody');
+  tbody.insertAdjacentHTML('beforeend', renderPOLineRow(tbody.children.length, {}));
+  APP.unsavedChanges = true;
+}
+
+function removePOLine(idx) {
+  var row = document.querySelector('#poLineTable tbody tr[data-line="' + idx + '"]');
+  if (row) row.remove();
+  recalcPOTotals();
+  APP.unsavedChanges = true;
+}
+
+function recalcPOTotals() {
+  var rows = document.querySelectorAll('#poLineTable tbody tr');
+  var subTotal = 0, gstTotal = 0, lineCount = rows.length;
+
+  for (var i = 0; i < rows.length; i++) {
+    var qty   = pf(rows[i].querySelector('[data-field="qty"]'));
+    var price = pf(rows[i].querySelector('[data-field="price"]'));
+    var disc  = pf(rows[i].querySelector('[data-field="disc"]'));
+    var gstPct= pf(rows[i].querySelector('[data-field="gst"]') || rows[i].querySelector('input[data-field="gst"]'));
+
+    // Read GST from the readonly field if available
+    if (!gstPct) {
+      var gstInput = rows[i].querySelector('input[data-ro="gst"]');
+      if (gstInput) gstPct = parseFloat(gstInput.value) || 0;
+    }
+
+    var lineBase = qty * price * (1 - disc / 100);
+    var lineGst  = lineBase * (gstPct || 0) / 100;
+    var lineTotal = lineBase + lineGst;
+
+    var b = rows[i].querySelector('.ln-base');
+    var g = rows[i].querySelector('.ln-gst');
+    var t = rows[i].querySelector('.ln-total');
+    if (b) b.textContent = fmtCur(lineBase);
+    if (g) g.textContent = fmtCur(lineGst);
+    if (t) t.textContent = fmtCur(lineTotal);
+    subTotal += lineBase;
+    gstTotal += lineGst;
+  }
+
+  setText('poTotalLines', lineCount);
+  setText('poBaseValue', fmtCur(subTotal));
+  setText('poTotalGST', fmtCur(gstTotal));
+  setText('poGrandTotal', fmtCur(subTotal + gstTotal));
+}
+
+// ── PO Save ──
+function savePOForm() {
+  var poCode = $('contentArea').dataset.poCode || '';
+  var poData = {
+    '\u26A0 PO Date':        val('poDate'),
+    'Season':                val('poSeason'),
+    'PO Type':               val('poType'),
+    '\u2192 Supplier Code':  val('poSupplier'),
+    '\u2192 Payment Terms':  val('poPayTerms'),
+    'Currency':              val('poCurrency'),
+    'Delivery Date':         val('poDeliveryDate'),
+    'Delivery Address':      val('poDeliveryAddr'),
+    'Remarks':               val('poRemarks'),
+    'Physical PO Image':     val('poPOImage'),
+    'Status':                val('poStatus'),
+    'Created By':            poCode ? '' : (APP.user ? APP.user.email : ''),
+    'Created Date':          poCode ? '' : new Date().toISOString()
+  };
+  poData.poCode = poCode;
+
+  var lineItems = collectPOLines();
+
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r.success) {
+        APP.unsavedChanges = false;
+        showToast('success', r.message);
+        navigateTo('procurement', 'po_form', { poCode: r.poCode });
+      } else {
+        showToast('error', r.message);
+        buildPOForm(poData, lineItems, poCode);
+      }
+    })
+    .withFailureHandler(function(err) { showToast('error', 'Save failed: ' + err.message); })
+    .savePO(poData, lineItems);
+}
+
+function collectPOLines() {
+  var rows = document.querySelectorAll('#poLineTable tbody tr');
+  var lines = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    lines.push({
+      'Item Master':      r.querySelector('select') ? r.querySelector('select').value : '',
+      '\u2192 Item Code': getField(r, 'itemCode'),
+      '\u2190 Item Name': getField(r, 'itemName'),
+      '\u2190 UOM':       getField(r, 'uom'),
+      '\u2190 HSN Code':  getField(r, 'hsn'),
+      '\u2190 GST %':     getField(r, 'gst'),
+      '\u26A0 Quantity':  getField(r, 'qty'),
+      '\u26A0 Unit Price': getField(r, 'price'),
+      'Discount %':       getField(r, 'disc'),
+      'Notes':            getField(r, 'notes')
+    });
+  }
+  return lines;
+}
+
+function submitPOAction(poCode) {
+  if (!confirm('Submit PO ' + poCode + ' for approval?')) return;
+  google.script.run
+    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
+    .withFailureHandler(function(e) { showToast('error',e.message); })
+    .submitPO(poCode);
+}
+
+function approvePOAction(poCode) {
+  if (!confirm('Approve PO ' + poCode + '?')) return;
+  google.script.run
+    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
+    .withFailureHandler(function(e) { showToast('error',e.message); })
+    .approvePO(poCode);
+}
+
+function cancelPOAction(poCode) {
+  if (!confirm('Cancel PO ' + poCode + '? This cannot be undone.')) return;
+  google.script.run
+    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
+    .withFailureHandler(function(e) { showToast('error',e.message); })
+    .cancelPO(poCode);
+}
+
+function exportPO(poCode, format) {
+  showToast('info', 'Exporting ' + format.toUpperCase() + '...');
+  var fn = format === 'pdf' ? 'exportPOToPDF' : 'exportPOToSheets';
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r.success) { window.open(r.url, '_blank'); showToast('success', r.message); }
+      else showToast('error', r.message);
+    })
+    .withFailureHandler(function(e) { showToast('error', e.message); })
+    [fn](poCode);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  GRN LIST — Matches GRN_MASTER (17 cols)
+// ═══════════════════════════════════════════════════════════════
+function loadGRNList() {
+  setPageTitle('Goods Receipt Notes');
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(d) { APP.grnList = d || []; renderGRNList(); })
+    .withFailureHandler(function(e) { showError('Failed to load GRNs: ' + e.message); })
+    .getGRNList();
+}
+
+function renderGRNList() {
+  var content = $('contentArea');
+  var html = '<div class="card"><div class="card-header">' +
+    '<span class="card-title">Goods Receipt Notes (' + APP.grnList.length + ')</span>' +
+    '<div class="flex gap-2">' +
+    '<div class="search-bar"><input type="text" placeholder="Search GRNs..." oninput="filterTable(\'grnTable\',this.value)"></div>' +
+    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'grn_form\')">+ New GRN</button>' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">PO List</button></div></div>';
+
+  html += '<div style="overflow-x:auto;"><table class="data-table" id="grnTable"><thead><tr>' +
+    '<th>GRN Number</th><th>GRN Date</th><th>PO Number</th><th>Supplier</th>' +
+    '<th>Vehicle No</th><th>DC Number</th><th>Warehouse</th>' +
+    '<th>Received By</th><th>Status</th><th>Created By</th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < APP.grnList.length; i++) {
+    var g = APP.grnList[i];
+    html += '<tr class="clickable" onclick="openGRN(\'' + esc(g['# GRN Number']||'') + '\')">' +
+      '<td class="font-mono text-accent">' + esc(g['# GRN Number']||'') + '</td>' +
+      '<td>' + fmtDate(g['\u26A0 GRN Date']||'') + '</td>' +
+      '<td class="font-mono">' + esc(g['\u2192 PO Number']||'') + '</td>' +
+      '<td class="truncate" style="max-width:160px;">' + esc(g['\u2190 Supplier Name']||'') + '</td>' +
+      '<td>' + esc(g['Vehicle No']||'') + '</td>' +
+      '<td>' + esc(g['DC Number']||'') + '</td>' +
+      '<td>' + esc(g['\u2190 Warehouse Name']||'') + '</td>' +
+      '<td class="text-xs">' + esc(g['Received By']||'') + '</td>' +
+      '<td>' + statusBadge(g['Status']||'Draft') + '</td>' +
+      '<td class="text-xs">' + esc(g['Created By']||'') + '</td></tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  content.innerHTML = html;
+}
+
+function openGRN(grnCode) { navigateTo('procurement', 'grn_form', { grnCode: grnCode }); }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  GRN FORM — All 17 GRN_MASTER columns
+// ═══════════════════════════════════════════════════════════════
+function renderGRNForm(params) {
+  params = params || {};
+  var isEdit = !!params.grnCode;
+  setPageTitle(isEdit ? 'Edit GRN: ' + params.grnCode : 'New GRN');
+
+  if (isEdit) {
+    showLoading();
+    google.script.run
+      .withSuccessHandler(function(data) {
+        APP.currentGRN = data;
+        buildGRNForm(data.grn || {}, data.lines || [], params.grnCode);
+      })
+      .withFailureHandler(function(err) { showError('Failed to load GRN: ' + err.message); })
+      .getGRNDetail(params.grnCode);
+  } else {
+    APP.currentGRN = null;
+    buildGRNForm({}, [], '');
+  }
+}
+
+function buildGRNForm(grn, lines, grnCode) {
+  var warehouses = APP.lookups.warehouses || [];
+  var content = $('contentArea');
+
+  // ── Action Bar ──
+  var html = '<div class="flex gap-2 mb-4 flex-wrap">' +
+    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">&larr; Back to List</button>' +
+    '<button class="btn btn-primary" onclick="saveGRNForm()">Save GRN</button>';
+  if (grnCode && (grn['Status'] === 'Draft' || grn['Status'] === 'Pending'))
+    html += '<button class="btn" style="background:var(--success);color:#fff;" onclick="confirmGRNAction(\'' + esc(grnCode) + '\')">Confirm GRN</button>';
+  html += '</div>';
+
+  // ── GRN Header Card ──
+  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">GRN Details</span>';
+  if (grnCode) html += '<span class="badge badge-submitted font-mono">' + esc(grnCode) + '</span>';
+  html += '</div>';
+
+  // Row 1: Core
+  html += '<div class="grid grid-4">';
+  html += fieldDate('\u26A0 GRN Date', 'grnDate', grn['\u26A0 GRN Date'] || todayISO());
+  html += fieldText('\u2192 PO Number', 'grnPONumber', grn['\u2192 PO Number'] || '');
+  html += fieldReadonly('\u2190 Supplier Code', grn['\u2190 Supplier Code'] || '(auto from PO)');
+  html += fieldReadonly('\u2190 Supplier Name', grn['\u2190 Supplier Name'] || '(auto from PO)');
+  html += '</div>';
+
+  // Row 2: Vehicle / DC
+  html += '<div class="grid grid-4">';
+  html += fieldText('Vehicle No', 'grnVehicle', grn['Vehicle No'] || '');
+  html += fieldText('DC Number', 'grnDC', grn['DC Number'] || '');
+  html += fieldDate('DC Date', 'grnDCDate', grn['DC Date'] || '');
+  html += fieldText('Gate Pass No', 'grnGatePass', grn['Gate Pass No'] || '');
+  html += '</div>';
+
+  // Row 3: Warehouse, Status, etc.
+  html += '<div class="grid grid-4">';
+  html += fieldSelect('\u2192 Warehouse', 'grnWarehouse',
+    warehouses.map(function(w) { return { value: w.code, label: w.code + ' - ' + w.name }; }),
+    grn['\u2192 Warehouse'] || '');
+  html += fieldReadonly('\u2190 Warehouse Name', grn['\u2190 Warehouse Name'] || '(auto)');
+  html += fieldText('Received By', 'grnReceivedBy', grn['Received By'] || (APP.user ? APP.user.email : ''));
+  html += fieldSelect('Status', 'grnStatus', listOpts(APP.lists.grnStatusList), grn['Status'] || 'Pending');
+  html += '</div>';
+
+  // Row 4: Notes, Image, Auto
+  html += '<div class="grid grid-4">';
+  html += fieldText('Notes', 'grnNotes', grn['Notes'] || '');
+  html += fieldText('Gate Inward Image', 'grnGateImage', grn['Gate Inward Image'] || '');
+  html += fieldReadonly('Created By', grn['Created By'] || (APP.user ? APP.user.email : ''));
+  html += fieldReadonly('Created Date', fmtDate(grn['Created Date'] || ''));
+  html += '</div>';
+
+  html += '</div>'; // end card
+
+  // ── GRN Line Items Card (matching GRN_LINE_ITEMS 19 cols) ──
+  html += '<div class="card"><div class="card-header"><span class="card-title">GRN Line Items</span>' +
+    '<div class="flex gap-2">' +
+    '<button class="btn btn-sm" onclick="loadPOLinesForGRN()">Load from PO</button>' +
+    '<button class="btn btn-sm btn-primary" onclick="addGRNLine()">+ Add Line</button></div></div>';
+
+  html += '<div style="overflow-x:auto;"><table class="data-table" id="grnLineTable"><thead><tr>' +
+    '<th>#</th><th>PO Line ID</th><th>Item Code</th><th>Item Name</th><th>UOM</th>' +
+    '<th>PO Qty</th><th>Received</th><th>Accepted</th><th>Rejected</th>' +
+    '<th>Batch No</th><th>Lot No</th><th>Rolls</th>' +
+    '<th>Inspection</th><th>Rejection Reason</th><th>Storage Bin</th>' +
+    '<th>Line Status</th><th>Notes</th><th></th>' +
+    '</tr></thead><tbody>';
+
+  for (var i = 0; i < lines.length; i++) {
+    html += renderGRNLineRow(i, lines[i]);
+  }
+  html += '</tbody></table></div></div>';
+
+  content.innerHTML = html;
+  content.dataset.grnCode = grnCode || '';
+}
+
+function renderGRNLineRow(idx, ln) {
+  ln = ln || {};
+  var poLineId  = ln['\u2192 PO Line ID'] || '';
+  var itemCode  = ln['\u2190 Item Code'] || '';
+  var itemName  = ln['\u2190 Item Name'] || '';
+  var uom       = ln['\u2190 UOM'] || '';
+  var poQty     = ln['\u2190 PO Qty'] || '';
+  var recvQty   = ln['\u26A0 Received Qty'] || '';
+  var accQty    = ln['\u26A0 Accepted Qty'] || '';
+  var rejQty    = ln['\u2211 Rejected Qty'] || '';
+  var batchNo   = ln['Batch No'] || '';
+  var lotNo     = ln['Lot No'] || '';
+  var rolls     = ln['Rolls'] || '';
+  var inspection= ln['Inspection Result'] || '';
+  var rejReason = ln['Rejection Reason'] || '';
+  var storageBin= ln['\u2192 Storage Bin'] || '';
+  var lineStatus= ln['Line Status'] || '';
+  var notes     = ln['Notes'] || '';
+
+  return '<tr data-gline="' + idx + '">' +
+    '<td>' + (idx+1) + '</td>' +
+    '<td>' + inp('poLineId', poLineId, '100px', 'font-mono', true) + '</td>' +
+    '<td>' + inp('itemCode', itemCode, '110px', 'font-mono', true) + '</td>' +
+    '<td>' + inp('itemName', itemName, '140px', '', true) + '</td>' +
+    '<td>' + inp('uom', uom, '50px', '', true) + '</td>' +
+    '<td>' + inp('poQty', poQty, '60px', 'text-right', true) + '</td>' +
+    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + recvQty + '" data-field="recvQty" oninput="calcGRNRejected(this)"></td>' +
+    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + accQty + '" data-field="accQty" oninput="calcGRNRejected(this)"></td>' +
+    '<td class="text-right grn-rej">' + (rejQty || '-') + '</td>' +
+    '<td>' + inp('batchNo', batchNo, '80px', '') + '</td>' +
+    '<td>' + inp('lotNo', lotNo, '80px', '') + '</td>' +
+    '<td><input class="form-input text-right" type="number" style="width:50px;" value="' + rolls + '" data-field="rolls"></td>' +
+    '<td>' + selInline('inspection', APP.lists.inspectionResult||[], inspection, '90px') + '</td>' +
+    '<td>' + inp('rejReason', rejReason, '120px', '') + '</td>' +
+    '<td>' + inp('storageBin', storageBin, '90px', 'font-mono') + '</td>' +
+    '<td>' + (lineStatus ? statusBadge(lineStatus) : '-') + '</td>' +
+    '<td>' + inp('notes', notes, '100px', '') + '</td>' +
+    '<td><button class="btn btn-sm btn-danger" onclick="removeGRNLine(' + idx + ')">&#x2715;</button></td></tr>';
+}
+
+function addGRNLine() {
+  var tbody = document.querySelector('#grnLineTable tbody');
+  tbody.insertAdjacentHTML('beforeend', renderGRNLineRow(tbody.children.length, {}));
+}
+
+function removeGRNLine(idx) {
+  var row = document.querySelector('#grnLineTable tbody tr[data-gline="' + idx + '"]');
+  if (row) row.remove();
+}
+
+function calcGRNRejected(el) {
+  var row = el.closest('tr');
+  var recv = parseFloat(row.querySelector('[data-field="recvQty"]').value) || 0;
+  var acc  = parseFloat(row.querySelector('[data-field="accQty"]').value) || 0;
+  var rej  = Math.max(0, recv - acc);
+  row.querySelector('.grn-rej').textContent = rej > 0 ? rej : '-';
+}
+
+function loadPOLinesForGRN() {
+  var poNumber = val('grnPONumber');
+  if (!poNumber) { showToast('warning', 'Enter a PO Number first.'); return; }
+
+  showToast('info', 'Loading PO lines...');
+  google.script.run
+    .withSuccessHandler(function(poLines) {
+      var tbody = document.querySelector('#grnLineTable tbody');
+      tbody.innerHTML = '';
+      for (var i = 0; i < poLines.length; i++) {
+        var pl = poLines[i];
+        var grnLine = {
+          '\u2192 PO Line ID': pl['# Line ID'] || '',
+          '\u2190 Item Code':  pl['\u2192 Item Code'] || '',
+          '\u2190 Item Name':  pl['\u2190 Item Name'] || '',
+          '\u2190 UOM':        pl['\u2190 UOM'] || '',
+          '\u2190 PO Qty':     pl['\u26A0 Quantity'] || ''
+        };
+        tbody.insertAdjacentHTML('beforeend', renderGRNLineRow(i, grnLine));
+      }
+      showToast('success', poLines.length + ' lines loaded from PO.');
+    })
+    .withFailureHandler(function(err) { showToast('error', err.message); })
+    .getPOLinesForGRN(poNumber);
+}
+
+function saveGRNForm() {
+  var grnCode = $('contentArea').dataset.grnCode || '';
+  var grnData = {
+    grnCode: grnCode,
+    '\u26A0 GRN Date':     val('grnDate'),
+    '\u2192 PO Number':    val('grnPONumber'),
+    '\u2192 Warehouse':    val('grnWarehouse'),
+    'Vehicle No':          val('grnVehicle'),
+    'DC Number':           val('grnDC'),
+    'DC Date':             val('grnDCDate'),
+    'Gate Pass No':        val('grnGatePass'),
+    'Received By':         val('grnReceivedBy'),
+    'Notes':               val('grnNotes'),
+    'Gate Inward Image':   val('grnGateImage'),
+    'Status':              val('grnStatus'),
+    'Created By':          grnCode ? '' : (APP.user ? APP.user.email : ''),
+    'Created Date':        grnCode ? '' : new Date().toISOString()
+  };
+
+  var lineItems = collectGRNLines();
+
+  showLoading();
+  google.script.run
+    .withSuccessHandler(function(r) {
+      if (r.success) { APP.unsavedChanges = false; showToast('success', r.message); navigateTo('procurement', 'grn_form', { grnCode: r.grnCode }); }
+      else showToast('error', r.message);
+    })
+    .withFailureHandler(function(err) { showToast('error', err.message); })
+    .saveGRN(grnData, lineItems);
+}
+
+function collectGRNLines() {
+  var rows = document.querySelectorAll('#grnLineTable tbody tr');
+  var lines = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    lines.push({
+      '\u2192 PO Line ID':    getField(r, 'poLineId'),
+      '\u2190 Item Code':     getField(r, 'itemCode'),
+      '\u2190 Item Name':     getField(r, 'itemName'),
+      '\u2190 UOM':           getField(r, 'uom'),
+      '\u2190 PO Qty':        getField(r, 'poQty'),
+      '\u26A0 Received Qty':  getField(r, 'recvQty'),
+      '\u26A0 Accepted Qty':  getField(r, 'accQty'),
+      'Batch No':             getField(r, 'batchNo'),
+      'Lot No':               getField(r, 'lotNo'),
+      'Rolls':                getField(r, 'rolls'),
+      'Inspection Result':    r.querySelector('select[data-field="inspection"]') ? r.querySelector('select[data-field="inspection"]').value : '',
+      'Rejection Reason':     getField(r, 'rejReason'),
+      '\u2192 Storage Bin':   getField(r, 'storageBin'),
+      'Notes':                getField(r, 'notes')
+    });
+  }
+  return lines;
+}
+
+function confirmGRNAction(grnCode) {
+  if (!confirm('Confirm GRN ' + grnCode + '?')) return;
+  google.script.run
+    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','grn_form',{grnCode:grnCode}); })
+    .withFailureHandler(function(e) { showToast('error',e.message); })
+    .confirmGRN(grnCode);
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════════════════════════
+function applyThemeMode(mode) {
+  var body = document.body;
+  body.className = body.className.replace(/mode-\S+/g, '');
+  if (mode !== 'light') body.classList.add('mode-' + mode);
+  var sel = $('themeMode');
+  if (sel) sel.value = mode;
+  saveThemePref();
+}
+
+function applyAccent(accent) {
+  var body = document.body;
+  body.className = body.className.replace(/accent-\S+/g, '');
+  body.classList.add('accent-' + accent);
+  var swatches = document.querySelectorAll('.accent-swatch');
+  for (var i = 0; i < swatches.length; i++) {
+    swatches[i].classList.toggle('active', swatches[i].dataset.accent === accent);
+  }
+  saveThemePref();
+}
+
+function saveThemePref() {
+  var mode = $('themeMode') ? $('themeMode').value : 'light';
+  var el = document.querySelector('.accent-swatch.active');
+  var accent = el ? el.dataset.accent : 'orange';
+  google.script.run.saveUserTheme({ mode: mode, accent: accent });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
+function loadNotifications() {
+  google.script.run
+    .withSuccessHandler(function(d) { APP.notifications = d || []; updateNotifBadge(); })
+    .getNotifications({});
+}
+
+function updateNotifBadge() {
+  var unread = APP.notifications.filter(function(n) { return n.status === 'Unread'; }).length;
+  $('btnNotifications').textContent = unread > 0 ? '\uD83D\uDD14 ' + unread : '\uD83D\uDD14';
+}
+
+function toggleNotificationPanel() {
+  var panel = $('notificationPanel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) renderNotifications();
+}
+
+function renderNotifications() {
+  var container = $('notificationList');
+  if (APP.notifications.length === 0) { container.innerHTML = '<div class="text-center text-muted p-4">No notifications</div>'; return; }
+  var html = '';
+  for (var i = 0; i < APP.notifications.length; i++) {
+    var n = APP.notifications[i];
+    var tc = n.type==='warning'?'var(--warning)':n.type==='action'?'var(--accent)':n.type==='system'?'var(--info)':'var(--text-muted)';
+    html += '<div class="card mb-2" style="border-left:3px solid ' + tc + ';">' +
+      '<div class="flex justify-between items-center">' +
+      '<span class="font-bold text-sm">' + esc(n.title) + '</span>' +
+      '<span class="text-xs text-muted">' + timeAgo(n.createdAt) + '</span></div>' +
+      '<div class="text-xs text-muted mt-2">' + esc(n.message) + '</div>' +
+      '<div class="flex gap-2 mt-2">' +
+      (n.status==='Unread'?'<button class="btn btn-sm" onclick="markRead(\''+n.id+'\')">Mark Read</button>':'') +
+      '<button class="btn btn-sm" onclick="dismiss(\''+n.id+'\')">Dismiss</button></div></div>';
+  }
+  container.innerHTML = html;
+}
+
+function markRead(id) { google.script.run.withSuccessHandler(function(){loadNotifications();}).markNotificationRead(id); }
+function dismiss(id) { google.script.run.withSuccessHandler(function(){loadNotifications();}).dismissNotification(id); }
+
+function toggleSettingsPanel() { $('settingsPanel').classList.toggle('hidden'); }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  COMMAND PALETTE
+// ═══════════════════════════════════════════════════════════════
+var COMMANDS = [
+  { label:'Dashboard',           action:function(){ navigateTo('dashboard','dashboard'); }},
+  { label:'New Purchase Order',  action:function(){ navigateTo('procurement','po_form'); }},
+  { label:'View PO List',        action:function(){ navigateTo('procurement','po_list'); }},
+  { label:'New GRN',             action:function(){ navigateTo('procurement','grn_form'); }},
+  { label:'View GRN List',       action:function(){ navigateTo('procurement','grn_list'); }},
+  { label:'Refresh Data',        action:function(){ navigateTo(APP.activeModule,APP.activePage); }},
+  { label:'Open Settings',       action:function(){ toggleSettingsPanel(); }}
+];
+
+function openCommandPalette() {
+  $('commandPaletteOverlay').classList.add('open');
+  var inp = $('commandInput'); inp.value = ''; inp.focus();
+  filterCommands('');
+}
+
+function closeCommandPalette(e) {
+  if (!e || e.target === $('commandPaletteOverlay'))
+    $('commandPaletteOverlay').classList.remove('open');
+}
+
+function filterCommands(q) {
+  q = q.toLowerCase();
+  var res = $('commandResults');
+  var f = COMMANDS.filter(function(c){ return c.label.toLowerCase().indexOf(q)!==-1; });
+  var html = '';
+  for (var i = 0; i < f.length; i++) {
+    html += '<div class="command-item" onclick="execCmd('+i+',\''+esc(q)+'\')">' + f[i].label + '</div>';
+  }
+  res.innerHTML = html || '<div class="p-4 text-muted text-center">No matching commands</div>';
+}
+
+function execCmd(idx, q) {
+  var f = COMMANDS.filter(function(c){ return c.label.toLowerCase().indexOf(q)!==-1; });
+  if (f[idx]) { closeCommandPalette(); f[idx].action(); }
+}
+
+function handleKeyboard(e) {
+  if ((e.ctrlKey||e.metaKey)&&e.key==='k') { e.preventDefault(); openCommandPalette(); }
+  if (e.key==='Escape') { closeCommandPalette(); $('notificationPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+//  HEARTBEAT
+// ═══════════════════════════════════════════════════════════════
+function sendHeartbeat() { google.script.run.heartbeat(APP.activeModule, APP.activePage); }
+
+
+// ═══════════════════════════════════════════════════════════════
+//  UTILITIES
+// ═══════════════════════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+function val(id) { var el = $(id); return el ? el.value : ''; }
+function setText(id, v) { var el = $(id); if (el) el.innerHTML = v; }
+function pf(el) { return el ? (parseFloat(el.value) || 0) : 0; }
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function fmtCur(v) {
+  var n = parseFloat(v);
+  if (isNaN(n)) return '-';
+  return n.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function fmtDate(v) {
+  if (!v) return '';
+  try { var d = new Date(v); return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
+  catch(e) { return String(v); }
+}
+
+function timeAgo(iso) {
+  if (!iso) return '';
+  var d = (new Date() - new Date(iso))/1000;
+  if (d<60) return 'just now';
+  if (d<3600) return Math.floor(d/60)+'m ago';
+  if (d<86400) return Math.floor(d/3600)+'h ago';
+  return Math.floor(d/86400)+'d ago';
+}
+
+function statusBadge(status) {
+  var cls = 'badge-draft';
+  var s = (status||'').toLowerCase();
+  if (s==='submitted'||s==='under review'||s==='pending') cls='badge-submitted';
+  else if (s==='approved'||s==='confirmed'||s==='accepted') cls='badge-approved';
+  else if (s.indexOf('received')!==-1||s==='completed') cls='badge-received';
+  else if (s==='cancelled'||s==='rejected') cls='badge-cancelled';
+  else if (s.indexOf('partial')!==-1) cls='badge-warning';
+  return '<span class="badge '+cls+'">'+esc(status)+'</span>';
+}
+
+function showLoading() {
+  $('contentArea').innerHTML = '<div class="text-center p-4"><div class="spinner"></div><div class="text-muted mt-2">Loading...</div></div>';
+}
+
+function showError(msg) {
+  $('contentArea').innerHTML = '<div class="card p-4 text-center"><div style="color:var(--danger);">' + esc(msg) + '</div></div>';
+}
+
+function showToast(type, message) {
+  var c = $('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.textContent = message;
+  c.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 4000);
+}
+
+function updateStatusBar(text, connected) {
+  $('statusText').textContent = text;
+  $('statusDot').style.background = connected ? 'var(--success)' : 'var(--danger)';
+}
+
+function updateUserInfo() {
+  if (APP.user) $('userInfo').textContent = APP.user.name + ' (' + APP.user.role + ')';
+}
+
+function filterTable(tableId, q) {
+  q = q.toLowerCase();
+  var rows = document.querySelectorAll('#' + tableId + ' tbody tr');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].style.display = rows[i].textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+  }
+}
+
+function getField(row, name) {
+  var el = row.querySelector('[data-field="' + name + '"]') || row.querySelector('input[data-ro="' + name + '"]');
+  return el ? el.value : '';
+}
+
+function listOpts(arr) {
+  return (arr||[]).map(function(v){ return { value:v, label:v }; });
+}
+
+// ── Form field builders ──
+function fieldText(label, id, value) {
+  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
+    '<input class="form-input" type="text" id="' + id + '" value="' + esc(value) + '"></div>';
+}
+
+function fieldDate(label, id, value) {
+  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
+    '<input class="form-input" type="date" id="' + id + '" value="' + esc(value) + '"></div>';
+}
+
+function fieldSelect(label, id, options, selectedValue) {
+  var html = '<div class="form-group"><label class="form-label">' + label + '</label>' +
+    '<select class="form-select" id="' + id + '"><option value="">-- Select --</option>';
+  for (var i = 0; i < options.length; i++) {
+    var o = options[i];
+    html += '<option value="' + esc(o.value) + '"' + (o.value===selectedValue?' selected':'') + '>' + esc(o.label) + '</option>';
+  }
+  return html + '</select></div>';
+}
+
+function fieldReadonly(label, value) {
+  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
+    '<div class="form-input" style="background:var(--bg-secondary);cursor:default;">' + (value||'-') + '</div></div>';
+}
+
+// Inline input for table cells
+function inp(field, value, width, cls, readonly) {
+  var ro = readonly ? ' readonly data-ro="' + field + '"' : ' data-field="' + field + '"';
+  var bg = readonly ? 'background:transparent;border:none;' : '';
+  return '<input class="form-input ' + (cls||'') + '" style="width:' + width + ';' + bg + '" value="' + esc(value) + '"' + ro + '>';
+}
+
+// Inline select for table cells
+function selInline(field, options, selected, width) {
+  var html = '<select class="form-select" data-field="' + field + '" style="width:' + width + ';"><option value="">-</option>';
+  for (var i = 0; i < options.length; i++) {
+    html += '<option' + (options[i]===selected?' selected':'') + '>' + esc(options[i]) + '</option>';
+  }
+  return html + '</select>';
+}
+
+// ─── BOOT ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', initApp);
+</script>

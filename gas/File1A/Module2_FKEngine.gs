@@ -99,13 +99,52 @@ function loadMasterRelations() {
     return cached;
   }
 
-  // Direct sheet read (Layer 3 fallback)
+  var relations = [];
+
+  // --- Load from FILE 1A MASTER_RELATIONS ---
   var sheet = getSheetByName(CONFIG.SHEETS.MASTER_RELATIONS);
-  if (!sheet) {
-    Logger.log('MODULE2 :: loadMasterRelations - MASTER_RELATIONS sheet not found.');
-    return [];
+  if (sheet) {
+    var rows1A = _readRelationsFromSheet(sheet);
+    for (var i = 0; i < rows1A.length; i++) {
+      relations.push(rows1A[i]);
+    }
+  } else {
+    Logger.log('MODULE2 :: loadMasterRelations - MASTER_RELATIONS sheet not found in FILE 1A.');
   }
 
+  // --- Load from FILE 2 MASTER_RELATIONS_F2 (Procurement) ---
+  try {
+    var fileId = CONFIG.FILE_IDS.FILE_2;
+    if (fileId && fileId !== 'YOUR_FILE_2_SPREADSHEET_ID') {
+      var ss2 = SpreadsheetApp.openById(fileId);
+      var sheet2 = ss2.getSheetByName(CONFIG.SHEETS_F2.MASTER_RELATIONS_F2);
+      if (sheet2) {
+        var rows2 = _readRelationsFromSheet(sheet2);
+        for (var j = 0; j < rows2.length; j++) {
+          relations.push(rows2[j]);
+        }
+        Logger.log('MODULE2 :: Loaded ' + rows2.length + ' relations from MASTER_RELATIONS_F2.');
+      }
+    }
+  } catch (err) {
+    Logger.log('MODULE2 :: loadMasterRelations - Could not load FILE 2 relations: ' + err.message);
+  }
+
+  // Store in cache for subsequent calls
+  _fkSetCachedRelations(relations);
+
+  return relations;
+}
+
+
+/**
+ * Reads and parses active relations from a MASTER_RELATIONS-format sheet.
+ * Used by loadMasterRelations() to read from both FILE 1A and FILE 2 relation sheets.
+ *
+ * @param   {GoogleAppsScript.Spreadsheet.Sheet} sheet - The relations sheet to read
+ * @returns {Object[]} Array of active parsed relation objects
+ */
+function _readRelationsFromSheet(sheet) {
   var lastRow = sheet.getLastRow();
   if (lastRow < FK_DATA_START_ROW) {
     return [];
@@ -115,27 +154,18 @@ function loadMasterRelations() {
   var numCols = MR_COL.NOTES; // 13 columns
   var data = sheet.getRange(FK_DATA_START_ROW, 1, numRows, numCols).getValues();
 
-  var relations = [];
+  var results = [];
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
-
-    // Skip empty rows (no relation code)
     if (!row[MR_COL.RELATION_CODE - 1] || String(row[MR_COL.RELATION_CODE - 1]).trim() === '') {
       continue;
     }
-
     var rel = _parseRelationRow(row);
-
-    // Only return active relations
     if (rel.active) {
-      relations.push(rel);
+      results.push(rel);
     }
   }
-
-  // Store in cache for subsequent calls
-  _fkSetCachedRelations(relations);
-
-  return relations;
+  return results;
 }
 
 
@@ -504,6 +534,134 @@ function handleFKEdit(e) {
 
   } catch (err) {
     Logger.log('MODULE2 :: handleFKEdit - Error: ' + err.message);
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// 6b. handleProcurementFKEdit() — FILE 2 Procurement FK handling
+// ---------------------------------------------------------------------------
+
+/**
+ * Called from onEdit routing when an edit occurs on a FILE 2 procurement sheet.
+ * Detects FK columns and auto-fills display columns, just like handleFKEdit but
+ * works against the FILE 2 spreadsheet and its MASTER_RELATIONS_F2 definitions.
+ *
+ * Also handles auto-fill chains:
+ *   - Selecting a PO on GRN_MASTER auto-fills Supplier Code + Name
+ *   - Selecting a PO Line on GRN_LINE_ITEMS auto-fills Item details
+ *
+ * @param {Object} e - The onEdit event object from FILE 2
+ */
+function handleProcurementFKEdit(e) {
+  try {
+    if (!e || !e.range) return;
+
+    var range = e.range;
+    var sheet = range.getSheet();
+    var sheetName = sheet.getName();
+    var row = range.getRow();
+    var col = range.getColumn();
+
+    if (row < FK_DATA_START_ROW) return;
+    if (range.getNumRows() > 1 || range.getNumColumns() > 1) return;
+
+    var headerValue = sheet.getRange(FK_HEADER_ROW, col).getValue();
+    var headerStr = String(headerValue).trim();
+
+    if (!_isFKColumn(headerStr)) return;
+
+    // Look up the relation (loads from both 1A and F2 MASTER_RELATIONS)
+    var rel = getRelationForColumn(sheetName, headerStr);
+    if (!rel) return;
+
+    var newCode = e.value !== undefined ? e.value : range.getValue();
+    var codeStr = newCode ? String(newCode).trim() : '';
+
+    // Auto-fill the display column (immediately adjacent)
+    var displayCol = col + 1;
+
+    if (!codeStr) {
+      sheet.getRange(row, displayCol).setValue('');
+      return;
+    }
+
+    // Resolve the display value
+    var displayValue = _lookupSingleFKDisplay(
+      codeStr,
+      rel.refSheet,
+      rel.refCodeCol,
+      rel.refDisplayCol,
+      rel.crossFile ? rel.refFileLabel : null
+    );
+    sheet.getRange(row, displayCol).setValue(displayValue);
+
+    // --- Auto-fill chains for procurement ---
+    // GRN_MASTER: when PO Code is selected, auto-fill Supplier Code + Name
+    if (sheetName === 'GRN_MASTER' && _normalizeHeader(headerStr) === _normalizeHeader('PO Code')) {
+      _autoFillGRNFromPO(sheet, row, codeStr);
+    }
+
+  } catch (err) {
+    Logger.log('MODULE2 :: handleProcurementFKEdit - Error: ' + err.message);
+  }
+}
+
+
+/**
+ * Auto-fills GRN_MASTER fields from the selected PO.
+ * When a PO Code is selected on a GRN, copies:
+ *   - Supplier Code → GRN Supplier Code column
+ *   - Supplier Name → GRN Supplier Name column
+ *
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} grnSheet - The GRN_MASTER sheet
+ * @param {number} row      - The edited row
+ * @param {string} poCode   - The selected PO code
+ */
+function _autoFillGRNFromPO(grnSheet, row, poCode) {
+  try {
+    var ss2 = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_2);
+    var poSheet = ss2.getSheetByName(CONFIG.SHEETS_F2.PO_MASTER);
+    if (!poSheet) return;
+
+    var poLastRow = poSheet.getLastRow();
+    if (poLastRow < FK_DATA_START_ROW) return;
+
+    // Read PO headers to find Supplier Code and Supplier Name columns
+    var poLastCol = poSheet.getLastColumn();
+    var poHeaders = poSheet.getRange(FK_HEADER_ROW, 1, 1, poLastCol).getValues()[0];
+    var poCodeIdx = -1, poSupCodeIdx = -1, poSupNameIdx = -1;
+
+    for (var i = 0; i < poHeaders.length; i++) {
+      var h = _normalizeHeader(String(poHeaders[i]));
+      if (h === _normalizeHeader('PO Code') || h === _normalizeHeader('# PO Code')) poCodeIdx = i;
+      if (h === _normalizeHeader('Supplier Code')) poSupCodeIdx = i;
+      if (h === _normalizeHeader('Supplier Name') || h === _normalizeHeader('Supplier Name (Auto)')) poSupNameIdx = i;
+    }
+    if (poCodeIdx === -1) return;
+
+    // Find the PO row
+    var poData = poSheet.getRange(FK_DATA_START_ROW, 1, poLastRow - FK_DATA_START_ROW + 1, poLastCol).getValues();
+    for (var r = 0; r < poData.length; r++) {
+      if (String(poData[r][poCodeIdx]).trim() === poCode) {
+        // Found the PO — now fill GRN fields
+        var grnLastCol = grnSheet.getLastColumn();
+        var grnHeaders = grnSheet.getRange(FK_HEADER_ROW, 1, 1, grnLastCol).getValues()[0];
+
+        for (var g = 0; g < grnHeaders.length; g++) {
+          var gh = _normalizeHeader(String(grnHeaders[g]));
+          if (gh === _normalizeHeader('Supplier Code') && poSupCodeIdx !== -1) {
+            grnSheet.getRange(row, g + 1).setValue(poData[r][poSupCodeIdx]);
+          }
+          if ((gh === _normalizeHeader('Supplier Name') || gh === _normalizeHeader('Supplier Name (Auto)')) && poSupNameIdx !== -1) {
+            grnSheet.getRange(row, g + 1).setValue(poData[r][poSupNameIdx]);
+          }
+        }
+        break;
+      }
+    }
+  } catch (err) {
+    Logger.log('MODULE2 :: _autoFillGRNFromPO - Error: ' + err.message);
   }
 }
 
@@ -1059,9 +1217,11 @@ function _resolveFileId(label) {
     'FILE_1A':  CONFIG.FILE_IDS.FILE_1A,
     'FILE_1B':  CONFIG.FILE_IDS.FILE_1B,
     'FILE_1C':  CONFIG.FILE_IDS.FILE_1C,
+    'FILE_2':   CONFIG.FILE_IDS.FILE_2,
     'FILE1A':   CONFIG.FILE_IDS.FILE_1A,
     'FILE1B':   CONFIG.FILE_IDS.FILE_1B,
-    'FILE1C':   CONFIG.FILE_IDS.FILE_1C
+    'FILE1C':   CONFIG.FILE_IDS.FILE_1C,
+    'FILE2':    CONFIG.FILE_IDS.FILE_2
   };
 
   return map[normalized] || null;

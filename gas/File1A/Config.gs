@@ -16,15 +16,17 @@ var CONFIG = {
   // GOOGLE SHEET FILE IDS
   // ===========================================================================
   // Replace these placeholder values with actual Google Spreadsheet IDs.
-  // File 1A: Items Master        (23 sheets)
-  // File 1B: Factory Master      (19 sheets)
+  // File 1A: Items Master        (22 sheets)
+  // File 1B: Factory Master      (23 sheets)
   // File 1C: Finance Master      (6 sheets)
+  // File 2:  Procurement          (5 sheets)
   // ===========================================================================
 
   FILE_IDS: {
     FILE_1A: '1eaDbKEJpty6c7_FrVm5wElOce_z4yHRMr3E-SAskdMc',
     FILE_1B: '1WjtpBhXwYVBVnPSDbzTWm8X0nyVhzsailBpRqXi7Se4',
-    FILE_1C: '1t3zHrORAjZJ2cVr8bru4HE4kUvyYdm5RDICA8NkiDX8'
+    FILE_1C: '1t3zHrORAjZJ2cVr8bru4HE4kUvyYdm5RDICA8NkiDX8',
+    FILE_2:  'YOUR_FILE_2_SPREADSHEET_ID'
   },
 
   // ===========================================================================
@@ -72,28 +74,35 @@ var CONFIG = {
   },
 
   // ===========================================================================
-  // SHEET NAMES - FILE 1B (Factory Master - 18 sheets)
+  // SHEET NAMES - FILE 1B (Factory Master - 23 sheets)
   // ===========================================================================
 
   SHEETS_1B: {
-    USER_MASTER:          'USER_MASTER',
-    DEPARTMENT_MASTER:    'DEPARTMENT_MASTER',
-    DESIGNATION_MASTER:   'DESIGNATION_MASTER',
-    SHIFT_MASTER:         'SHIFT_MASTER',
-    CUSTOMER_MASTER:      'CUSTOMER_MASTER',
-    CONTRACTOR_MASTER:    'CONTRACTOR_MASTER',
-    WAREHOUSE_MASTER:     'WAREHOUSE_MASTER',
-    STORAGE_BIN_MASTER:   'STORAGE_BIN_MASTER',
-    FACTORY_MASTER:       'FACTORY_MASTER',
-    MACHINE_MASTER:       'MACHINE_MASTER',
-    MACHINE_CATEGORY:     'MACHINE_CATEGORY',
-    ASSET_MASTER:         'ASSET_MASTER',
-    MAINTENANCE_SCHEDULE: 'MAINTENANCE_SCHEDULE',
-    SPARE_PARTS_MASTER:   'SPARE_PARTS_MASTER',
-    PROCESS_MASTER:       'PROCESS_MASTER',
-    WORK_CENTER_MASTER:   'WORK_CENTER_MASTER',
-    JOBWORK_PARTY_MASTER: 'JOBWORK_PARTY_MASTER',
-    ITEM_SUPPLIER_RATES:  'ITEM_SUPPLIER_RATES'
+    USER_MASTER:            'USER_MASTER',
+    DEPARTMENT_MASTER:      'DEPARTMENT_MASTER',
+    DESIGNATION_MASTER:     'DESIGNATION_MASTER',
+    SHIFT_MASTER:           'SHIFT_MASTER',
+    CUSTOMER_MASTER:        'CUSTOMER_MASTER',
+    CONTRACTOR_MASTER:      'CONTRACTOR_MASTER',
+    WAREHOUSE_MASTER:       'WAREHOUSE_MASTER',
+    STORAGE_BIN_MASTER:     'STORAGE_BIN_MASTER',
+    FACTORY_MASTER:         'FACTORY_MASTER',
+    MACHINE_MASTER:         'MACHINE_MASTER',
+    MACHINE_CATEGORY:       'MACHINE_CATEGORY',
+    ASSET_MASTER:           'ASSET_MASTER',
+    MAINTENANCE_SCHEDULE:   'MAINTENANCE_SCHEDULE',
+    SPARE_PARTS_MASTER:     'SPARE_PARTS_MASTER',
+    PROCESS_MASTER:         'PROCESS_MASTER',
+    WORK_CENTER_MASTER:     'WORK_CENTER_MASTER',
+    JOBWORK_PARTY_MASTER:   'JOBWORK_PARTY_MASTER',
+    ITEM_SUPPLIER_RATES:    'ITEM_SUPPLIER_RATES',
+
+    // -- System / Support --
+    PRESENCE:               'PRESENCE',
+    NOTIFICATIONS:          'NOTIFICATIONS',
+    ROLE_MASTER:            'ROLE_MASTER',
+    ROLE_PERMISSIONS:        'ROLE_PERMISSIONS',
+    NOTIFICATION_TEMPLATES: 'NOTIFICATION_TEMPLATES'
   },
 
   // ===========================================================================
@@ -107,6 +116,18 @@ var CONFIG = {
     BANK_MASTER:           'BANK_MASTER',
     COST_CENTER_MASTER:    'COST_CENTER_MASTER',
     ACCOUNT_MASTER:        'ACCOUNT_MASTER'
+  },
+
+  // ===========================================================================
+  // SHEET NAMES - FILE 2 (Procurement - 5 sheets)
+  // ===========================================================================
+
+  SHEETS_F2: {
+    PO_MASTER:           'PO_MASTER',
+    PO_LINE_ITEMS:       'PO_LINE_ITEMS',
+    GRN_MASTER:          'GRN_MASTER',
+    GRN_LINE_ITEMS:      'GRN_LINE_ITEMS',
+    MASTER_RELATIONS_F2: 'MASTER_RELATIONS_F2'
   },
 
   // ===========================================================================
@@ -167,6 +188,36 @@ var CONFIG = {
       seqDigits:   5,
       perCategory: false,
       pattern:     'ISR-#####'
+    },
+
+    // -- Procurement Codes (FILE 2) --
+    PO_MASTER: {
+      prefix:      'PO-',
+      seqDigits:   4,
+      perCategory: false,
+      yearBased:   true,
+      pattern:     'PO-YYYY-NNNN'
+    },
+    PO_LINE_ITEMS: {
+      prefix:      'POL-',
+      seqDigits:   5,
+      perCategory: false,
+      yearBased:   false,
+      pattern:     'POL-NNNNN'
+    },
+    GRN_MASTER: {
+      prefix:      'GRN-',
+      seqDigits:   4,
+      perCategory: false,
+      yearBased:   true,
+      pattern:     'GRN-YYYY-NNNN'
+    },
+    GRN_LINE_ITEMS: {
+      prefix:      'GRL-',
+      seqDigits:   5,
+      perCategory: false,
+      yearBased:   false,
+      pattern:     'GRL-NNNNN'
     }
   },
 
@@ -240,6 +291,49 @@ var CONFIG = {
   PRIORITY_LIST: ['Primary', 'Secondary', 'Backup', 'Approved'],
 
   // ===========================================================================
+  // PROCUREMENT STATUS VALUES
+  // ===========================================================================
+
+  PO_STATUS: {
+    DRAFT:              'Draft',
+    PENDING:            'Pending',
+    APPROVED:           'Approved',
+    SENT:               'Sent',
+    ACKNOWLEDGED:       'Acknowledged',
+    PARTIALLY_RECEIVED: 'Partially Received',
+    FULLY_RECEIVED:     'Fully Received',
+    CANCELLED:          'Cancelled'
+  },
+
+  PO_STATUS_LIST: [
+    'Draft', 'Pending', 'Approved', 'Sent', 'Acknowledged',
+    'Partially Received', 'Fully Received', 'Cancelled'
+  ],
+
+  GRN_STATUS: {
+    PENDING:  'Pending',
+    ACCEPTED: 'Accepted',
+    PARTIAL:  'Partial',
+    REJECTED: 'Rejected'
+  },
+
+  GRN_STATUS_LIST: ['Pending', 'Accepted', 'Partial', 'Rejected'],
+
+  PO_GRN_STATUS_LIST: ['None', 'Partial', 'Full'],
+
+  PO_TYPE_LIST: ['Fabric', 'Trim', 'Packaging', 'Chemicals', 'Services', 'Assets'],
+
+  SEASON_LIST: ['SS25', 'AW25', 'SS26', 'AW26', 'Year Round'],
+
+  CURRENCY_LIST: ['INR', 'USD', 'EUR'],
+
+  INSPECTION_RESULT_LIST: ['Pass', 'Fail', 'Conditional'],
+
+  ITEM_MASTER_LIST: ['FABRIC', 'TRIM', 'YARN', 'WOVEN', 'CONSUMABLE', 'PACKAGING'],
+
+  LINE_STATUS_LIST: ['Open', 'Partial', 'Closed'],
+
+  // ===========================================================================
   // UNITS OF MEASUREMENT
   // ===========================================================================
 
@@ -291,7 +385,8 @@ var CONFIG = {
     TRIM_ATTR_VALUES:     '#1A0A3A',   // Deeper Purple - TRIM_ATTR_VALUES
     FILE_1B_FACTORY:      '#2C3E50',   // Dark Slate - File 1B sheets
     ITEM_SUPPLIER_RATES:  '#004D40',   // Teal - ITEM_SUPPLIER_RATES
-    FILE_1C_FINANCE:      '#1A3A4A'    // Dark Steel - File 1C sheets
+    FILE_1C_FINANCE:      '#1A3A4A',   // Dark Steel - File 1C sheets
+    FILE_2_PROCUREMENT:   '#8B0000'    // Dark Red - procurement sheets
   },
 
   // ===========================================================================
@@ -388,7 +483,20 @@ var CONFIG = {
       FABRIC_TYPE_MASTER: 'CACHE_FABRIC_TYPE_MASTER',
       TAG_MASTER:         'CACHE_TAG_MASTER',
       ITEM_CHANGE_LOG:    'CACHE_ITEM_CHANGE_LOG',
-      MASTER_RELATIONS:   'CACHE_MASTER_RELATIONS'
+      MASTER_RELATIONS:   'CACHE_MASTER_RELATIONS',
+
+      // -- File 2 Procurement --
+      PO_MASTER:           'CACHE_PO_MASTER',
+      PO_LINE_ITEMS:       'CACHE_PO_LINE_ITEMS',
+      GRN_MASTER:          'CACHE_GRN_MASTER',
+      GRN_LINE_ITEMS:      'CACHE_GRN_LINE_ITEMS',
+      MASTER_RELATIONS_F2: 'CACHE_MASTER_RELATIONS_F2',
+
+      // -- File 1B System --
+      PRESENCE:            'CACHE_PRESENCE',
+      NOTIFICATIONS:       'CACHE_NOTIFICATIONS',
+      ROLE_MASTER:         'CACHE_ROLE_MASTER',
+      ROLE_PERMISSIONS:    'CACHE_ROLE_PERMISSIONS'
     }
   },
 

@@ -3,7 +3,7 @@
  * CONFIDENCE CLOTHING — ERP FILE 1B
  * Sheet Structure Setup & Formatting — Factory Master
  * ============================================================
- * Creates all 18 sheets with proper headers, descriptions,
+ * Creates all 23 sheets with proper headers, descriptions,
  * formatting, data validation, and tab colors.
  * ============================================================
  */
@@ -30,11 +30,16 @@ function setupAllSheets_1B(ss) {
   setup1B_WorkCenterMaster_(ss);
   setup1B_JobworkPartyMaster_(ss);
   setup1B_ItemSupplierRates_(ss);
+  setup1B_Presence_(ss);
+  setup1B_Notifications_(ss);
+  setup1B_RoleMaster_(ss);
+  setup1B_RolePermissions_(ss);
+  setup1B_NotificationTemplates_(ss);
 
   // Delete temp sheet created during old-sheet deletion
   deleteTempSheet_(ss);
 
-  Logger.log('All 18 FILE 1B sheets setup complete.');
+  Logger.log('All 23 FILE 1B sheets setup complete.');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -548,4 +553,140 @@ function setup1B_ItemSupplierRates_(ss) {
   setValidation_(sheet, 12, CONFIG.UOM_LIST);
   setValidation_(sheet, 15, CONFIG.PRIORITY_LIST);
   setValidation_(sheet, 20, ['Yes', 'No']);
+}
+
+/* ── 19. PRESENCE (System) ── */
+function setup1B_Presence_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.PRESENCE);
+  var headers = [
+    '# Presence ID', 'User Email', 'User Name', 'Module',
+    'Page / Sheet', 'Last Heartbeat', 'Session Start',
+    'IP Address', 'Device', 'Status'
+  ];
+  var descriptions = [
+    'AUTO: PRS-00001', 'Google account email', 'Display name',
+    'Active module (procurement, masters, etc.)',
+    'Current page or sheet name', 'ISO timestamp of last ping',
+    'ISO timestamp of session start', 'Client IP (if available)',
+    'Browser / device info', 'Online/Away/Offline'
+  ];
+
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — PRESENCE — Real-Time User Presence Tracking',
+    headers, descriptions, '#1B2631'); // Dark system tab
+
+  setValidation_(sheet, 10, ['Online', 'Away', 'Offline']);
+}
+
+/* ── 20. NOTIFICATIONS ── */
+function setup1B_Notifications_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.NOTIFICATIONS);
+  var headers = [
+    '# Notification ID', 'Type', 'Title', 'Message',
+    'To User Email', 'From User Email', 'Module', 'Reference ID',
+    'Created At', 'Read At', 'Status', 'Priority'
+  ];
+  var descriptions = [
+    'AUTO: NTF-00001', 'action/warning/info/system',
+    'Notification headline', 'Detailed message body',
+    'Recipient email', 'Sender email (or SYSTEM)',
+    'Source module', 'Related record ID (PO/GRN/etc.)',
+    'ISO timestamp', 'ISO timestamp when read',
+    'Unread/Read/Dismissed/Archived', 'High/Normal/Low'
+  ];
+
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — NOTIFICATIONS — User Notification Queue',
+    headers, descriptions, '#1B2631');
+
+  setValidation_(sheet, 2, ['action', 'warning', 'info', 'system']);
+  setValidation_(sheet, 11, ['Unread', 'Read', 'Dismissed', 'Archived']);
+  setValidation_(sheet, 12, ['High', 'Normal', 'Low']);
+}
+
+/* ── 21. ROLE_MASTER ── */
+function setup1B_RoleMaster_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.ROLE_MASTER);
+  var headers = [
+    '# Role Code', 'Role Name', 'Description', 'Level', 'Active'
+  ];
+  var descriptions = [
+    'Unique role identifier', 'Display name',
+    'What this role can do', 'Hierarchy level (1=highest)',
+    'Yes/No'
+  ];
+
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — ROLE_MASTER — System Role Definitions',
+    headers, descriptions, '#1B2631');
+
+  setValidation_(sheet, 5, ['Yes', 'No']);
+
+  // Pre-populate 7 standard roles
+  var data = [
+    ['SUPER_ADMIN',    'Super Admin',      'Full system access, can manage all settings and users', 1, 'Yes'],
+    ['ADMIN',          'Admin',            'System admin, can manage users and configuration',       2, 'Yes'],
+    ['PURCHASE_MGR',   'Purchase Manager', 'Manages procurement: PO creation, approval, GRN',       3, 'Yes'],
+    ['PRODUCTION_MGR', 'Production Manager', 'Manages production planning and floor operations',    3, 'Yes'],
+    ['STORE_KEEPER',   'Store Keeper',     'Manages warehouse, inventory, GRN receipt',              4, 'Yes'],
+    ['ACCOUNTS',       'Accounts',         'Finance, billing, payment tracking',                     4, 'Yes'],
+    ['VIEW_ONLY',      'View Only',        'Read-only access to permitted modules',                  5, 'Yes']
+  ];
+  sheet.getRange(4, 1, data.length, data[0].length).setValues(data);
+}
+
+/* ── 22. ROLE_PERMISSIONS ── */
+function setup1B_RolePermissions_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.ROLE_PERMISSIONS);
+  var headers = [
+    '# Permission ID', '→ Role Code', '← Role Name (Auto)',
+    'Sheet / Module', 'Can View', 'Can Edit', 'Can Delete'
+  ];
+  var descriptions = [
+    'AUTO: RPERM-00001', 'FK → ROLE_MASTER', 'Auto from role',
+    'Sheet name or module identifier',
+    'Yes/No', 'Yes/No', 'Yes/No'
+  ];
+
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — ROLE_PERMISSIONS — Role-Sheet Access Matrix',
+    headers, descriptions, '#1B2631');
+
+  setValidation_(sheet, 5, ['Yes', 'No']);
+  setValidation_(sheet, 6, ['Yes', 'No']);
+  setValidation_(sheet, 7, ['Yes', 'No']);
+}
+
+/* ── 23. NOTIFICATION_TEMPLATES ── */
+function setup1B_NotificationTemplates_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.NOTIFICATION_TEMPLATES);
+  var headers = [
+    '# Template Code', 'Template Name', 'Type', 'Title Template',
+    'Message Template', 'Module', 'Active'
+  ];
+  var descriptions = [
+    'Unique template code', 'Descriptive name',
+    'action/warning/info/system', 'Title with {{placeholders}}',
+    'Message body with {{placeholders}}', 'Source module',
+    'Yes/No'
+  ];
+
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — NOTIFICATION_TEMPLATES — Notification Message Templates',
+    headers, descriptions, '#1B2631');
+
+  setValidation_(sheet, 3, ['action', 'warning', 'info', 'system']);
+  setValidation_(sheet, 7, ['Yes', 'No']);
+
+  // Pre-populate standard templates
+  var data = [
+    ['NTPL-001', 'PO Submitted',     'action',  'PO {{po_code}} Submitted for Approval', 'Purchase Order {{po_code}} from {{supplier}} has been submitted and requires your approval. Total: {{currency}} {{total}}.', 'procurement', 'Yes'],
+    ['NTPL-002', 'PO Approved',       'info',    'PO {{po_code}} Approved',                'Your Purchase Order {{po_code}} has been approved by {{approver}}.', 'procurement', 'Yes'],
+    ['NTPL-003', 'PO Rejected',       'warning', 'PO {{po_code}} Rejected',                'Your Purchase Order {{po_code}} has been rejected by {{approver}}. Reason: {{reason}}.', 'procurement', 'Yes'],
+    ['NTPL-004', 'GRN Created',       'info',    'GRN {{grn_code}} Created',                'GRN {{grn_code}} has been created against PO {{po_code}} at {{warehouse}}.', 'procurement', 'Yes'],
+    ['NTPL-005', 'Reorder Alert',     'warning', 'Reorder Alert: {{item_name}}',            '{{item_name}} ({{item_code}}) has fallen below reorder level. Current stock: {{current_qty}} {{uom}}. Reorder level: {{reorder_level}} {{uom}}.', 'inventory', 'Yes'],
+    ['NTPL-006', 'Low Stock Warning',  'warning', 'Low Stock: {{item_name}}',               '{{item_name}} ({{item_code}}) is running low. Current stock: {{current_qty}} {{uom}}.', 'inventory', 'Yes'],
+    ['NTPL-007', 'Maintenance Due',    'action',  'Maintenance Due: {{machine_name}}',      'Scheduled maintenance for {{machine_name}} ({{machine_code}}) is due on {{due_date}}. Type: {{maintenance_type}}.', 'production', 'Yes']
+  ];
+  sheet.getRange(4, 1, data.length, data[0].length).setValues(data);
 }

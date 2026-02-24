@@ -95,6 +95,18 @@ var CROSS_FILE_1C_SHEETS = [
   'PAYMENT_TERMS_MASTER'
 ];
 
+/**
+ * Cross-file sheets pulled from FILE 2 (Procurement).
+ * Requires CONFIG.FILE_IDS.FILE_2 (set in Config.gs).
+ */
+var CROSS_FILE_F2_SHEETS = [
+  'PO_MASTER',
+  'PO_LINE_ITEMS',
+  'GRN_MASTER',
+  'GRN_LINE_ITEMS',
+  'MASTER_RELATIONS_F2'
+];
+
 
 // ===========================================================================
 //  LAYER 1 — CacheService  (session-level, 6-hour TTL)
@@ -330,6 +342,23 @@ function refreshCrossFileProperties() {
     }
   }
 
+  // --- FILE 2 sheets (Procurement) ---
+  var file2Id = CONFIG.FILE_IDS.FILE_2;
+  if (file2Id && file2Id !== 'YOUR_FILE_2_SPREADSHEET_ID') {
+    for (var k = 0; k < CROSS_FILE_F2_SHEETS.length; k++) {
+      var sheetNameF2 = CROSS_FILE_F2_SHEETS[k];
+      try {
+        var dataF2 = readSheetData(sheetNameF2, file2Id);
+        if (dataF2 && dataF2.length > 0) {
+          setCrossFileData(sheetNameF2, dataF2);
+          setCacheData(sheetNameF2, dataF2);
+        }
+      } catch (e) {
+        Logger.log('refreshCrossFileProperties — FILE_2 ' + sheetNameF2 + ': ' + e.message);
+      }
+    }
+  }
+
   Logger.log('refreshCrossFileProperties completed at ' + new Date().toISOString());
 }
 
@@ -501,7 +530,8 @@ function invalidateAllCaches() {
     var allKeys = [];
     var allSheets = LOCAL_MASTERS
       .concat(CROSS_FILE_1B_SHEETS)
-      .concat(CROSS_FILE_1C_SHEETS);
+      .concat(CROSS_FILE_1C_SHEETS)
+      .concat(CROSS_FILE_F2_SHEETS);
 
     // Deduplicate (SUPPLIER_MASTER appears in both 1B and 1C lists)
     var seen = {};
@@ -695,7 +725,8 @@ function onEditCache(e) {
     // Only invalidate if the edited sheet is a known master
     var allKnown = LOCAL_MASTERS
       .concat(CROSS_FILE_1B_SHEETS)
-      .concat(CROSS_FILE_1C_SHEETS);
+      .concat(CROSS_FILE_1C_SHEETS)
+      .concat(CROSS_FILE_F2_SHEETS);
 
     for (var i = 0; i < allKnown.length; i++) {
       if (allKnown[i] === sheetName) {

@@ -102,6 +102,25 @@ function onEdit(e) {
     }
   }
 
+  // ── Procurement: Auto Code Generation (FILE 2 sheets) ──
+  if (isProcurementCodeSheet(sheetName)) {
+    try {
+      handleProcurementCodeGen(e);
+    } catch (err) {
+      Logger.log('Procurement CodeGen error: ' + err.message);
+    }
+  }
+
+  // ── Procurement: FK Auto-Display (FILE 2 sheets) ──
+  if (sheetName === 'PO_MASTER' || sheetName === 'PO_LINE_ITEMS' ||
+      sheetName === 'GRN_MASTER' || sheetName === 'GRN_LINE_ITEMS') {
+    try {
+      handleProcurementFKEdit(e);
+    } catch (err) {
+      Logger.log('Procurement FK error: ' + err.message);
+    }
+  }
+
   // ── Layer 3: Smart Cache Invalidation ──
   try {
     invalidateCache(sheetName);
@@ -140,10 +159,15 @@ function buildCustomMenu_(ui, role) {
   menu.addItem('📦 Supplier Lookup', 'menuOpenSupplierSidebar');
   menu.addSeparator();
 
+  // Procurement
+  menu.addItem('📋 Open Procurement App', 'menuOpenProcurementApp');
+  menu.addSeparator();
+
   // Admin only
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
     menu.addItem('🔧 Setup File 1A Sheets', 'menuSetupSheetStructure');
-    menu.addItem('⚙ MASTER SETUP — All 3 Files', 'masterSetupAll');
+    menu.addItem('🔧 Setup File 2 (Procurement)', 'setupFile2_Only');
+    menu.addItem('⚙ MASTER SETUP — All 4 Files', 'masterSetupAll');
     menu.addItem('📊 Setup All Triggers', 'menuSetupAllTriggers');
     menu.addItem('🗑️ Clear All Caches', 'menuClearAllCaches');
     menu.addItem('📋 View Change Log', 'menuViewChangeLog');
@@ -268,17 +292,46 @@ function menuViewChangeLog() {
   }
 }
 
+function menuOpenProcurementApp() {
+  var html = HtmlService.createTemplateFromFile('index')
+    .evaluate()
+    .setTitle('CC ERP — Procurement')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
 function menuAbout() {
   var ui = SpreadsheetApp.getUi();
   ui.alert(
-    'Confidence Clothing ERP — File 1A',
-    'Version: V4\n' +
-    'Sheets: 23 Item Masters\n' +
-    'Modules: Code Gen, FK Engine, Attr Sync, Change Log, Access Control, Color Swatch, Reorder Alerts, ISR\n' +
+    'Confidence Clothing ERP',
+    'Version: V5\n' +
+    'Files: 1A (22 Items) + 1B (23 Factory) + 1C (6 Finance) + F2 (5 Procurement)\n' +
+    'Modules: Code Gen, FK Engine, Attr Sync, Change Log, Access Control, Color Swatch, Reorder Alerts, ISR, Export, Presence, UIBootstrap, Notifications, QuickAccess, ProcurementAPI\n' +
     'Cache: 3-Layer (CacheService + PropertiesService + Smart Invalidation)\n\n' +
     'Built with Google Apps Script',
     ui.ButtonSet.OK
   );
+}
+
+/* ───────────────────────────────────────────────────────────
+   WEB APP ENTRY POINT — doGet
+   Serves the ERP web app via HtmlService templating.
+   Deploy as: Web App → Execute as: User Accessing → Access: Domain
+   ─────────────────────────────────────────────────────────── */
+function doGet(e) {
+  var template = HtmlService.createTemplateFromFile('index');
+  return template.evaluate()
+    .setTitle('CC ERP — Confidence Clothing')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/* ───────────────────────────────────────────────────────────
+   TEMPLATE INCLUDE HELPER
+   Used in HTML templates: <?!= include('styles') ?>
+   ─────────────────────────────────────────────────────────── */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 /* ───────────────────────────────────────────────────────────

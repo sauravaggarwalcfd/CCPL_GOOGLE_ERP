@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <?!= include('styles') ?>
+</head>
+<body class="mode-light accent-orange">
+
+<!-- ============================================================
+     CC ERP — Main Application Shell
+     ============================================================ -->
+<div class="app-container" id="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h2>CC ERP</h2>
+      <div class="subtitle">Confidence Clothing Pvt. Ltd.</div>
+    </div>
+    <nav class="sidebar-nav" id="sidebarNav">
+      <!-- Populated by JS -->
+    </nav>
+    <div style="padding:12px; border-top:1px solid rgba(255,255,255,0.1);">
+      <div id="userInfo" class="text-xs" style="color:rgba(255,255,255,0.6);"></div>
+      <div id="onlineCount" class="text-xs" style="color:rgba(255,255,255,0.4); margin-top:4px;"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main-content">
+
+    <!-- HEADER BAR -->
+    <header class="header-bar">
+      <div class="flex items-center gap-2">
+        <span class="header-title" id="pageTitle">Dashboard</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-sm" onclick="openCommandPalette()" title="Ctrl+K">&#x2318;K</button>
+        <button class="btn btn-sm" id="btnNotifications" onclick="toggleNotificationPanel()">&#x1F514;</button>
+        <button class="btn btn-sm" onclick="toggleSettingsPanel()">&#x2699;</button>
+      </div>
+    </header>
+
+    <!-- CONTENT AREA -->
+    <main class="content-area" id="contentArea">
+      <div class="text-center p-4">
+        <div class="spinner"></div>
+        <div class="text-muted mt-2">Loading CC ERP...</div>
+      </div>
+    </main>
+
+    <!-- STATUS BAR -->
+    <footer class="status-bar">
+      <div><span class="status-dot" id="statusDot"></span><span id="statusText">Connecting...</span></div>
+      <div id="statusRight">CC ERP v5</div>
+    </footer>
+  </div>
+</div>
+
+<!-- COMMAND PALETTE OVERLAY -->
+<div class="command-palette-overlay" id="commandPaletteOverlay" onclick="closeCommandPalette(event)">
+  <div class="command-palette" onclick="event.stopPropagation()">
+    <input type="text" id="commandInput" placeholder="Type a command or search..." oninput="filterCommands(this.value)">
+    <div class="command-results" id="commandResults"></div>
+  </div>
+</div>
+
+<!-- NOTIFICATION PANEL -->
+<div id="notificationPanel" class="hidden" style="position:fixed; top:var(--header-height); right:0; width:360px; height:calc(100vh - var(--header-height) - var(--status-bar-height)); background:var(--bg-card); border-left:1px solid var(--border-color); z-index:200; overflow-y:auto; box-shadow:var(--shadow-lg);">
+  <div class="p-4" style="border-bottom:1px solid var(--border-color);">
+    <div class="flex items-center justify-between">
+      <span class="font-bold">Notifications</span>
+      <button class="btn btn-sm" onclick="toggleNotificationPanel()">&#x2715;</button>
+    </div>
+  </div>
+  <div id="notificationList" class="p-2"></div>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div id="settingsPanel" class="hidden" style="position:fixed; top:var(--header-height); right:0; width:320px; height:calc(100vh - var(--header-height) - var(--status-bar-height)); background:var(--bg-card); border-left:1px solid var(--border-color); z-index:200; overflow-y:auto; box-shadow:var(--shadow-lg);">
+  <div class="p-4" style="border-bottom:1px solid var(--border-color);">
+    <div class="flex items-center justify-between">
+      <span class="font-bold">Settings</span>
+      <button class="btn btn-sm" onclick="toggleSettingsPanel()">&#x2715;</button>
+    </div>
+  </div>
+  <div class="p-4">
+    <div class="form-group">
+      <label class="form-label">Color Mode</label>
+      <select class="form-select" id="themeMode" onchange="applyThemeMode(this.value)">
+        <option value="light">Light</option>
+        <option value="black">Black</option>
+        <option value="lightgrey">Light Grey</option>
+        <option value="midnight">Midnight</option>
+        <option value="warm">Warm</option>
+        <option value="slate">Slate</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Accent Color</label>
+      <div class="flex gap-2 mt-2" id="accentPicker">
+        <div class="accent-swatch" data-accent="orange" style="background:#f97316;" onclick="applyAccent('orange')"></div>
+        <div class="accent-swatch" data-accent="blue" style="background:#3b82f6;" onclick="applyAccent('blue')"></div>
+        <div class="accent-swatch" data-accent="teal" style="background:#14b8a6;" onclick="applyAccent('teal')"></div>
+        <div class="accent-swatch" data-accent="green" style="background:#22c55e;" onclick="applyAccent('green')"></div>
+        <div class="accent-swatch" data-accent="purple" style="background:#a855f7;" onclick="applyAccent('purple')"></div>
+        <div class="accent-swatch" data-accent="rose" style="background:#f43f5e;" onclick="applyAccent('rose')"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<style>
+.accent-swatch {
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; transition: all 150ms ease;
+}
+.accent-swatch:hover { transform: scale(1.15); }
+.accent-swatch.active { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-card); }
+</style>
+
+<?!= include('scripts') ?>
+
+</body>
+</html>

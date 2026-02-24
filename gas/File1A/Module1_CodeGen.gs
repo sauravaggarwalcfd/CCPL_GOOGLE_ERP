@@ -6,9 +6,9 @@
  * Scope:   FILE 1A — CC ERP Masters (Items)
  * Version: V4
  *
- * Generates sequential item codes for all master sheets in FILE 1A.
+ * Generates sequential item codes for all master sheets in FILE 1A + FILE 2.
  *
- * Code Formats:
+ * Code Formats — FILE 1A:
  *   RM_MASTER_FABRIC   → RM-FAB-001  (auto, 3-digit seq)
  *   RM_MASTER_YARN     → RM-YRN-001  (auto, 3-digit seq)
  *   RM_MASTER_WOVEN    → RM-WVN-001  (auto, 3-digit seq)
@@ -18,6 +18,12 @@
  *   ARTICLE_MASTER     → 5249HP       (manual, validated by GAS)
  *   ITEM_SUPPLIER_RATES→ ISR-00001    (auto, 5-digit seq)
  *
+ * Code Formats — FILE 2 (Procurement):
+ *   PO_MASTER          → PO-2026-0001   (auto, year-based 4-digit seq)
+ *   PO_LINE_ITEMS      → POL-00001      (auto, 5-digit seq)
+ *   GRN_MASTER         → GRN-2026-0001  (auto, year-based 4-digit seq)
+ *   GRN_LINE_ITEMS     → GRL-00001      (auto, 5-digit seq)
+ *
  * Row Layout:
  *   Row 1 = Banner, Row 2 = Headers, Row 3 = Descriptions, Row 4+ = Data
  *
@@ -25,6 +31,7 @@
  *   - Code column is ALWAYS column A (col 1)
  *   - Never overwrite an existing code
  *   - Sequence is per-category for TRIM, CONSUMABLE, PACKAGING
+ *   - Year-based codes reset sequence per year (PO/GRN)
  *   - No company prefix (CC-) anywhere — decision locked V1
  * ============================================================================
  */
@@ -42,7 +49,19 @@ var SIMPLE_CODE_CONFIG = {
   'RM_MASTER_FABRIC':    { prefix: 'RM-FAB-', digits: 3 },
   'RM_MASTER_YARN':      { prefix: 'RM-YRN-', digits: 3 },
   'RM_MASTER_WOVEN':     { prefix: 'RM-WVN-', digits: 3 },
-  'ITEM_SUPPLIER_RATES': { prefix: 'ISR-',    digits: 5 }
+  'ITEM_SUPPLIER_RATES': { prefix: 'ISR-',    digits: 5 },
+  'PO_LINE_ITEMS':       { prefix: 'POL-',    digits: 5 },
+  'GRN_LINE_ITEMS':      { prefix: 'GRL-',    digits: 5 }
+};
+
+/**
+ * Year-based auto-code sheets (FILE 2 — Procurement).
+ * Code format: PREFIX + YEAR + "-" + SEQUENCE
+ * Example: PO-2026-0001, GRN-2026-0042
+ */
+var YEAR_CODE_CONFIG = {
+  'PO_MASTER':  { prefix: 'PO-',  digits: 4 },
+  'GRN_MASTER': { prefix: 'GRN-', digits: 4 }
 };
 
 /**
@@ -136,6 +155,135 @@ function generateItemCode(sheetName, row, category) {
   Logger.log('CodeGen: Generated "' + newCode + '" at row ' + row + ' on "' + sheetName + '".');
 
   return newCode;
+}
+
+
+// ---------------------------------------------------------------------------
+// MAIN ENTRY: generateProcurementCode (FILE 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a code for a new row in a FILE 2 (Procurement) sheet.
+ * Unlike generateItemCode, this opens FILE 2 by ID instead of using
+ * the active spreadsheet.
+ *
+ * Supports both:
+ *   - Year-based codes: PO-2026-0001, GRN-2026-0001
+ *   - Simple sequential: POL-00001, GRL-00001
+ *
+ * @param {string} sheetName - The procurement sheet name (e.g. 'PO_MASTER').
+ * @param {number} row       - The data row number (1-indexed, >= DATA_START_ROW).
+ * @return {string|null}     - The generated code, or null if generation failed.
+ */
+function generateProcurementCode(sheetName, row) {
+  if (row < DATA_START_ROW) {
+    Logger.log('CodeGen-F2: Row ' + row + ' is above data start. Skipping.');
+    return null;
+  }
+
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_2);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    Logger.log('CodeGen-F2: Sheet "' + sheetName + '" not found in FILE 2.');
+    return null;
+  }
+
+  // Never overwrite existing code
+  var existingCode = sheet.getRange(row, CODE_COL).getValue();
+  if (existingCode !== '' && existingCode !== null && existingCode !== undefined) {
+    Logger.log('CodeGen-F2: Row ' + row + ' already has code "' + existingCode + '". Skipping.');
+    return null;
+  }
+
+  var newCode;
+
+  // Year-based codes (PO_MASTER, GRN_MASTER)
+  if (YEAR_CODE_CONFIG.hasOwnProperty(sheetName)) {
+    var cfg = YEAR_CODE_CONFIG[sheetName];
+    var year = new Date().getFullYear().toString();
+    var yearPrefix = cfg.prefix + year + '-';
+    var nextSeq = getNextSequence(sheet, yearPrefix);
+    newCode = yearPrefix + formatSequence(nextSeq, cfg.digits);
+
+    // Duplicate check
+    if (codeExistsInSheet_(sheet, newCode)) {
+      nextSeq++;
+      newCode = yearPrefix + formatSequence(nextSeq, cfg.digits);
+    }
+  }
+  // Simple sequential codes (PO_LINE_ITEMS, GRN_LINE_ITEMS)
+  else if (SIMPLE_CODE_CONFIG.hasOwnProperty(sheetName)) {
+    var sCfg = SIMPLE_CODE_CONFIG[sheetName];
+    var nextSeqS = getNextSequence(sheet, sCfg.prefix);
+    newCode = sCfg.prefix + formatSequence(nextSeqS, sCfg.digits);
+
+    if (codeExistsInSheet_(sheet, newCode)) {
+      nextSeqS++;
+      newCode = sCfg.prefix + formatSequence(nextSeqS, sCfg.digits);
+    }
+  }
+  else {
+    Logger.log('CodeGen-F2: No config found for sheet "' + sheetName + '".');
+    return null;
+  }
+
+  sheet.getRange(row, CODE_COL).setValue(newCode);
+  Logger.log('CodeGen-F2: Generated "' + newCode + '" at row ' + row + ' on "' + sheetName + '".');
+  return newCode;
+}
+
+
+// ---------------------------------------------------------------------------
+// handleProcurementCodeGen — onEdit entry for FILE 2 procurement sheets
+// ---------------------------------------------------------------------------
+
+/**
+ * Called from onEdit routing when an edit occurs on a FILE 2 procurement sheet.
+ * Generates auto-codes for PO_MASTER, PO_LINE_ITEMS, GRN_MASTER, GRN_LINE_ITEMS.
+ *
+ * Trigger conditions:
+ *   - Edit is on a recognized procurement sheet
+ *   - Edited row >= DATA_START_ROW
+ *   - Code cell (col A) is empty
+ *   - Edit is NOT in col A (the auto-code column)
+ *
+ * @param {Event} e - The Google Sheets onEdit event object.
+ */
+function handleProcurementCodeGen(e) {
+  if (!e || !e.range) return;
+
+  var sheet = e.range.getSheet();
+  var sheetName = sheet.getName();
+  var editedRow = e.range.getRow();
+  var editedCol = e.range.getColumn();
+
+  if (editedRow < DATA_START_ROW) return;
+  if (editedCol === CODE_COL) return; // don't trigger on code column itself
+
+  // Only for procurement sheets
+  if (!isProcurementCodeSheet(sheetName)) return;
+
+  // Check if code cell is empty
+  var existingCode = sheet.getRange(editedRow, CODE_COL).getValue();
+  if (existingCode !== '' && existingCode !== null && existingCode !== undefined) return;
+
+  // Require non-empty edit
+  var editedValue = e.range.getValue();
+  if (editedValue === '' || editedValue === null || editedValue === undefined) return;
+
+  generateProcurementCode(sheetName, editedRow);
+}
+
+
+/**
+ * Checks whether a sheet is a procurement auto-code sheet (FILE 2).
+ *
+ * @param {string} sheetName - The sheet name to check.
+ * @return {boolean}
+ */
+function isProcurementCodeSheet(sheetName) {
+  return YEAR_CODE_CONFIG.hasOwnProperty(sheetName) ||
+         (sheetName === 'PO_LINE_ITEMS' || sheetName === 'GRN_LINE_ITEMS');
 }
 
 
@@ -549,6 +697,9 @@ function getDigitCount_(sheetName) {
   if (CATEGORY_CODE_CONFIG.hasOwnProperty(sheetName)) {
     return CATEGORY_CODE_CONFIG[sheetName].digits;
   }
+  if (YEAR_CODE_CONFIG.hasOwnProperty(sheetName)) {
+    return YEAR_CODE_CONFIG[sheetName].digits;
+  }
   return 3; // default
 }
 
@@ -599,6 +750,9 @@ function getCodeConfig(sheetName) {
   if (CATEGORY_CODE_CONFIG.hasOwnProperty(sheetName)) {
     return CATEGORY_CODE_CONFIG[sheetName];
   }
+  if (YEAR_CODE_CONFIG.hasOwnProperty(sheetName)) {
+    return YEAR_CODE_CONFIG[sheetName];
+  }
   return null;
 }
 
@@ -611,7 +765,8 @@ function getCodeConfig(sheetName) {
  */
 function isAutoCodeSheet(sheetName) {
   return SIMPLE_CODE_CONFIG.hasOwnProperty(sheetName) ||
-         CATEGORY_CODE_CONFIG.hasOwnProperty(sheetName);
+         CATEGORY_CODE_CONFIG.hasOwnProperty(sheetName) ||
+         YEAR_CODE_CONFIG.hasOwnProperty(sheetName);
 }
 
 
@@ -646,6 +801,11 @@ function addCodeGenMenuItems(menu) {
       .addItem('Batch Generate — Consumable Master', 'batchGenCONSUMABLE_')
       .addItem('Batch Generate — Packaging Master', 'batchGenPACKAGING_')
       .addItem('Batch Generate — Item Supplier Rates', 'batchGenISR_')
+      .addSeparator()
+      .addItem('Batch Generate — PO Master (F2)', 'batchGenPO_MASTER_')
+      .addItem('Batch Generate — PO Line Items (F2)', 'batchGenPO_LINES_')
+      .addItem('Batch Generate — GRN Master (F2)', 'batchGenGRN_MASTER_')
+      .addItem('Batch Generate — GRN Line Items (F2)', 'batchGenGRN_LINES_')
   );
 }
 
@@ -657,3 +817,64 @@ function batchGenTRIM_()       { batchGenerateCodes('TRIM_MASTER'); }
 function batchGenCONSUMABLE_() { batchGenerateCodes('CONSUMABLE_MASTER'); }
 function batchGenPACKAGING_()  { batchGenerateCodes('PACKAGING_MASTER'); }
 function batchGenISR_()        { batchGenerateCodes('ITEM_SUPPLIER_RATES'); }
+function batchGenPO_MASTER_()  { batchGenerateProcurementCodes('PO_MASTER'); }
+function batchGenPO_LINES_()   { batchGenerateProcurementCodes('PO_LINE_ITEMS'); }
+function batchGenGRN_MASTER_() { batchGenerateProcurementCodes('GRN_MASTER'); }
+function batchGenGRN_LINES_()  { batchGenerateProcurementCodes('GRN_LINE_ITEMS'); }
+
+
+// ---------------------------------------------------------------------------
+// BATCH CODE GENERATION — PROCUREMENT (FILE 2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates codes for all rows in a FILE 2 procurement sheet that are missing codes.
+ *
+ * @param {string} sheetName - The procurement sheet name.
+ */
+function batchGenerateProcurementCodes(sheetName) {
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_2);
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('Sheet "' + sheetName + '" not found in FILE 2.');
+    return;
+  }
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) {
+    SpreadsheetApp.getUi().alert('No data rows found in "' + sheetName + '".');
+    return;
+  }
+
+  var numDataRows = lastRow - DATA_START_ROW + 1;
+  var lastCol = sheet.getLastColumn();
+  var allData = sheet.getRange(DATA_START_ROW, 1, numDataRows, Math.max(lastCol, 2)).getValues();
+  var codesGenerated = 0;
+
+  for (var i = 0; i < allData.length; i++) {
+    var row = allData[i];
+    var rowNum = DATA_START_ROW + i;
+    var existingCode = row[0];
+
+    if (existingCode !== '' && existingCode !== null && existingCode !== undefined) continue;
+
+    // Skip truly empty rows
+    var hasContent = false;
+    for (var c = 1; c < row.length; c++) {
+      if (row[c] !== '' && row[c] !== null && row[c] !== undefined) {
+        hasContent = true;
+        break;
+      }
+    }
+    if (!hasContent) continue;
+
+    generateProcurementCode(sheetName, rowNum);
+    codesGenerated++;
+  }
+
+  SpreadsheetApp.getUi().alert(
+    'Batch Code Generation Complete (FILE 2)\n\n' +
+    'Sheet: ' + sheetName + '\n' +
+    'Codes generated: ' + codesGenerated
+  );
+}
