@@ -22,9 +22,9 @@ var CONFIG = {
   // ===========================================================================
 
   FILE_IDS: {
-    FILE_1A: 'YOUR_FILE_1A_SPREADSHEET_ID',
-    FILE_1B: 'YOUR_FILE_1B_SPREADSHEET_ID',
-    FILE_1C: 'YOUR_FILE_1C_SPREADSHEET_ID'
+    FILE_1A: '1eaDbKEJpty6c7_FrVm5wElOce_z4yHRMr3E-SAskdMc',
+    FILE_1B: '1WjtpBhXwYVBVnPSDbzTWm8X0nyVhzsailBpRqXi7Se4',
+    FILE_1C: '1t3zHrORAjZJ2cVr8bru4HE4kUvyYdm5RDICA8NkiDX8'
   },
 
   // ===========================================================================
@@ -69,6 +69,44 @@ var CONFIG = {
 
     // -- Relations --
     MASTER_RELATIONS:     'MASTER_RELATIONS'
+  },
+
+  // ===========================================================================
+  // SHEET NAMES - FILE 1B (Factory Master - 18 sheets)
+  // ===========================================================================
+
+  SHEETS_1B: {
+    USER_MASTER:          'USER_MASTER',
+    DEPARTMENT_MASTER:    'DEPARTMENT_MASTER',
+    DESIGNATION_MASTER:   'DESIGNATION_MASTER',
+    SHIFT_MASTER:         'SHIFT_MASTER',
+    CUSTOMER_MASTER:      'CUSTOMER_MASTER',
+    CONTRACTOR_MASTER:    'CONTRACTOR_MASTER',
+    WAREHOUSE_MASTER:     'WAREHOUSE_MASTER',
+    STORAGE_BIN_MASTER:   'STORAGE_BIN_MASTER',
+    FACTORY_MASTER:       'FACTORY_MASTER',
+    MACHINE_MASTER:       'MACHINE_MASTER',
+    MACHINE_CATEGORY:     'MACHINE_CATEGORY',
+    ASSET_MASTER:         'ASSET_MASTER',
+    MAINTENANCE_SCHEDULE: 'MAINTENANCE_SCHEDULE',
+    SPARE_PARTS_MASTER:   'SPARE_PARTS_MASTER',
+    PROCESS_MASTER:       'PROCESS_MASTER',
+    WORK_CENTER_MASTER:   'WORK_CENTER_MASTER',
+    JOBWORK_PARTY_MASTER: 'JOBWORK_PARTY_MASTER',
+    ITEM_SUPPLIER_RATES:  'ITEM_SUPPLIER_RATES'
+  },
+
+  // ===========================================================================
+  // SHEET NAMES - FILE 1C (Finance Master - 6 sheets)
+  // ===========================================================================
+
+  SHEETS_1C: {
+    SUPPLIER_MASTER:       'SUPPLIER_MASTER',
+    PAYMENT_TERMS_MASTER:  'PAYMENT_TERMS_MASTER',
+    TAX_MASTER:            'TAX_MASTER',
+    BANK_MASTER:           'BANK_MASTER',
+    COST_CENTER_MASTER:    'COST_CENTER_MASTER',
+    ACCOUNT_MASTER:        'ACCOUNT_MASTER'
   },
 
   // ===========================================================================

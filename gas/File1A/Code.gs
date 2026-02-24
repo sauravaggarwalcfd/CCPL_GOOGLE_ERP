@@ -142,7 +142,8 @@ function buildCustomMenu_(ui, role) {
 
   // Admin only
   if (role === 'SUPER_ADMIN' || role === 'ADMIN') {
-    menu.addItem('🔧 Setup Sheet Structure', 'menuSetupSheetStructure');
+    menu.addItem('🔧 Setup File 1A Sheets', 'menuSetupSheetStructure');
+    menu.addItem('⚙ MASTER SETUP — All 3 Files', 'masterSetupAll');
     menu.addItem('📊 Setup All Triggers', 'menuSetupAllTriggers');
     menu.addItem('🗑️ Clear All Caches', 'menuClearAllCaches');
     menu.addItem('📋 View Change Log', 'menuViewChangeLog');

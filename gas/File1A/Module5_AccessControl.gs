@@ -104,9 +104,10 @@ var AC_SHEET_GROUPS = {
  * @param {string} email      - The user's email address
  * @param {string} sheetName  - The name of the sheet being accessed
  * @param {string} actionType - 'edit' or 'read'
+ * @param {string=} optRole   - Optional pre-resolved role (avoids repeated lookups)
  * @returns {Object} { canEdit: boolean, canRead: boolean, role: string }
  */
-function checkUserAccess(email, sheetName, actionType) {
+function checkUserAccess(email, sheetName, actionType, optRole) {
   var result = {
     canEdit: false,
     canRead: false,
@@ -114,16 +115,15 @@ function checkUserAccess(email, sheetName, actionType) {
   };
 
   try {
-    if (!email || !sheetName) {
-      Logger.log('ACCESS :: checkUserAccess - Missing email or sheetName.');
+    if (!sheetName) {
+      Logger.log('ACCESS :: checkUserAccess - Missing sheetName.');
       return result;
     }
 
-    var role = getUserRole(email);
+    var role = optRole || getUserRole(email);
     result.role = role;
 
     if (!role) {
-      Logger.log('ACCESS :: checkUserAccess - No role found for email: ' + email);
       return result;
     }
 
@@ -228,9 +228,13 @@ function checkUserAccess(email, sheetName, actionType) {
 }
 
 
+/** Sentinel value used to cache "user not found" results so we don't re-query. */
+var AC_NOT_FOUND_SENTINEL = '__NOT_FOUND__';
+
 /**
  * Reads the user's role from USER_MASTER in FILE 1B.
  * Uses 3-layer cache: CacheService -> PropertiesService -> direct sheet read.
+ * Caches negative results (user not found) to prevent repeated cross-file lookups.
  *
  * @param {string} email - The user's email address
  * @returns {string} The role string (e.g. 'SUPER_ADMIN'), or empty string if not found
@@ -248,7 +252,7 @@ function getUserRole(email) {
     var cache = CacheService.getScriptCache();
     var cachedRole = cache.get(cacheKey);
     if (cachedRole !== null) {
-      return cachedRole;
+      return cachedRole === AC_NOT_FOUND_SENTINEL ? '' : cachedRole;
     }
   } catch (e) {
     Logger.log('ACCESS :: getUserRole - CacheService read failed: ' + e.message);
@@ -263,7 +267,7 @@ function getUserRole(email) {
       try {
         CacheService.getScriptCache().put(cacheKey, storedRole, AC_CACHE_TTL);
       } catch (e2) { /* ignore cache write failure */ }
-      return storedRole;
+      return storedRole === AC_NOT_FOUND_SENTINEL ? '' : storedRole;
     }
   } catch (e) {
     Logger.log('ACCESS :: getUserRole - PropertiesService read failed: ' + e.message);
@@ -272,15 +276,14 @@ function getUserRole(email) {
   // --- Layer 3: Direct sheet read (fallback, slowest) ---
   var role = _readRoleFromUserMaster(normalizedEmail);
 
-  // Store in both cache layers for future lookups
-  if (role) {
-    try {
-      CacheService.getScriptCache().put(cacheKey, role, AC_CACHE_TTL);
-    } catch (e) { /* ignore */ }
-    try {
-      PropertiesService.getScriptProperties().setProperty(cacheKey, role);
-    } catch (e) { /* ignore */ }
-  }
+  // Store in both cache layers — including negative results to prevent repeated lookups
+  var valueToCache = role || AC_NOT_FOUND_SENTINEL;
+  try {
+    CacheService.getScriptCache().put(cacheKey, valueToCache, AC_CACHE_TTL);
+  } catch (e) { /* ignore */ }
+  try {
+    PropertiesService.getScriptProperties().setProperty(cacheKey, valueToCache);
+  } catch (e) { /* ignore */ }
 
   return role;
 }
@@ -310,23 +313,42 @@ function applyAccessControl() {
 
     var sheets = ss.getSheets();
 
+    // First pass: determine which sheets are visible vs hidden
+    var visibleSheets = [];
+    var hiddenSheets = [];
+
     for (var i = 0; i < sheets.length; i++) {
       var sheet = sheets[i];
       var sheetName = sheet.getName();
-      var access = checkUserAccess(email, sheetName, 'read');
+      // Pass role directly to avoid repeated getUserRole lookups
+      var access = checkUserAccess(email, sheetName, 'read', role);
 
-      if (!access.canRead) {
-        // Hide sheets the user has no read access to
-        sheet.hideSheet();
+      if (access.canRead) {
+        visibleSheets.push({ sheet: sheet, canEdit: access.canEdit });
       } else {
-        // Ensure readable sheets are visible
-        sheet.showSheet();
-
-        if (!access.canEdit) {
-          // Protect read-only sheets — user can view but not edit data rows
-          protectSheet(sheet, []);
-        }
+        hiddenSheets.push(sheet);
       }
+    }
+
+    // Safety: ensure at least one sheet stays visible
+    if (visibleSheets.length === 0 && sheets.length > 0) {
+      // Show the first sheet as fallback to prevent "can't hide all sheets" error
+      visibleSheets.push({ sheet: sheets[0], canEdit: false });
+      hiddenSheets = sheets.slice(1);
+      Logger.log('ACCESS :: applyAccessControl - No readable sheets for role ' + role + '. Showing first sheet as fallback.');
+    }
+
+    // Second pass: show visible sheets and apply protections
+    for (var v = 0; v < visibleSheets.length; v++) {
+      visibleSheets[v].sheet.showSheet();
+      if (!visibleSheets[v].canEdit) {
+        protectSheet(visibleSheets[v].sheet, []);
+      }
+    }
+
+    // Third pass: hide non-readable sheets
+    for (var h = 0; h < hiddenSheets.length; h++) {
+      hiddenSheets[h].hideSheet();
     }
 
     // Build the role-specific custom menu

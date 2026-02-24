@@ -2,265 +2,696 @@
 <html>
 <head>
   <base target="_top">
+
+  <!-- Google Material Design Lite -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.red-indigo.min.css">
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Google Sans', Roboto, Arial, sans-serif;
-      font-size: 13px;
-      color: #333;
-      padding: 16px;
-      background: #fafafa;
+    /* =====================================================================
+     * CCPL ERP — Create New FK Record Sidebar
+     * Width: 300px (standard GAS sidebar)
+     * Dynamic form fields loaded from master sheet column headers (row 2)
+     * Theme: Header #CC0000, Material Design
+     * ===================================================================== */
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
-    .header {
+
+    body {
+      font-family: 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+      font-size: 13px;
+      color: #333333;
+      background: #FAFAFA;
+      width: 300px;
+      overflow-x: hidden;
+    }
+
+    /* --- Header --- */
+    .sidebar-header {
       background: #CC0000;
-      color: white;
-      padding: 12px 16px;
-      margin: -16px -16px 16px -16px;
+      color: #FFFFFF;
+      padding: 16px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .sidebar-header h3 {
       font-size: 15px;
       font-weight: 500;
+      margin: 0 0 4px 0;
     }
-    .header small {
-      display: block;
+
+    .sidebar-header .context-info {
+      font-size: 12px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .sidebar-header .sheet-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 2px 8px;
+      border-radius: 3px;
       font-size: 11px;
-      opacity: 0.8;
+      font-family: 'Roboto Mono', monospace;
       margin-top: 4px;
     }
-    .info-bar {
-      background: #FFF3E0;
-      border-left: 3px solid #F39C12;
-      padding: 8px 12px;
+
+    /* --- Content area --- */
+    .sidebar-content {
+      padding: 16px;
+    }
+
+    /* --- Info banner --- */
+    .info-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      background: #E3F2FD;
+      border: 1px solid #BBDEFB;
+      border-radius: 4px;
+      padding: 10px 12px;
       margin-bottom: 16px;
       font-size: 12px;
-      border-radius: 0 4px 4px 0;
+      color: #1565C0;
+      line-height: 1.4;
     }
+
+    .info-banner .material-icons {
+      font-size: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* --- Form --- */
+    .form-container {
+      display: none;
+    }
+
+    .form-container.visible {
+      display: block;
+    }
+
     .form-group {
       margin-bottom: 14px;
     }
-    .form-group label {
+
+    .form-label {
       display: block;
       font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #666666;
+      margin-bottom: 4px;
+    }
+
+    .form-label .required-star {
+      color: #CC0000;
+      margin-left: 2px;
+    }
+
+    .form-label .auto-badge {
+      display: inline-block;
+      font-size: 9px;
       font-weight: 600;
-      color: #555;
+      background: #F0F0F0;
+      color: #999999;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 4px;
       text-transform: uppercase;
       letter-spacing: 0.3px;
-      margin-bottom: 4px;
     }
-    .form-group .desc {
-      font-size: 10px;
-      color: #999;
-      margin-bottom: 4px;
+
+    .form-label .readonly-badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 600;
+      background: #FFF3E0;
+      color: #E65100;
+      padding: 1px 5px;
+      border-radius: 3px;
+      margin-left: 4px;
+      text-transform: uppercase;
     }
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
+
+    .form-input {
       width: 100%;
       padding: 8px 10px;
-      border: 1px solid #ddd;
+      border: 1px solid #E0E0E0;
       border-radius: 4px;
       font-size: 13px;
       font-family: inherit;
-    }
-    .form-group input:focus,
-    .form-group select:focus,
-    .form-group textarea:focus {
       outline: none;
+      transition: border-color 0.2s;
+      background: #FFFFFF;
+    }
+
+    .form-input:focus {
       border-color: #CC0000;
-      box-shadow: 0 0 0 2px rgba(204, 0, 0, 0.1);
+      box-shadow: 0 0 0 1px rgba(204, 0, 0, 0.1);
     }
-    .form-group textarea { resize: vertical; min-height: 60px; }
-    .form-group .required::after {
-      content: ' *';
-      color: #CC0000;
+
+    .form-input:disabled,
+    .form-input.readonly {
+      background: #F5F5F5;
+      color: #999999;
+      cursor: not-allowed;
     }
-    .divider { border-top: 1px solid #eee; margin: 16px 0; }
+
+    .form-input.auto-generated {
+      background: #F9F9F9;
+      color: #AAAAAA;
+      font-style: italic;
+      border-style: dashed;
+    }
+
+    select.form-input {
+      appearance: auto;
+    }
+
+    textarea.form-input {
+      min-height: 60px;
+      resize: vertical;
+    }
+
+    .form-hint {
+      font-size: 10px;
+      color: #AAAAAA;
+      margin-top: 2px;
+      font-style: italic;
+    }
+
+    /* --- Footer / buttons --- */
+    .sidebar-footer {
+      position: sticky;
+      bottom: 0;
+      background: #FFFFFF;
+      border-top: 1px solid #E0E0E0;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      z-index: 10;
+    }
+
     .btn {
       padding: 8px 20px;
-      border: none;
       border-radius: 4px;
       font-size: 13px;
-      cursor: pointer;
       font-weight: 500;
-      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+      transition: background 0.2s, opacity 0.2s;
     }
-    .btn-primary { background: #CC0000; color: white; }
-    .btn-primary:hover { background: #AA0000; }
-    .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-    .btn-secondary { background: #f0f0f0; color: #333; }
-    .btn-secondary:hover { background: #ddd; }
-    .btn-row {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-      margin-top: 16px;
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
-    .loading { text-align: center; padding: 40px; color: #999; }
-    .success-msg {
-      background: #E8F5E9;
-      border: 1px solid #27AE60;
-      color: #27AE60;
-      padding: 12px;
-      border-radius: 4px;
+
+    .btn-cancel {
+      background: #F5F5F5;
+      color: #666666;
+      border: 1px solid #E0E0E0;
+    }
+
+    .btn-cancel:hover:not(:disabled) {
+      background: #EEEEEE;
+    }
+
+    .btn-create {
+      background: #CC0000;
+      color: #FFFFFF;
+    }
+
+    .btn-create:hover:not(:disabled) {
+      background: #B00000;
+    }
+
+    /* --- Loading spinner --- */
+    .loading {
       text-align: center;
-      display: none;
-      margin-top: 16px;
+      padding: 40px 16px;
+      color: #888888;
     }
-    .success-msg.show { display: block; }
-    .error-msg {
-      background: #FFEBEE;
-      border: 1px solid #CC0000;
-      color: #CC0000;
+
+    .spinner {
+      border: 3px solid #F0F0F0;
+      border-top: 3px solid #CC0000;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* --- Status message --- */
+    .status-msg {
+      text-align: center;
       padding: 8px;
-      border-radius: 4px;
       font-size: 12px;
+      border-radius: 4px;
+      margin: 12px 0;
       display: none;
-      margin-top: 8px;
     }
-    .error-msg.show { display: block; }
-    #formContainer { display: none; }
+
+    .status-msg.success {
+      display: block;
+      background: #E8F5E9;
+      color: #2E7D32;
+    }
+
+    .status-msg.error {
+      display: block;
+      background: #FFEBEE;
+      color: #C62828;
+    }
+
+    .status-msg.info {
+      display: block;
+      background: #E3F2FD;
+      color: #1565C0;
+    }
+
+    /* --- Success result --- */
+    .success-result {
+      display: none;
+      text-align: center;
+      padding: 24px 16px;
+    }
+
+    .success-result.visible {
+      display: block;
+    }
+
+    .success-result .material-icons {
+      font-size: 48px;
+      color: #4CAF50;
+      display: block;
+      margin-bottom: 12px;
+    }
+
+    .success-result .new-code {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 18px;
+      font-weight: 600;
+      color: #1A1A2E;
+      margin-bottom: 4px;
+    }
+
+    .success-result .success-text {
+      font-size: 13px;
+      color: #666666;
+    }
   </style>
 </head>
+
 <body>
-  <div class="header">
-    ➕ Create New Record
-    <small id="headerSheetName">Loading...</small>
+
+  <!-- Header -->
+  <div class="sidebar-header">
+    <h3 id="headerTitle">Create New Record</h3>
+    <div class="context-info">
+      Create a new record in the referenced master sheet.
+      <div class="sheet-badge" id="headerSheetBadge"></div>
+    </div>
   </div>
 
-  <div class="info-bar">
-    Fill in the required fields to create a new record. The code will be auto-generated.
+  <!-- Content -->
+  <div class="sidebar-content">
+
+    <!-- Loading state -->
+    <div id="loadingState" class="loading">
+      <div class="spinner"></div>
+      Loading form fields...
+    </div>
+
+    <!-- Info banner -->
+    <div id="infoBanner" class="info-banner" style="display:none;">
+      <span class="material-icons">info</span>
+      <span>Auto-generated fields (marked <em>AUTO</em>) will be filled automatically. Read-only fields will be populated after creation.</span>
+    </div>
+
+    <!-- Dynamic form -->
+    <div id="formContainer" class="form-container">
+      <div id="formFields"></div>
+    </div>
+
+    <!-- Success result -->
+    <div id="successResult" class="success-result">
+      <span class="material-icons">check_circle</span>
+      <div class="new-code" id="newCodeDisplay"></div>
+      <div class="success-text">Record created successfully.<br>Inserting into FK cell...</div>
+    </div>
+
+    <!-- Status message -->
+    <div id="statusMsg" class="status-msg"></div>
   </div>
 
-  <div id="loadingState" class="loading">Loading form fields...</div>
-
-  <div id="formContainer"></div>
-
-  <div id="successMsg" class="success-msg">
-    ✅ Record created! Code: <strong id="newCodeDisplay"></strong>
-  </div>
-
-  <div id="errorMsg" class="error-msg"></div>
-
-  <div class="divider"></div>
-
-  <div class="btn-row">
-    <button class="btn btn-secondary" onclick="google.script.host.close()">Cancel</button>
-    <button class="btn btn-primary" id="createBtn" onclick="createRecord()" disabled>
-      ✅ Create Record
-    </button>
+  <!-- Footer -->
+  <div class="sidebar-footer">
+    <button class="btn btn-cancel" id="btnCancel" onclick="handleCancel()">Cancel</button>
+    <button class="btn btn-create" id="btnCreate" onclick="handleCreate()" disabled>Create</button>
   </div>
 
   <script>
-    var targetSheet = '';
-    var formFields = [];
+    // =========================================================================
+    // Create New FK Record Sidebar — Client-Side Logic
+    // =========================================================================
 
-    // Get sheet name from URL parameter or server
-    function init(sheetName) {
-      targetSheet = sheetName;
-      document.getElementById('headerSheetName').textContent = 'New ' + sheetName + ' record';
+    /**
+     * State variables
+     */
+    var sheetName     = '';    // Target master sheet name
+    var fieldDefs     = [];    // Array of field definitions from server
+    var fkCellRef     = '';    // A1 reference of the FK cell that triggered this sidebar
+    var codeFieldName = '';    // Name of the auto-generated code field
 
+    /**
+     * Header prefix symbols (matching CONFIG.HEADER_PREFIXES in Config.gs)
+     */
+    var PREFIX = {
+      FK_TO:          '\u2192',   // ->
+      AUTO_DISPLAY:   '\u2190',   // <-
+      TWO_WAY_SYNC:   '\u27F7',  // <->
+      CALCULATED:     '\u2211',   // SUM
+      MANDATORY:      '\u26A0',   // !!
+      AUTO_GENERATED: '#',        // #
+      PRIMARY_KEY:    '\uD83D\uDD11' // KEY
+    };
+
+    // -----------------------------------------------------------------------
+    // Initialization
+    // -----------------------------------------------------------------------
+
+    document.addEventListener('DOMContentLoaded', function() {
       google.script.run
-        .withSuccessHandler(renderForm)
-        .withFailureHandler(showError)
-        .getSheetHeaders(sheetName);
-    }
+        .withSuccessHandler(onFormDataLoaded)
+        .withFailureHandler(onFormDataError)
+        .getCreateNewFormData();
+    });
 
-    function renderForm(fields) {
-      formFields = fields;
-      var container = document.getElementById('formContainer');
-      container.innerHTML = '';
-
-      if (!fields || fields.length === 0) {
-        container.innerHTML = '<div class="loading">No editable fields found.</div>';
+    /**
+     * Callback: receives form field definitions from server.
+     *
+     * @param {Object} data
+     *   {string}   data.sheetName    - Target master sheet name
+     *   {string}   data.fkCellRef    - FK cell reference
+     *   {Object[]} data.fields       - Array of field definitions:
+     *     {string}   field.header      - Raw header text from row 2
+     *     {string}   field.cleanName   - Header without prefix symbols
+     *     {string}   field.type        - 'text'|'number'|'date'|'dropdown'|'auto'|'readonly'
+     *     {boolean}  field.required    - Whether field is mandatory
+     *     {boolean}  field.isCode      - Whether this is the auto-generated code field
+     *     {boolean}  field.isAutoDisplay - Whether this is an auto-display (<-) field
+     *     {boolean}  field.isFK        - Whether this is an FK (->) field
+     *     {boolean}  field.isCalculated - Whether this is a calculated (SUM) field
+     *     {string[]} field.options     - Dropdown options (if type is 'dropdown')
+     *     {number}   field.colIndex    - Column index (1-based)
+     */
+    function onFormDataLoaded(data) {
+      if (!data || !data.fields || data.fields.length === 0) {
+        document.getElementById('loadingState').style.display = 'none';
+        showStatus('No form fields available for this sheet.', 'error');
         return;
       }
 
-      fields.forEach(function(field) {
+      sheetName = data.sheetName || '';
+      fieldDefs = data.fields || [];
+      fkCellRef = data.fkCellRef || '';
+
+      // Find the code field name
+      for (var i = 0; i < fieldDefs.length; i++) {
+        if (fieldDefs[i].isCode) {
+          codeFieldName = fieldDefs[i].cleanName;
+          break;
+        }
+      }
+
+      // Update header
+      var displayName = sheetName.replace(/_/g, ' ');
+      document.getElementById('headerTitle').textContent = 'Create New ' + displayName;
+      document.getElementById('headerSheetBadge').textContent = sheetName;
+
+      // Hide loading, show form
+      document.getElementById('loadingState').style.display = 'none';
+      document.getElementById('infoBanner').style.display = 'flex';
+      document.getElementById('formContainer').classList.add('visible');
+
+      buildForm();
+      document.getElementById('btnCreate').disabled = false;
+    }
+
+    function onFormDataError(err) {
+      document.getElementById('loadingState').style.display = 'none';
+      showStatus('Error loading form: ' + (err.message || err), 'error');
+    }
+
+    // -----------------------------------------------------------------------
+    // Build dynamic form
+    // -----------------------------------------------------------------------
+
+    function buildForm() {
+      var container = document.getElementById('formFields');
+      container.innerHTML = '';
+
+      fieldDefs.forEach(function(field, index) {
         var group = document.createElement('div');
         group.className = 'form-group';
 
+        // --- Label ---
         var label = document.createElement('label');
-        var isRequired = field.header.indexOf('⚠') !== -1;
-        if (isRequired) {
-          label.className = 'required';
+        label.className = 'form-label';
+        label.setAttribute('for', 'field_' + index);
+
+        var labelText = escapeHtml(field.cleanName);
+
+        // Add required star for mandatory fields
+        if (field.required && !field.isCode && !field.isAutoDisplay && !field.isCalculated) {
+          labelText += '<span class="required-star">*</span>';
         }
-        label.textContent = field.header.replace(/[→⟷⚠🔑#←∑]/g, '').trim();
+
+        // Add badge for auto-generated fields
+        if (field.isCode) {
+          labelText += '<span class="auto-badge">AUTO</span>';
+        }
+
+        // Add badge for read-only auto-display fields
+        if (field.isAutoDisplay || field.isCalculated) {
+          labelText += '<span class="readonly-badge">READ-ONLY</span>';
+        }
+
+        label.innerHTML = labelText;
         group.appendChild(label);
 
-        if (field.description) {
-          var desc = document.createElement('div');
-          desc.className = 'desc';
-          desc.textContent = field.description;
-          group.appendChild(desc);
+        // --- Input element ---
+        var input;
+        var fieldId = 'field_' + index;
+
+        if (field.isCode) {
+          // Auto-generated code field — show placeholder, disabled
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-input auto-generated';
+          input.value = '';
+          input.placeholder = 'Auto-generated on save';
+          input.disabled = true;
+          input.id = fieldId;
+
+        } else if (field.isAutoDisplay || field.isCalculated) {
+          // Read-only field — disabled
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-input readonly';
+          input.value = '';
+          input.placeholder = 'Auto-populated';
+          input.disabled = true;
+          input.id = fieldId;
+
+        } else if (field.type === 'dropdown' && field.options && field.options.length > 0) {
+          // Dropdown
+          input = document.createElement('select');
+          input.className = 'form-input';
+          input.id = fieldId;
+
+          var emptyOpt = document.createElement('option');
+          emptyOpt.value = '';
+          emptyOpt.textContent = '-- Select --';
+          input.appendChild(emptyOpt);
+
+          field.options.forEach(function(opt) {
+            var option = document.createElement('option');
+            option.value = opt;
+            option.textContent = opt;
+            input.appendChild(option);
+          });
+
+        } else if (field.type === 'date') {
+          // Date field
+          input = document.createElement('input');
+          input.type = 'date';
+          input.className = 'form-input';
+          input.id = fieldId;
+
+        } else if (field.type === 'number') {
+          // Number field
+          input = document.createElement('input');
+          input.type = 'number';
+          input.className = 'form-input';
+          input.step = 'any';
+          input.id = fieldId;
+
+        } else if (field.type === 'textarea') {
+          // Textarea for notes/descriptions
+          input = document.createElement('textarea');
+          input.className = 'form-input';
+          input.rows = 3;
+          input.id = fieldId;
+
+        } else {
+          // Default: text input
+          input = document.createElement('input');
+          input.type = 'text';
+          input.className = 'form-input';
+          input.id = fieldId;
         }
 
-        var input = document.createElement('input');
-        input.type = 'text';
-        input.id = 'field_' + field.col;
-        input.setAttribute('data-col', field.col);
+        // Store field metadata as data attributes
+        input.setAttribute('data-field-index', index);
+        input.setAttribute('data-col-index', field.colIndex);
         input.setAttribute('data-header', field.header);
-        if (isRequired) input.required = true;
-        input.placeholder = field.description || 'Enter value';
+        input.setAttribute('data-clean-name', field.cleanName);
+        input.setAttribute('data-required', field.required ? 'true' : 'false');
+
         group.appendChild(input);
+
+        // --- Hint for FK fields ---
+        if (field.isFK) {
+          var hint = document.createElement('div');
+          hint.className = 'form-hint';
+          hint.textContent = 'Foreign key reference';
+          group.appendChild(hint);
+        }
 
         container.appendChild(group);
       });
-
-      document.getElementById('loadingState').style.display = 'none';
-      container.style.display = 'block';
-      document.getElementById('createBtn').disabled = false;
     }
 
-    function createRecord() {
-      var btn = document.getElementById('createBtn');
-      btn.disabled = true;
-      btn.textContent = 'Creating...';
+    // -----------------------------------------------------------------------
+    // Create record
+    // -----------------------------------------------------------------------
 
+    function handleCreate() {
+      // Validate required fields
       var formData = {};
-      formFields.forEach(function(field) {
-        var input = document.getElementById('field_' + field.col);
-        if (input) {
-          formData[field.header] = input.value;
+      var errors = [];
+
+      fieldDefs.forEach(function(field, index) {
+        var input = document.getElementById('field_' + index);
+        if (!input) return;
+
+        // Skip auto-generated and read-only fields
+        if (field.isCode || field.isAutoDisplay || field.isCalculated) {
+          return;
         }
+
+        var value = (input.value || '').trim();
+
+        // Check required fields
+        if (field.required && !value) {
+          errors.push(field.cleanName + ' is required.');
+          input.style.borderColor = '#CC0000';
+        } else {
+          input.style.borderColor = '#E0E0E0';
+        }
+
+        formData[field.cleanName] = value;
       });
 
+      if (errors.length > 0) {
+        showStatus(errors.join(' '), 'error');
+        return;
+      }
+
+      // Disable buttons
+      document.getElementById('btnCreate').disabled = true;
+      document.getElementById('btnCancel').disabled = true;
+      document.getElementById('btnCreate').textContent = 'Creating...';
+      showStatus('Creating record...', 'info');
+
       google.script.run
-        .withSuccessHandler(function(result) {
-          if (result && result.code) {
-            document.getElementById('newCodeDisplay').textContent = result.code;
-            document.getElementById('successMsg').classList.add('show');
-            document.getElementById('formContainer').style.display = 'none';
-            btn.textContent = 'Done!';
-
-            // Close after 2 seconds
-            setTimeout(function() {
-              google.script.host.close();
-            }, 2000);
-          } else {
-            showError('Failed to create record.');
-            btn.disabled = false;
-            btn.textContent = '✅ Create Record';
-          }
-        })
-        .withFailureHandler(function(err) {
-          showError(err.message || 'Error creating record.');
-          btn.disabled = false;
-          btn.textContent = '✅ Create Record';
-        })
-        .createNewFKRecord(targetSheet, formData);
+        .withSuccessHandler(onCreateSuccess)
+        .withFailureHandler(onCreateFailure)
+        .createNewFKRecord(sheetName, formData);
     }
 
-    function showError(msg) {
-      var el = document.getElementById('errorMsg');
-      el.textContent = msg;
-      el.classList.add('show');
-      setTimeout(function() { el.classList.remove('show'); }, 5000);
+    function onCreateSuccess(result) {
+      if (result && result.success) {
+        // Hide form, show success
+        document.getElementById('formContainer').classList.remove('visible');
+        document.getElementById('infoBanner').style.display = 'none';
+        document.getElementById('statusMsg').className = 'status-msg';
+
+        var successEl = document.getElementById('successResult');
+        successEl.classList.add('visible');
+        document.getElementById('newCodeDisplay').textContent = result.code || 'New Record';
+
+        // Auto-close after delay
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
+      } else {
+        showStatus((result && result.message) || 'Failed to create record.', 'error');
+        document.getElementById('btnCreate').disabled = false;
+        document.getElementById('btnCancel').disabled = false;
+        document.getElementById('btnCreate').textContent = 'Create';
+      }
     }
 
-    // Initialize with sheet name passed from server
-    // The calling GAS function should pass the sheet name via template
-    // For now, try to get it from a global
-    if (typeof SIDEBAR_SHEET_NAME !== 'undefined') {
-      init(SIDEBAR_SHEET_NAME);
+    function onCreateFailure(err) {
+      showStatus('Error: ' + (err.message || err), 'error');
+      document.getElementById('btnCreate').disabled = false;
+      document.getElementById('btnCancel').disabled = false;
+      document.getElementById('btnCreate').textContent = 'Create';
+    }
+
+    // -----------------------------------------------------------------------
+    // Cancel
+    // -----------------------------------------------------------------------
+
+    function handleCancel() {
+      google.script.host.close();
+    }
+
+    // -----------------------------------------------------------------------
+    // Utility functions
+    // -----------------------------------------------------------------------
+
+    function showStatus(message, type) {
+      var el = document.getElementById('statusMsg');
+      el.textContent = message;
+      el.className = 'status-msg ' + (type || '');
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(str));
+      return div.innerHTML;
     }
   </script>
+
 </body>
 </html>
