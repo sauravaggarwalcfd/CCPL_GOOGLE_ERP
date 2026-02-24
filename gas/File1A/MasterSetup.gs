@@ -3,8 +3,8 @@
  * CONFIDENCE CLOTHING — ERP MASTER SETUP
  * ============================================================
  * One-click setup for ALL 3 Google Sheet files:
- *   FILE 1A: Items Master   (22 sheets)
- *   FILE 1B: Factory Master  (18 sheets)
+ *   FILE 1A: Items Master   (23 sheets)
+ *   FILE 1B: Factory Master  (21 sheets)
  *   FILE 1C: Finance Master  (6 sheets)
  *
  * Deletes ALL old sheets, then creates fresh sheets with
@@ -21,8 +21,8 @@ function masterSetupAll() {
   var result = ui.alert(
     '⚙ MASTER SETUP — All 3 Files',
     'This will DELETE all existing sheets and create fresh sheets in:\n\n' +
-    '• FILE 1A (Items Master) — 22 sheets\n' +
-    '• FILE 1B (Factory Master) — 18 sheets\n' +
+    '• FILE 1A (Items Master) — 23 sheets\n' +
+    '• FILE 1B (Factory Master) — 21 sheets\n' +
     '• FILE 1C (Finance Master) — 6 sheets\n\n' +
     '⚠ ALL existing data will be lost!\n\n' +
     'Continue?',
@@ -77,10 +77,10 @@ function masterSetupAll() {
 
   var elapsed = ((new Date() - startTime) / 1000).toFixed(1);
   var msg = 'MASTER SETUP COMPLETE!\n\n' +
-    '• FILE 1A: 22 sheets created\n' +
-    '• FILE 1B: 18 sheets created\n' +
+    '• FILE 1A: 23 sheets created\n' +
+    '• FILE 1B: 21 sheets created\n' +
     '• FILE 1C: 6 sheets created\n\n' +
-    'Total: 46 sheets in ' + elapsed + ' seconds.';
+    'Total: 50 sheets in ' + elapsed + ' seconds.';
   Logger.log(msg);
   ui.alert(msg);
 }
@@ -93,7 +93,7 @@ function setupFile1A_Only() {
   deleteAllOldSheets_(ss);
   setupAllSheets();
   SpreadsheetApp.flush();
-  SpreadsheetApp.getUi().alert('FILE 1A setup complete — 22 sheets created.');
+  SpreadsheetApp.getUi().alert('FILE 1A setup complete — 23 sheets created.');
 }
 
 function setupFile1B_Only() {
@@ -101,7 +101,7 @@ function setupFile1B_Only() {
   deleteAllOldSheets_(ss);
   setupAllSheets_1B(ss);
   SpreadsheetApp.flush();
-  SpreadsheetApp.getUi().alert('FILE 1B setup complete — 18 sheets created.');
+  SpreadsheetApp.getUi().alert('FILE 1B setup complete — 21 sheets created.');
 }
 
 function setupFile1C_Only() {

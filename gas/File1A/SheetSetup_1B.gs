@@ -13,6 +13,7 @@
    ─────────────────────────────────────────────────────────── */
 function setupAllSheets_1B(ss) {
   setup1B_UserMaster_(ss);
+  setup1B_RoleMaster_(ss);
   setup1B_DepartmentMaster_(ss);
   setup1B_DesignationMaster_(ss);
   setup1B_ShiftMaster_(ss);
@@ -30,11 +31,12 @@ function setupAllSheets_1B(ss) {
   setup1B_WorkCenterMaster_(ss);
   setup1B_JobworkPartyMaster_(ss);
   setup1B_ItemSupplierRates_(ss);
+  setup1B_Presence_(ss);
 
   // Delete temp sheet created during old-sheet deletion
   deleteTempSheet_(ss);
 
-  Logger.log('All 18 FILE 1B sheets setup complete.');
+  Logger.log('All 21 FILE 1B sheets setup complete.');
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -548,4 +550,63 @@ function setup1B_ItemSupplierRates_(ss) {
   setValidation_(sheet, 12, CONFIG.UOM_LIST);
   setValidation_(sheet, 15, CONFIG.PRIORITY_LIST);
   setValidation_(sheet, 20, ['Yes', 'No']);
+}
+
+/* ── 20. ROLE_MASTER ★ NEW V5 ── */
+function setup1B_RoleMaster_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.ROLE_MASTER);
+  var headers = [
+    '🔑 Role Code', 'Role Name', 'Description',
+    'Module Access (JSON)', 'Action Rights', 'Export Rights',
+    'Field Visibility', 'Active'
+  ];
+  var descriptions = [
+    'AUTO: ROL-001', 'Display name of role',
+    'What this role can do',
+    'JSON: {"Procurement":true,"Inventory":true,...}',
+    'view/create/edit/delete/approve/reject/export/print/import/comment/assign/bulk_edit/override',
+    'pdf/sheets/excel/clipboard/print',
+    'Fields hidden for this role (JSON)',
+    'Yes/No'
+  ];
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — ROLE_MASTER — Role Permission Matrix (V5 RBAC)',
+    headers, descriptions, TAB_1B);
+
+  var roleData = [
+    ['ROL-001', 'SUPER ADMIN', 'Full access to all 49 sheets and all actions',
+     '{"ALL":true}', 'ALL', 'ALL', '{}', 'Yes'],
+    ['ROL-002', 'ADMIN', 'All item + factory masters. Read-only finance.',
+     '{"Items":true,"Factory":true,"Finance":false}', 'view,create,edit,delete,approve,export,print', 'pdf,sheets,excel,clipboard,print', '{}', 'Yes'],
+    ['ROL-003', 'PURCHASE MGR', 'Supplier, ISR, Payment Terms. Read item masters.',
+     '{"Procurement":true,"Items":false}', 'view,create,edit,approve,export', 'pdf,sheets,excel,clipboard', '{"WSP":true,"MRP":true}', 'Yes'],
+    ['ROL-004', 'PRODUCTION MGR', 'Process, Work Center, Machine. Read items.',
+     '{"Production":true,"Items":false}', 'view,create,edit,export', 'pdf,sheets,clipboard', '{"WSP":true,"MRP":true}', 'Yes'],
+    ['ROL-005', 'STORE KEEPER', 'Warehouse, Bin, Spare Parts. Read items.',
+     '{"Stores":true,"Items":false}', 'view,create,edit', 'pdf,clipboard', '{"WSP":true,"MRP":true}', 'Yes']
+  ];
+  sheet.getRange(4, 1, roleData.length, roleData[0].length).setValues(roleData);
+  setValidation_(sheet, 8, ['Yes', 'No']);
+}
+
+/* ── 21. PRESENCE ★ NEW V5 ── */
+function setup1B_Presence_(ss) {
+  var sheet = ss.insertSheet(CONFIG.SHEETS_1B.PRESENCE);
+  var headers = [
+    'Timestamp', 'Email', 'Name', 'Module', 'Page', 'Session ID', 'Action'
+  ];
+  var descriptions = [
+    'Auto: DD-MMM-YYYY HH:mm:ss IST', 'Google account email',
+    'Full name from USER_MASTER', 'ERP module (e.g. Items, Procurement)',
+    'Page within module', 'Unique session identifier', 'LOGIN / LOGOUT / HEARTBEAT'
+  ];
+  applyFormat_(sheet,
+    'CC ERP FILE 1B — PRESENCE — Active User Session Log (V5 — GAS-written only)',
+    headers, descriptions, TAB_1B);
+
+  setValidation_(sheet, 7, ['LOGIN', 'LOGOUT', 'HEARTBEAT']);
+
+  // Protect the sheet — GAS auto-writes only
+  var protection = sheet.protect().setDescription('PRESENCE — GAS auto-write only. Do not edit manually.');
+  protection.setWarningOnly(true);
 }

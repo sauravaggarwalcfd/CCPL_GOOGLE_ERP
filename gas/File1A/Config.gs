@@ -61,6 +61,7 @@ var CONFIG = {
     HSN_MASTER:           'HSN_MASTER',
     COLOR_MASTER:         'COLOR_MASTER',
     SIZE_MASTER:          'SIZE_MASTER',
+    GARMENT_COMPONENT:    'GARMENT_COMPONENT',
     FABRIC_TYPE_MASTER:   'FABRIC_TYPE_MASTER',
     TAG_MASTER:           'TAG_MASTER',
 
@@ -72,11 +73,12 @@ var CONFIG = {
   },
 
   // ===========================================================================
-  // SHEET NAMES - FILE 1B (Factory Master - 18 sheets)
+  // SHEET NAMES - FILE 1B (Factory Master - 21 sheets)
   // ===========================================================================
 
   SHEETS_1B: {
     USER_MASTER:          'USER_MASTER',
+    ROLE_MASTER:          'ROLE_MASTER',
     DEPARTMENT_MASTER:    'DEPARTMENT_MASTER',
     DESIGNATION_MASTER:   'DESIGNATION_MASTER',
     SHIFT_MASTER:         'SHIFT_MASTER',
@@ -93,7 +95,8 @@ var CONFIG = {
     PROCESS_MASTER:       'PROCESS_MASTER',
     WORK_CENTER_MASTER:   'WORK_CENTER_MASTER',
     JOBWORK_PARTY_MASTER: 'JOBWORK_PARTY_MASTER',
-    ITEM_SUPPLIER_RATES:  'ITEM_SUPPLIER_RATES'
+    ITEM_SUPPLIER_RATES:  'ITEM_SUPPLIER_RATES',
+    PRESENCE:             'PRESENCE'
   },
 
   // ===========================================================================
