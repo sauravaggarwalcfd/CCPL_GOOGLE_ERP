@@ -37,8 +37,11 @@ function setupAllSheets() {
   setupItemChangeLog_(ss);
   setupMasterRelations_(ss);
 
+  // Delete temp sheet created during old-sheet deletion
+  deleteTempSheet_(ss);
+
   SpreadsheetApp.flush();
-  Logger.log('All 22 sheets setup complete.');
+  Logger.log('All 22 FILE 1A sheets setup complete.');
 }
 
 /* ───────────────────────────────────────────────────────────
@@ -164,7 +167,7 @@ function setupArticleMaster_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — ARTICLE_MASTER — Finished Garments',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Validations
   setColumnValidation_(sheet, 8, ['Tops-Polo', 'Tops-Tee', 'Sweatshirt', 'Tracksuit', 'Bottoms']);
@@ -172,7 +175,7 @@ function setupArticleMaster_(ss) {
   setColumnValidation_(sheet, 11, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
   setColumnValidation_(sheet, 12, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
   setColumnValidation_(sheet, 13, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
-  setColumnValidation_(sheet, 24, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 24, CONFIG.STATUS_LIST);
 
   // L1 Division auto-fill
   sheet.getRange(4, 7, 500, 1).setValue('Apparel');
@@ -203,12 +206,12 @@ function setupRMFabric_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — RM_MASTER_FABRIC — Knit Fabrics',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   setColumnValidation_(sheet, 6, ['KORA', 'FINISHED']);
   setColumnValidation_(sheet, 7, ['KORA', 'COLOURED', 'DYED', 'MEL']);
-  setColumnValidation_(sheet, 11, CONFIG.UOM_VALUES);
-  setColumnValidation_(sheet, 22, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 11, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 22, CONFIG.STATUS_LIST);
 }
 
 /* ── 03. RM_MASTER_YARN (15 cols) ── */
@@ -231,10 +234,10 @@ function setupRMYarn_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — RM_MASTER_YARN — Yarn',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   setColumnValidation_(sheet, 3, ['Raw', 'Dyed', 'Melange']);
-  setColumnValidation_(sheet, 14, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
 /* ── 04. RM_MASTER_WOVEN (15 cols) ── */
@@ -255,11 +258,11 @@ function setupRMWoven_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — RM_MASTER_WOVEN — Woven & Interlining',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   setColumnValidation_(sheet, 3, ['Woven', 'Interlining', 'Fusing']);
-  setColumnValidation_(sheet, 7, CONFIG.UOM_VALUES);
-  setColumnValidation_(sheet, 14, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 7, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
 /* ── 05. TRIM_MASTER (29 cols) ── */
@@ -293,9 +296,9 @@ function setupTrimMaster_(ss) {
     headers, descriptions, CONFIG.TAB_COLORS.TRIM_MASTER);
 
   // Trim Category dropdown
-  setColumnValidation_(sheet, 4, CONFIG.TRIM_CATEGORIES);
-  setColumnValidation_(sheet, 9, CONFIG.UOM_VALUES);
-  setColumnValidation_(sheet, 16, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 4, CONFIG.TRIM_CATEGORY_LIST);
+  setColumnValidation_(sheet, 9, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 16, CONFIG.STATUS_LIST);
 }
 
 /* ── 06. TRIM_ATTR_NAMES ── */
@@ -312,7 +315,7 @@ function setupTrimAttrNames_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — TRIM_ATTR_NAMES — Attribute Names per Category',
-    headers, descriptions, CONFIG.TAB_COLORS.TRIM_ATTR);
+    headers, descriptions, CONFIG.TAB_COLORS.TRIM_ATTR_NAMES);
 
   // Pre-populate attr names per the V4 spec
   var attrData = [
@@ -345,7 +348,7 @@ function setupTrimAttrValues_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — TRIM_ATTR_VALUES — Allowed Values per Attribute',
-    headers, descriptions, CONFIG.TAB_COLORS.TRIM_ATTR_DEEP);
+    headers, descriptions, CONFIG.TAB_COLORS.TRIM_ATTR_VALUES);
 }
 
 /* ── 08. CONSUMABLE_MASTER ── */
@@ -370,9 +373,9 @@ function setupConsumableMaster_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — CONSUMABLE_MASTER — Dyes, Chemicals, Needles, Oils',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 13, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 13, CONFIG.STATUS_LIST);
 }
 
 /* ── 09. CON_ATTR_NAMES ── */
@@ -388,7 +391,7 @@ function setupConAttrNames_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — CON_ATTR_NAMES — Consumable Attribute Names',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
 /* ── 10. CON_ATTR_VALUES ── */
@@ -402,7 +405,7 @@ function setupConAttrValues_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — CON_ATTR_VALUES — Consumable Attribute Values',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
 /* ── 11. PACKAGING_MASTER ── */
@@ -427,9 +430,9 @@ function setupPackagingMaster_(ss) {
 
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — PACKAGING_MASTER — Poly Bags, Cartons, Hangers',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 13, CONFIG.STATUS_VALUES);
+  setColumnValidation_(sheet, 13, CONFIG.STATUS_LIST);
 }
 
 /* ── 12. PKG_ATTR_NAMES ── */
@@ -445,7 +448,7 @@ function setupPkgAttrNames_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — PKG_ATTR_NAMES — Packaging Attribute Names',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
 /* ── 13. PKG_ATTR_VALUES ── */
@@ -459,7 +462,7 @@ function setupPkgAttrValues_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — PKG_ATTR_VALUES — Packaging Attribute Values',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
 /* ── 14. ITEM_CATEGORIES ── */
@@ -473,7 +476,7 @@ function setupItemCategories_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — ITEM_CATEGORIES — 3-Level Category Tree',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Pre-populate categories
   var catData = [
@@ -499,7 +502,7 @@ function setupUOMMaster_(ss) {
   var descriptions = ['Short code', 'Full name', 'Usage description', 'Yes/No'];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — UOM_MASTER — Units of Measure',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   var uomData = [
     ['CONE', 'Cone', 'Thread/yarn cones', 'Yes'],
@@ -524,7 +527,7 @@ function setupHSNMaster_(ss) {
   var descriptions = ['4-8 digit HSN', 'Official description', '5/12/18/28', 'Product type', 'Yes/No'];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — HSN_MASTER — GST HSN Codes with Rates',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Common textile HSN codes
   var hsnData = [
@@ -563,7 +566,7 @@ function setupColorMaster_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — COLOR_MASTER — Colors with Pantone & Hex Swatch',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Sample colors
   var colorData = [
@@ -597,7 +600,7 @@ function setupSizeMaster_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — SIZE_MASTER — Size Specs with Body Measurements',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   var sizeData = [
     ['S', 'Small', 38, 26, 17, 8, 'Tops', 'Men', 'Yes'],
@@ -625,7 +628,7 @@ function setupFabricTypeMaster_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — FABRIC_TYPE_MASTER — Knit Construction Types',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   var fabricData = [
     ['FT-001', 'Single Jersey', 'SJ', 'Plain knit one face', 'T-shirts, vests', 'Yes'],
@@ -655,7 +658,7 @@ function setupTagMaster_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — TAG_MASTER — 28 Starter Tags (Chip System)',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   var tagData = [
     ['TAG-001', 'Best Seller', 'ARTICLE_MASTER', 'Yes', '#27AE60', 'Top selling article'],
@@ -706,7 +709,7 @@ function setupItemChangeLog_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — ITEM_CHANGE_LOG — Auto Audit Trail (GAS-written only)',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Protect this sheet — GAS writes only
   var protection = sheet.protect().setDescription('ITEM_CHANGE_LOG — GAS auto-write only');
@@ -730,7 +733,7 @@ function setupMasterRelations_(ss) {
   ];
   applyStandardFormat_(sheet,
     'CC ERP FILE 1A — MASTER_RELATIONS — 46 FK Relations Config',
-    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A);
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
   // Pre-populate key File 1A relations
   var relData = [
