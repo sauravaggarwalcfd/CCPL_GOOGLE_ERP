@@ -2,125 +2,220 @@
 <html>
 <head>
   <base target="_top">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <?!= include('styles') ?>
 </head>
 <body class="mode-light accent-orange">
 
 <!-- ============================================================
-     CC ERP — Main Application Shell
+     CC ERP v6 — Application Shell
+     Matches CC_ERP_Main.jsx pixel-perfect
      ============================================================ -->
-<div class="app-container" id="app">
+<div class="app-root theme-anim" id="appRoot">
 
-  <!-- SIDEBAR -->
-  <aside class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <h2>CC ERP</h2>
-      <div class="subtitle">Confidence Clothing Pvt. Ltd.</div>
+  <!-- ══ SHELL BAR ════════════════════════════════════════════ -->
+  <div class="shell-bar" id="shellBar">
+
+    <!-- Logo -->
+    <div class="shell-logo">
+      <div class="shell-logo-icon">📦</div>
+      <div class="shell-logo-text">
+        <h1>CC ERP</h1>
+        <span>Confidence Clothing</span>
+      </div>
     </div>
-    <nav class="sidebar-nav" id="sidebarNav">
+
+    <!-- Breadcrumb -->
+    <div class="shell-breadcrumb" id="breadcrumb">
+      <a onclick="navigateTo('dashboard')">Home</a>
+    </div>
+
+    <!-- Ctrl+K Search Pill -->
+    <button class="shell-search-pill" onclick="openCommandPalette()" title="Ctrl+K">
+      <span class="icon">🔍</span>
+      <span class="label">Search…</span>
+      <span class="kbd" style="margin-left:8px">Ctrl</span>
+      <span class="kbd">K</span>
+    </button>
+
+    <div class="shell-spacer"></div>
+
+    <!-- Quick Theme -->
+    <div class="shell-section">
+      <span class="shell-section-label">Theme</span>
+      <div class="shell-theme-bar" id="themeBar">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Quick Accent -->
+    <div class="shell-section">
+      <span class="shell-section-label">Accent</span>
+      <div class="shell-accent-bar" id="accentBar">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- Notification Bell -->
+    <div style="position:relative;flex-shrink:0;" id="notifWrapper">
+      <button class="shell-icon-btn" id="btnNotif" onclick="toggleNotifPanel()">
+        🔔
+        <div class="notif-badge" id="notifBadge" style="display:none;"></div>
+      </button>
+      <!-- Notification Panel (rendered by JS) -->
+      <div id="notifPanelContainer"></div>
+    </div>
+
+    <!-- Settings -->
+    <button class="shell-icon-btn" id="btnSettings" onclick="toggleSettingsPanel()">⚙️</button>
+
+    <!-- Separator -->
+    <div class="shell-divider"></div>
+
+    <!-- Avatars -->
+    <div class="shell-avatars" id="shellAvatars">
       <!-- Populated by JS -->
-    </nav>
-    <div style="padding:12px; border-top:1px solid rgba(255,255,255,0.1);">
-      <div id="userInfo" class="text-xs" style="color:rgba(255,255,255,0.6);"></div>
-      <div id="onlineCount" class="text-xs" style="color:rgba(255,255,255,0.4); margin-top:4px;"></div>
     </div>
-  </aside>
+  </div>
 
-  <!-- MAIN -->
-  <div class="main-content">
+  <!-- ══ BODY ═══════════════════════════════════════════════ -->
+  <div class="app-body">
 
-    <!-- HEADER BAR -->
-    <header class="header-bar">
-      <div class="flex items-center gap-2">
-        <span class="header-title" id="pageTitle">Dashboard</span>
+    <!-- ── SIDEBAR ──────────────────────────────────────────── -->
+    <div class="sidebar" id="sidebar" style="width:340px;">
+
+      <!-- Panel label -->
+      <div class="sidebar-label" id="sidebarLabel">
+        <span>Navigation · <span id="sidebarWidthLabel">340</span>px</span>
+        <button onclick="toggleCompactSidebar(true)" title="Collapse">‹</button>
       </div>
-      <div class="header-actions">
-        <button class="btn btn-sm" onclick="openCommandPalette()" title="Ctrl+K">&#x2318;K</button>
-        <button class="btn btn-sm" id="btnNotifications" onclick="toggleNotificationPanel()">&#x1F514;</button>
-        <button class="btn btn-sm" onclick="toggleSettingsPanel()">&#x2699;</button>
-      </div>
-    </header>
 
-    <!-- CONTENT AREA -->
-    <main class="content-area" id="contentArea">
-      <div class="text-center p-4">
-        <div class="spinner"></div>
-        <div class="text-muted mt-2">Loading CC ERP...</div>
-      </div>
-    </main>
+      <div class="sidebar-scroll" id="sidebarScroll">
 
-    <!-- STATUS BAR -->
-    <footer class="status-bar">
-      <div><span class="status-dot" id="statusDot"></span><span id="statusText">Connecting...</span></div>
-      <div id="statusRight">CC ERP v5</div>
-    </footer>
+        <!-- Quick Access -->
+        <div id="quickAccessSection">
+          <div class="qa-header">
+            <span>⭐ Quick Access</span>
+            <button onclick="openCommandPalette()" title="Add via Ctrl+K">＋</button>
+            <button id="qaEditBtn" onclick="toggleQAEdit()">Edit</button>
+          </div>
+          <div id="quickAccessList">
+            <!-- Populated by JS -->
+          </div>
+          <div style="height:1px;background:var(--divider);margin:4px 0;"></div>
+        </div>
+
+        <!-- Module Nav -->
+        <div class="sb-section-label" id="modulesLabel">Modules</div>
+        <div id="moduleNav">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Divider + Extra Nav -->
+        <div class="nav-divider"></div>
+        <div id="extraNav">
+          <!-- Populated by JS -->
+        </div>
+
+      </div>
+
+      <!-- User Card -->
+      <div class="sidebar-user" id="sidebarUser">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <!-- ── DRAG HANDLE ──────────────────────────────────────── -->
+    <div class="drag-handle" id="dragHandle">
+      <div class="bar"></div>
+    </div>
+
+    <!-- ── MAIN CONTENT ─────────────────────────────────────── -->
+    <div class="main-area" id="mainArea">
+
+      <!-- Sub-toolbar -->
+      <div class="sub-toolbar" id="subToolbar">
+        <span class="title">🏠 Home — Module Overview</span>
+        <div class="shell-spacer"></div>
+        <span class="time" id="clockDisplay"></span>
+        <button class="tool-btn">🖨️ Print</button>
+        <button class="tool-btn">📤 Export ▾</button>
+      </div>
+
+      <!-- Content -->
+      <div class="content-scroll" id="contentArea">
+        <div class="text-center p-4">
+          <div class="spinner"></div>
+          <div class="text-muted mt-2">Loading CC ERP...</div>
+        </div>
+      </div>
+
+      <!-- Status Bar -->
+      <div class="status-bar" id="statusBar">
+        <span class="lbl">MODULES</span>
+        <span class="val" id="statModules">8</span>
+        <div class="sep"></div>
+        <span class="lbl">ONLINE</span>
+        <span class="val" id="statOnline" style="color:#22c55e;">1</span>
+        <div class="sep"></div>
+        <span class="lbl">PENDING</span>
+        <span class="val" id="statPending" style="color:#ef4444;">0</span>
+        <div class="shell-spacer"></div>
+        <span style="font-size:9px;color:var(--text-d);" id="statusRight">CC ERP · Home</span>
+        <div class="sep"></div>
+        <span style="font-size:9px;color:var(--text-d);" id="statusClock"></span>
+      </div>
+    </div>
+
   </div>
 </div>
 
-<!-- COMMAND PALETTE OVERLAY -->
-<div class="command-palette-overlay" id="commandPaletteOverlay" onclick="closeCommandPalette(event)">
-  <div class="command-palette" onclick="event.stopPropagation()">
-    <input type="text" id="commandInput" placeholder="Type a command or search..." oninput="filterCommands(this.value)">
-    <div class="command-results" id="commandResults"></div>
+<!-- ── COMMAND PALETTE ──────────────────────────────────────── -->
+<div class="cmd-overlay" id="cmdOverlay" onclick="closeCommandPalette(event)">
+  <div class="cmd-panel cmd-anim" onclick="event.stopPropagation()">
+    <div class="cmd-search">
+      <span class="icon">🔍</span>
+      <input type="text" id="cmdInput" placeholder="Search modules, actions, records, settings…" oninput="filterCommands(this.value)" onkeydown="handleCmdKey(event)">
+      <span class="esc-badge">ESC</span>
+    </div>
+    <div class="cmd-results" id="cmdResults">
+      <!-- Populated by JS -->
+    </div>
+    <div class="cmd-footer">
+      <div class="hint"><span class="key">↑↓</span><span class="hlbl">Navigate</span></div>
+      <div class="hint"><span class="key">↵</span><span class="hlbl">Open</span></div>
+      <div class="hint"><span class="key">☆</span><span class="hlbl">Pin to Quick Access</span></div>
+      <div class="hint"><span class="key">ESC</span><span class="hlbl">Close</span></div>
+    </div>
   </div>
 </div>
 
-<!-- NOTIFICATION PANEL -->
-<div id="notificationPanel" class="hidden" style="position:fixed; top:var(--header-height); right:0; width:360px; height:calc(100vh - var(--header-height) - var(--status-bar-height)); background:var(--bg-card); border-left:1px solid var(--border-color); z-index:200; overflow-y:auto; box-shadow:var(--shadow-lg);">
-  <div class="p-4" style="border-bottom:1px solid var(--border-color);">
-    <div class="flex items-center justify-between">
-      <span class="font-bold">Notifications</span>
-      <button class="btn btn-sm" onclick="toggleNotificationPanel()">&#x2715;</button>
-    </div>
-  </div>
-  <div id="notificationList" class="p-2"></div>
-</div>
-
-<!-- SETTINGS PANEL -->
-<div id="settingsPanel" class="hidden" style="position:fixed; top:var(--header-height); right:0; width:320px; height:calc(100vh - var(--header-height) - var(--status-bar-height)); background:var(--bg-card); border-left:1px solid var(--border-color); z-index:200; overflow-y:auto; box-shadow:var(--shadow-lg);">
-  <div class="p-4" style="border-bottom:1px solid var(--border-color);">
-    <div class="flex items-center justify-between">
-      <span class="font-bold">Settings</span>
-      <button class="btn btn-sm" onclick="toggleSettingsPanel()">&#x2715;</button>
-    </div>
-  </div>
-  <div class="p-4">
-    <div class="form-group">
-      <label class="form-label">Color Mode</label>
-      <select class="form-select" id="themeMode" onchange="applyThemeMode(this.value)">
-        <option value="light">Light</option>
-        <option value="black">Black</option>
-        <option value="lightgrey">Light Grey</option>
-        <option value="midnight">Midnight</option>
-        <option value="warm">Warm</option>
-        <option value="slate">Slate</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Accent Color</label>
-      <div class="flex gap-2 mt-2" id="accentPicker">
-        <div class="accent-swatch" data-accent="orange" style="background:#f97316;" onclick="applyAccent('orange')"></div>
-        <div class="accent-swatch" data-accent="blue" style="background:#3b82f6;" onclick="applyAccent('blue')"></div>
-        <div class="accent-swatch" data-accent="teal" style="background:#14b8a6;" onclick="applyAccent('teal')"></div>
-        <div class="accent-swatch" data-accent="green" style="background:#22c55e;" onclick="applyAccent('green')"></div>
-        <div class="accent-swatch" data-accent="purple" style="background:#a855f7;" onclick="applyAccent('purple')"></div>
-        <div class="accent-swatch" data-accent="rose" style="background:#f43f5e;" onclick="applyAccent('rose')"></div>
+<!-- ── SETTINGS PANEL ──────────────────────────────────────── -->
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsPanel()"></div>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-header">
+    <div class="top">
+      <div>
+        <div class="title">⚙ Workspace Settings</div>
+        <div class="sub">Personalise your ERP interface</div>
       </div>
+      <button class="close-btn" onclick="closeSettingsPanel()">×</button>
     </div>
+  </div>
+  <div class="settings-body" id="settingsBody">
+    <!-- Populated by JS -->
+  </div>
+  <div class="settings-footer">
+    <button class="reset-btn" onclick="resetSettings()">↩ Reset Defaults</button>
+    <button class="apply-btn" onclick="applySettings()">✓ Apply & Close</button>
   </div>
 </div>
 
-<!-- TOAST CONTAINER -->
+<!-- ── TOAST ───────────────────────────────────────────────── -->
 <div class="toast-container" id="toastContainer"></div>
 
-<style>
-.accent-swatch {
-  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
-  border: 2px solid transparent; transition: all 150ms ease;
-}
-.accent-swatch:hover { transform: scale(1.15); }
-.accent-swatch.active { border-color: var(--text-primary); box-shadow: 0 0 0 2px var(--bg-card); }
-</style>
+<!-- ── BACKDROP (for dropdowns) ────────────────────────────── -->
+<div id="globalBackdrop" style="display:none;position:fixed;inset:0;z-index:9000;" onclick="closeAllDropdowns()"></div>
 
 <?!= include('scripts') ?>
 

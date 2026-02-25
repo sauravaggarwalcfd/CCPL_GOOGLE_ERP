@@ -314,16 +314,17 @@ function menuAbout() {
 }
 
 /* ───────────────────────────────────────────────────────────
-   WEB APP ENTRY POINT — doGet
-   Serves the ERP web app via HtmlService templating.
-   Deploy as: Web App → Execute as: User Accessing → Access: Domain
+   WEB APP ENTRY POINT — API ONLY
+   GAS serves ONLY as a JSON API backend for the React webapp.
+   No HTML is served from here — the frontend runs locally via Vite.
+   Deploy as: Web App → Execute as: User Accessing → Access: Anyone
    ─────────────────────────────────────────────────────────── */
 function doGet(e) {
-  var template = HtmlService.createTemplateFromFile('index');
-  return template.evaluate()
-    .setTitle('CC ERP — Confidence Clothing')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  return handleAPIRequest(e, 'GET');
+}
+
+function doPost(e) {
+  return handleAPIRequest(e, 'POST');
 }
 
 /* ───────────────────────────────────────────────────────────

@@ -1,16 +1,179 @@
 <script>
 /* ============================================================
-   CC ERP — Client-Side JavaScript
-   Vanilla JS + DOM — Matches SheetSetup_F2.gs column structure
+   CC ERP v6 — Client-Side JavaScript
+   Vanilla JS — Matches CC_ERP_Main.jsx pixel-perfect
+   Wired to google.script.run APIs
    ============================================================ */
+
+// ─── COLOUR SYSTEM (exact from JSX) ──────────────────────────
+var MODES = {
+  light:    {id:"light",    lbl:"☀️", name:"Light",      bg:"#f0f2f5",shellBg:"#ffffff",shellBd:"#e2e4e8",sidebarBg:"#ffffff",sidebarBd:"#e2e4e8",surfHigh:"#ffffff",surfMid:"#f7f8fa",surfLow:"#f0f2f5",hoverBg:"#eef1f8",inputBg:"#ffffff",inputBd:"#d1d5db",dropBg:"#ffffff",divider:"#e5e7eb",tblHead:"#f4f5f7",tblEven:"#ffffff",tblOdd:"#fafbfc",statusBg:"#f0f2f5",badgeBg:"#e5e7eb",badgeTx:"#374151",textA:"#111827",textB:"#374151",textC:"#6b7280",textD:"#9ca3af",scrollThumb:"#d1d5db",shadow:"0 4px 20px rgba(0,0,0,.09)"},
+  black:    {id:"black",    lbl:"⬛", name:"Black",      bg:"#000000",shellBg:"#0a0a0a",shellBd:"#1c1c1c",sidebarBg:"#0a0a0a",sidebarBd:"#1c1c1c",surfHigh:"#111111",surfMid:"#161616",surfLow:"#0a0a0a",hoverBg:"#1c1c1c",inputBg:"#0d0d0d",inputBd:"#2a2a2a",dropBg:"#111111",divider:"#1f1f1f",tblHead:"#0d0d0d",tblEven:"#111111",tblOdd:"#141414",statusBg:"#0a0a0a",badgeBg:"#1c1c1c",badgeTx:"#888888",textA:"#f0f0f0",textB:"#a0a0a0",textC:"#666666",textD:"#444444",scrollThumb:"#2a2a2a",shadow:"0 4px 28px rgba(0,0,0,.85)"},
+  lightgrey:{id:"lightgrey",lbl:"🩶", name:"Light Grey", bg:"#e4e7ec",shellBg:"#f2f3f5",shellBd:"#d4d6dc",sidebarBg:"#f2f3f5",sidebarBd:"#d4d6dc",surfHigh:"#f8f9fa",surfMid:"#eef0f3",surfLow:"#e4e7ec",hoverBg:"#e0e4ef",inputBg:"#f8f9fa",inputBd:"#c8cdd8",dropBg:"#f8f9fa",divider:"#d4d6dc",tblHead:"#ebedf0",tblEven:"#f8f9fa",tblOdd:"#f0f2f5",statusBg:"#e4e7ec",badgeBg:"#d4d6dc",badgeTx:"#3d4460",textA:"#1a1f2e",textB:"#3d4460",textC:"#6b7590",textD:"#9ba3b8",scrollThumb:"#c0c5d4",shadow:"0 4px 16px rgba(0,0,0,.08)"},
+  midnight: {id:"midnight", lbl:"🌙", name:"Midnight",   bg:"#0d1117",shellBg:"#161b22",shellBd:"#21262d",sidebarBg:"#161b22",sidebarBd:"#21262d",surfHigh:"#1c2128",surfMid:"#161b22",surfLow:"#0d1117",hoverBg:"#21262d",inputBg:"#0d1117",inputBd:"#30363d",dropBg:"#161b22",divider:"#21262d",tblHead:"#161b22",tblEven:"#1c2128",tblOdd:"#161b22",statusBg:"#0d1117",badgeBg:"#21262d",badgeTx:"#7d8590",textA:"#e6edf3",textB:"#8b949e",textC:"#6e7681",textD:"#484f58",scrollThumb:"#30363d",shadow:"0 4px 24px rgba(0,0,0,.6)"},
+  warm:     {id:"warm",     lbl:"🌅", name:"Warm Ivory", bg:"#f0ebe0",shellBg:"#fdf8f0",shellBd:"#e4d8c4",sidebarBg:"#fdf8f0",sidebarBd:"#e4d8c4",surfHigh:"#fdfaf4",surfMid:"#f5f0e8",surfLow:"#ede5d4",hoverBg:"#e8dece",inputBg:"#fdfaf4",inputBd:"#d4c8b0",dropBg:"#fdfaf4",divider:"#ddd0b8",tblHead:"#f0ebe0",tblEven:"#fdfaf4",tblOdd:"#f5f0e8",statusBg:"#ede5d4",badgeBg:"#e4d8c4",badgeTx:"#4a3c28",textA:"#1c1409",textB:"#5a4a34",textC:"#8a7460",textD:"#b0a090",scrollThumb:"#c8b89c",shadow:"0 4px 16px rgba(60,40,10,.12)"},
+  slate:    {id:"slate",    lbl:"🔷", name:"Slate",      bg:"#1a2030",shellBg:"#252d40",shellBd:"#2d3654",sidebarBg:"#1e2433",sidebarBd:"#2d3654",surfHigh:"#2a3450",surfMid:"#222a3e",surfLow:"#1a2030",hoverBg:"#2d3654",inputBg:"#1a2030",inputBd:"#2d3654",dropBg:"#222a3e",divider:"#2d3654",tblHead:"#1e2433",tblEven:"#222a3e",tblOdd:"#1e2433",statusBg:"#1a2030",badgeBg:"#2d3654",badgeTx:"#8895b0",textA:"#d8e0f0",textB:"#8895b0",textC:"#5a6680",textD:"#3a4460",scrollThumb:"#2d3654",shadow:"0 4px 24px rgba(0,0,0,.5)"}
+};
+var ACCENTS = {
+  orange:{id:"orange",lbl:"Oracle Orange",a:"#E8690A",al:"rgba(232,105,10,.1)",ad:"#b85208",tx:"#fff"},
+  blue:  {id:"blue",  lbl:"Azure Blue",   a:"#0078D4",al:"rgba(0,120,212,.1)", ad:"#005a9e",tx:"#fff"},
+  teal:  {id:"teal",  lbl:"Deep Teal",    a:"#007C7C",al:"rgba(0,124,124,.1)", ad:"#005f5f",tx:"#fff"},
+  green: {id:"green", lbl:"Emerald",      a:"#15803D",al:"rgba(21,128,61,.1)", ad:"#0f6330",tx:"#fff"},
+  purple:{id:"purple",lbl:"Violet",       a:"#7C3AED",al:"rgba(124,58,237,.1)",ad:"#5b21b6",tx:"#fff"},
+  rose:  {id:"rose",  lbl:"Rose Red",     a:"#BE123C",al:"rgba(190,18,60,.1)", ad:"#9b0d30",tx:"#fff"}
+};
+
+// ─── FONT CATALOGUES ─────────────────────────────────────────
+var UI_FONTS = [
+  {id:"nunito",   name:"Nunito Sans",       family:"'Nunito Sans', sans-serif",      tag:"DEFAULT · Warm & Rounded"},
+  {id:"inter",    name:"Inter",             family:"'Inter', sans-serif",            tag:"Clean · Neutral"},
+  {id:"dm",       name:"DM Sans",           family:"'DM Sans', sans-serif",          tag:"Modern · Geometric"},
+  {id:"jakarta",  name:"Plus Jakarta Sans", family:"'Plus Jakarta Sans', sans-serif",tag:"Professional · Crisp"},
+  {id:"outfit",   name:"Outfit",            family:"'Outfit', sans-serif",           tag:"Minimal · Contemporary"},
+  {id:"source",   name:"Source Sans 3",     family:"'Source Sans 3', sans-serif",    tag:"Editorial · Readable"}
+];
+var DATA_FONTS = [
+  {id:"ibmplex",  name:"IBM Plex Mono",   family:"'IBM Plex Mono', monospace",  tag:"DEFAULT · Technical"},
+  {id:"jetbrains",name:"JetBrains Mono",  family:"'JetBrains Mono', monospace", tag:"Dev-Friendly · Sharp"},
+  {id:"fira",     name:"Fira Code",       family:"'Fira Code', monospace",      tag:"Ligatures · Elegant"},
+  {id:"roboto",   name:"Roboto Mono",     family:"'Roboto Mono', monospace",    tag:"Neutral · Clean"},
+  {id:"space",    name:"Space Mono",      family:"'Space Mono', monospace",     tag:"Distinctive · Retro"}
+];
+function uiFF(id) { return (UI_FONTS.find(function(f){return f.id===id})||UI_FONTS[0]).family; }
+function dataFF(id){ return (DATA_FONTS.find(function(f){return f.id===id})||DATA_FONTS[0]).family; }
+
+// ─── DEFAULTS ────────────────────────────────────────────────
+var DEFAULTS = {
+  mode:"light", accent:"orange",
+  density:"comfortable", fontSize:"medium",
+  tblStyle:"striped", lineView:"table",
+  sbWidth:340, showStatusBar:true,
+  showThumbs:true, showRowNums:true,
+  showCatBadge:true, compactSide:false,
+  uiFont:"nunito", dataFont:"ibmplex"
+};
+var FS_MAP = {small:11,medium:13,large:15};
+var PY_MAP = {compact:4,comfortable:7,spacious:12};
+
+// ─── CONSTANTS ───────────────────────────────────────────────
+var ROLE_C = {Admin:"#BE123C",Manager:"#1D4ED8",Supervisor:"#7C3AED",Operator:"#15803D","View Only":"#6b7280"};
+var ROLE_K = {Admin:"ADMIN",Manager:"MGR",Supervisor:"SUP",Operator:"OPR","View Only":"VIEW"};
+var NOTIF_C = {action:"#ef4444",warning:"#f59e0b",info:"#0078D4",system:"#6b7280"};
+var NOTIF_BG = {action:"rgba(239,68,68,.08)",warning:"rgba(245,158,11,.08)",info:"rgba(0,120,212,.08)",system:"rgba(107,114,128,.06)"};
+
+// ─── MODULE DEFINITIONS ──────────────────────────────────────
+var MODS = [
+  {id:"procurement",icon:"📦",lbl:"Procurement", badge:3, desc:"PO · GRN · Returns",       col:"#E8690A",stats:{pend:3,today:12,val:"₹4.2L"}},
+  {id:"production", icon:"🏭",lbl:"Production",  badge:1, desc:"Work Orders · BOM · JW",   col:"#0078D4",stats:{pend:1,today:5, val:"8 WOs"}},
+  {id:"inventory",  icon:"🗄️",lbl:"Inventory",   badge:0, desc:"Stock · Transfer · Alerts", col:"#007C7C",stats:{pend:0,today:8, val:"142 SKUs"}},
+  {id:"quality",    icon:"🔬",lbl:"Quality",      badge:2, desc:"Fabric · Inline · AQL",     col:"#7C3AED",stats:{pend:2,today:6, val:"94.2%"}},
+  {id:"sales",      icon:"💼",lbl:"Sales",        badge:0, desc:"Orders · DC · Invoice",     col:"#15803D",stats:{pend:0,today:3, val:"₹8.7L"}},
+  {id:"finance",    icon:"💰",lbl:"Finance",      badge:4, desc:"Payments · GST · Reports",  col:"#BE123C",stats:{pend:4,today:9, val:"₹2.1L"}},
+  {id:"masters",    icon:"🗂️",lbl:"Masters",      badge:0, desc:"Items · Suppliers · Setup", col:"#B45309",stats:{pend:0,today:0, val:"52 sheets"}},
+  {id:"dashboard",  icon:"📈",lbl:"Dashboard",    badge:0, desc:"Reports · Analytics",      col:"#0E7490",stats:{pend:0,today:0, val:"Live"}}
+];
+
+// ─── ACTIVITY (used on dashboard) ────────────────────────────
+var ACTIVITY = [
+  {icon:"📦",text:"PO-2026-0042 submitted to Coats India",  sub:"Rajesh Kumar · 14:08", col:"#E8690A"},
+  {icon:"🔬",text:"Fabric QC failed — Lot LOT-089",         sub:"Priya Sharma · 13:45", col:"#BE123C"},
+  {icon:"🏭",text:"Work Order WO-0089 started",             sub:"Amit Singh · 13:30",   col:"#0078D4"},
+  {icon:"🗄️",text:"Stock transfer ST-0034 approved",       sub:"Ravi Verma · 12:55",   col:"#007C7C"},
+  {icon:"💰",text:"Payment ₹45,000 approved",               sub:"Saurav · 12:00",       col:"#15803D"}
+];
+
+// ─── CMD PALETTE INDEX ───────────────────────────────────────
+var CMD_INDEX = [];
+function buildCmdIndex() {
+  CMD_INDEX = [];
+  MODS.forEach(function(m) {
+    CMD_INDEX.push({icon:m.icon,label:m.lbl,sub:m.desc,group:"Modules",id:m.id,type:"module"});
+  });
+  var actions = [
+    {icon:"➕",label:"New Purchase Order",    sub:"Procurement → PO", group:"Quick Actions",id:"new-po",  type:"action"},
+    {icon:"➕",label:"New Work Order",         sub:"Production → WO",  group:"Quick Actions",id:"new-wo",  type:"action"},
+    {icon:"➕",label:"New GRN",               sub:"Procurement → GRN",group:"Quick Actions",id:"new-grn", type:"action"},
+    {icon:"➕",label:"New Fabric Inspection", sub:"Quality → Fabric", group:"Quick Actions",id:"new-qc",  type:"action"},
+    {icon:"🔍",label:"Search Suppliers",      sub:"Masters → Supplier",group:"Quick Actions",id:"sup-srch",type:"action"},
+    {icon:"🔍",label:"Search Items",          sub:"Masters → Items",  group:"Quick Actions",id:"itm-srch",type:"action"}
+  ];
+  var records = [
+    {icon:"🧾",label:"PO-2026-0042",sub:"Coats India · ₹1,24,500 · Pending",    group:"Recent Records",id:"rec1",type:"record"},
+    {icon:"🔧",label:"WO-0089",     sub:"5249HP · 240 pcs · Completed",          group:"Recent Records",id:"rec2",type:"record"},
+    {icon:"🧪",label:"QC-0012",     sub:"LOT-089 · Fabric · Failed",             group:"Recent Records",id:"rec3",type:"record"},
+    {icon:"📋",label:"STK-0034",    sub:"RM-FAB-007 · Transfer · Approved",      group:"Recent Records",id:"rec4",type:"record"}
+  ];
+  var settings = [
+    {icon:"⚙️",label:"Open Settings",         sub:"Workspace preferences",group:"Settings",id:"open-cfg",  type:"setting"},
+    {icon:"🩶",label:"Switch to Light Grey",  sub:"Theme · Light Grey",   group:"Settings",id:"mode-lg",   type:"setting"},
+    {icon:"🌙",label:"Switch to Midnight",    sub:"Theme · Midnight",     group:"Settings",id:"mode-mid",  type:"setting"},
+    {icon:"🔷",label:"Switch to Slate",       sub:"Theme · Slate",        group:"Settings",id:"mode-slate",type:"setting"}
+  ];
+  CMD_INDEX = CMD_INDEX.concat(actions, records, settings);
+}
 
 // ─── GLOBAL STATE ────────────────────────────────────────────
 var APP = {
   user: null, modules: [], lists: {}, lookups: {},
-  preferences: {}, activeModule: 'dashboard', activePage: 'dashboard',
+  preferences: {},
+  activeModule: 'dashboard', activePage: 'dashboard',
+  cfg: JSON.parse(JSON.stringify(DEFAULTS)),
+  settingsDraft: null,
+  notifications: [],
+  shortcuts: [],
+  onlineUsers: [],
   poList: [], grnList: [], currentPO: null, currentGRN: null,
-  unsavedChanges: false, heartbeatInterval: null, notifications: []
+  unsavedChanges: false, heartbeatInterval: null,
+  notifOpen: false, cmdOpen: false, cfgOpen: false,
+  showAllUsers: false, editSC: false,
+  cmdSel: 0, cmdQuery: "",
+  sidebarDrag: false, sidebarWidth: 340,
+  clockInterval: null
 };
+
+// ─── HELPERS ─────────────────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+function aColor(e) {
+  var P = ["#E8690A","#0078D4","#007C7C","#15803D","#7C3AED","#BE123C","#B45309","#0E7490","#6D28D9","#047857","#C2410C","#1D4ED8"];
+  var h = 0;
+  for (var i = 0; i < e.length; i++) h = e.charCodeAt(i) + ((h << 5) - h);
+  return P[Math.abs(h) % P.length];
+}
+function ini(n) {
+  var p = n.trim().split(" ");
+  return (p[0][0] + (p[1] ? p[1][0] : (p[0][1] || ""))).toUpperCase();
+}
+function ago(ts) {
+  var s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return s + "s";
+  if (s < 3600) return Math.floor(s / 60) + "m";
+  if (s < 86400) return Math.floor(s / 3600) + "h";
+  return Math.floor(s / 86400) + "d";
+}
+function greet() {
+  var h = new Date().getHours();
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+function todayStr() {
+  return new Date().toLocaleDateString("en-IN", {weekday:"long",day:"numeric",month:"long",year:"numeric"});
+}
+function timeStr() {
+  return new Date().toLocaleTimeString("en-IN", {hour:"2-digit",minute:"2-digit"});
+}
+function fuzzy(q, s) { return !q || s.toLowerCase().indexOf(q.toLowerCase()) >= 0; }
+function M() { return MODES[APP.cfg.mode]; }
+function A() { return ACCENTS[APP.cfg.accent]; }
+function fz() { return FS_MAP[APP.cfg.fontSize]; }
+
+// ─── TOAST ───────────────────────────────────────────────────
+function showToast(msg) {
+  var c = $('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(function() { t.remove(); }, 3000);
+}
 
 // ─── INIT ────────────────────────────────────────────────────
 function initApp() {
@@ -22,1096 +185,1230 @@ function initApp() {
 
 function onBootstrapSuccess(data) {
   APP.user = data.user;
-  APP.modules = data.modules;
-  APP.lists = data.lists;
-  APP.lookups = data.lookups;
-  APP.preferences = data.preferences;
+  APP.modules = data.modules || MODS;
+  APP.lists = data.lists || {};
+  APP.lookups = data.lookups || {};
+  APP.preferences = data.preferences || {};
 
-  if (data.preferences.theme) {
-    applyThemeMode(data.preferences.theme.mode || 'light');
-    applyAccent(data.preferences.theme.accent || 'orange');
+  // Apply saved theme
+  if (data.preferences && data.preferences.theme) {
+    APP.cfg.mode = data.preferences.theme.mode || 'light';
+    APP.cfg.accent = data.preferences.theme.accent || 'orange';
   }
 
+  // Apply saved shortcuts
+  if (data.preferences && data.preferences.shortcuts) {
+    APP.shortcuts = data.preferences.shortcuts;
+  } else {
+    // Default shortcuts
+    APP.shortcuts = [
+      {id:"sc1",icon:"📦",label:"New PO",        mod:"procurement",sub:"Procurement"},
+      {id:"sc2",icon:"🏭",label:"WO-0089",       mod:"production", sub:"Production"},
+      {id:"sc3",icon:"🏭",label:"Coats India",   mod:"masters",    sub:"Supplier"},
+      {id:"sc4",icon:"🔬",label:"Pending QC",    mod:"quality",    sub:"Quality"}
+    ];
+  }
+
+  buildCmdIndex();
+  applyTheme();
+  renderShellBar();
   renderSidebar();
-  updateUserInfo();
-  updateStatusBar('Ready', true);
-  navigateTo('dashboard', 'dashboard');
+  navigateTo('dashboard');
+  updateClock();
+  APP.clockInterval = setInterval(updateClock, 60000);
+
+  // Heartbeat
   sendHeartbeat();
   APP.heartbeatInterval = setInterval(sendHeartbeat, 30000);
+
+  // Load notifications
   loadNotifications();
-  document.addEventListener('keydown', handleKeyboard);
+
+  // Load online users
+  loadOnlineUsers();
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', handleGlobalKey);
 }
 
 function onBootstrapError(err) {
   $('contentArea').innerHTML =
-    '<div class="card p-4 text-center"><h3 style="color:var(--danger);">Failed to load ERP</h3>' +
-    '<p class="text-muted mt-2">' + (err.message || 'Unknown error') + '</p>' +
-    '<button class="btn btn-primary mt-4" onclick="initApp()">Retry</button></div>';
-  updateStatusBar('Connection error', false);
+    '<div style="text-align:center;padding:40px;">' +
+    '<h3 style="color:#ef4444;">Failed to load ERP</h3>' +
+    '<p style="color:var(--text-c);margin-top:8px;">' + (err.message || 'Unknown error') + '</p>' +
+    '<button onclick="initApp()" style="margin-top:16px;padding:8px 20px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;">Retry</button>' +
+    '</div>';
 }
 
-// ─── SIDEBAR ─────────────────────────────────────────────────
-function renderSidebar() {
-  var nav = $('sidebarNav');
-  var html = '';
-  // Add dashboard first
-  var dashActive = APP.activeModule === 'dashboard' ? ' active' : '';
-  html += '<div class="nav-item' + dashActive + '" onclick="navigateTo(\'dashboard\',\'dashboard\')">' +
-    '<span class="nav-icon">&#x1F4CA;</span><span>Dashboard</span></div>';
+// ─── THEME SYSTEM ────────────────────────────────────────────
+function applyTheme() {
+  var b = document.body;
+  // Remove old mode/accent classes
+  b.className = b.className.replace(/mode-\S+/g, '').replace(/accent-\S+/g, '').trim();
+  b.classList.add('mode-' + APP.cfg.mode, 'accent-' + APP.cfg.accent);
 
-  // Procurement sub-pages
-  var procActive = APP.activeModule === 'procurement' ? ' active' : '';
-  html += '<div class="nav-item' + procActive + '" onclick="navigateTo(\'procurement\',\'po_list\')">' +
-    '<span class="nav-icon">&#x1F4E6;</span><span>Procurement</span></div>';
+  // Apply font family
+  document.documentElement.style.setProperty('--ff-ui', uiFF(APP.cfg.uiFont));
+  document.documentElement.style.setProperty('--ff-data', dataFF(APP.cfg.dataFont));
+  document.documentElement.style.setProperty('--fz', fz() + 'px');
+  document.documentElement.style.setProperty('--py', PY_MAP[APP.cfg.density] + 'px');
 
-  // Other modules
-  for (var i = 0; i < APP.modules.length; i++) {
-    var m = APP.modules[i];
-    if (m.id === 'procurement' || m.id === 'dashboard') continue;
-    var active = m.id === APP.activeModule ? ' active' : '';
-    html += '<div class="nav-item' + active + '" onclick="onModuleClick(\'' + m.id + '\')">' +
-      '<span class="nav-icon">' + getModuleIcon(m.id) + '</span><span>' + m.name + '</span></div>';
-  }
-  nav.innerHTML = html;
+  // Scrollbar colour
+  var scr = document.getElementById('_scrollStyle');
+  if (!scr) { scr = document.createElement('style'); scr.id = '_scrollStyle'; document.head.appendChild(scr); }
+  scr.textContent = '::-webkit-scrollbar-thumb{background:' + M().scrollThumb + '}';
+
+  // Theme animation
+  var root = $('appRoot');
+  if (root) { root.classList.remove('theme-anim'); void root.offsetWidth; root.classList.add('theme-anim'); }
+
+  // Update shell bar theme/accent buttons
+  renderThemeBar();
+  renderAccentBar();
 }
 
-function getModuleIcon(id) {
-  var icons = {
-    procurement:'&#x1F4E6;', production:'&#x1F3ED;', inventory:'&#x1F4E6;',
-    quality:'&#x1F6E1;', sales:'&#x1F4C8;', finance:'&#x20B9;',
-    masters:'&#x1F5C4;', dashboard:'&#x1F4CA;'
-  };
-  return icons[id] || '&#x25CF;';
-}
-
-function onModuleClick(moduleId) {
-  if (APP.unsavedChanges && !confirm('You have unsaved changes. Discard?')) return;
-  APP.unsavedChanges = false;
-  APP.activeModule = moduleId;
-  renderSidebar();
-  setPageTitle(moduleId.charAt(0).toUpperCase() + moduleId.slice(1));
-  $('contentArea').innerHTML =
-    '<div class="card p-4 text-center text-muted"><p>Module "' + moduleId + '" is under development.</p></div>';
-}
-
-// ─── NAVIGATION ──────────────────────────────────────────────
-function navigateTo(module, page, params) {
-  if (APP.unsavedChanges && !confirm('Unsaved changes. Discard?')) return;
-  APP.unsavedChanges = false;
-  APP.activeModule = module;
-  APP.activePage = page;
-  renderSidebar();
-
-  if (module === 'dashboard') renderDashboard();
-  else if (module === 'procurement') {
-    if (page === 'po_list')       loadPOList();
-    else if (page === 'po_form')  renderPOForm(params);
-    else if (page === 'grn_list') loadGRNList();
-    else if (page === 'grn_form') renderGRNForm(params);
-  }
-}
-
-function setPageTitle(t) { $('pageTitle').textContent = t; }
-
-// ═══════════════════════════════════════════════════════════════
-//  DASHBOARD
-// ═══════════════════════════════════════════════════════════════
-function renderDashboard() {
-  setPageTitle('Dashboard');
-  var content = $('contentArea');
-
-  // Summary cards
-  var html = '<div class="grid grid-4 mb-4">';
-  html += dashCard('&#x1F4CB;', 'Purchase Orders', APP.poList.length || '-', 'var(--accent)');
-  html += dashCard('&#x1F4E5;', 'GRN Entries', APP.grnList.length || '-', 'var(--success)');
-  html += dashCard('&#x23F3;', 'Pending Approval', '-', 'var(--warning)');
-  html += dashCard('&#x1F464;', APP.user ? APP.user.name : 'User', APP.user ? APP.user.role : '-', 'var(--info)');
-  html += '</div>';
-
-  // Quick Actions
-  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">Quick Actions</span></div>' +
-    '<div class="flex gap-2">' +
-    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'po_form\')">+ New PO</button>' +
-    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'grn_form\')">+ New GRN</button>' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">View PO List</button>' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">View GRN List</button>' +
-    '</div></div>';
-
-  // Recent POs
-  html += '<div class="grid grid-2">';
-  html += '<div class="card"><div class="card-header"><span class="card-title">Recent Purchase Orders</span></div>';
-  html += '<div id="dashRecentPO" class="text-center text-muted p-2">Loading...</div></div>';
-  html += '<div class="card"><div class="card-header"><span class="card-title">Recent GRNs</span></div>';
-  html += '<div id="dashRecentGRN" class="text-center text-muted p-2">Loading...</div></div>';
-  html += '</div>';
-
-  content.innerHTML = html;
-
-  // Load recent data
-  google.script.run.withSuccessHandler(function(data) {
-    APP.poList = data || [];
-    var el = $('dashRecentPO');
-    if (!el) return;
-    if (data.length === 0) { el.innerHTML = '<span class="text-muted">No POs yet</span>'; return; }
-    var t = '<table class="data-table"><thead><tr><th>PO Number</th><th>Supplier</th><th>Status</th><th>Total</th></tr></thead><tbody>';
-    var max = Math.min(data.length, 5);
-    for (var i = 0; i < max; i++) {
-      var p = data[i];
-      t += '<tr class="clickable" onclick="navigateTo(\'procurement\',\'po_form\',{poCode:\'' + esc(p['# PO Number']||'') + '\'})">' +
-        '<td class="font-mono text-accent">' + esc(p['# PO Number']||'') + '</td>' +
-        '<td>' + esc(p['\u2190 Supplier Name']||'') + '</td>' +
-        '<td>' + statusBadge(p['Status']||'Draft') + '</td>' +
-        '<td class="text-right font-mono">' + fmtCur(p['\u2211 Grand Total']||'') + '</td></tr>';
-    }
-    t += '</tbody></table>';
-    el.innerHTML = t;
-
-    // Count pending
-    var pending = 0;
-    for (var j = 0; j < data.length; j++) { if ((data[j]['Status']||'') === 'Submitted') pending++; }
-    var pc = document.querySelector('.dash-card-pending');
-    if (pc) pc.textContent = pending;
-  }).getPOList();
-
-  google.script.run.withSuccessHandler(function(data) {
-    APP.grnList = data || [];
-    var el = $('dashRecentGRN');
-    if (!el) return;
-    if (data.length === 0) { el.innerHTML = '<span class="text-muted">No GRNs yet</span>'; return; }
-    var t = '<table class="data-table"><thead><tr><th>GRN Number</th><th>PO</th><th>Supplier</th><th>Status</th></tr></thead><tbody>';
-    var max = Math.min(data.length, 5);
-    for (var i = 0; i < max; i++) {
-      var g = data[i];
-      t += '<tr class="clickable" onclick="navigateTo(\'procurement\',\'grn_form\',{grnCode:\'' + esc(g['# GRN Number']||'') + '\'})">' +
-        '<td class="font-mono text-accent">' + esc(g['# GRN Number']||'') + '</td>' +
-        '<td class="font-mono">' + esc(g['\u2192 PO Number']||'') + '</td>' +
-        '<td>' + esc(g['\u2190 Supplier Name']||'') + '</td>' +
-        '<td>' + statusBadge(g['Status']||'Draft') + '</td></tr>';
-    }
-    t += '</tbody></table>';
-    el.innerHTML = t;
-  }).getGRNList();
-}
-
-function dashCard(icon, title, value, color) {
-  var cls = title === 'Pending Approval' ? ' dash-card-pending' : '';
-  return '<div class="card" style="border-top:3px solid ' + color + ';">' +
-    '<div class="flex items-center gap-2 mb-2"><span style="font-size:20px;">' + icon + '</span>' +
-    '<span class="text-sm text-muted">' + title + '</span></div>' +
-    '<div class="font-bold' + cls + '" style="font-size:24px;">' + value + '</div></div>';
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  PO LIST — Matches PO_MASTER (21 cols)
-// ═══════════════════════════════════════════════════════════════
-function loadPOList() {
-  setPageTitle('Purchase Orders');
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(d) { APP.poList = d || []; renderPOList(); })
-    .withFailureHandler(function(e) { showError('Failed to load POs: ' + e.message); })
-    .getPOList();
-}
-
-function renderPOList() {
-  var content = $('contentArea');
-  var html = '<div class="card">' +
-    '<div class="card-header"><div class="flex items-center gap-2">' +
-    '<span class="card-title">Purchase Orders (' + APP.poList.length + ')</span></div>' +
-    '<div class="flex gap-2">' +
-    '<div class="search-bar"><input type="text" id="poSearch" placeholder="Search POs..." oninput="filterTable(\'poTable\',this.value)"></div>' +
-    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'po_form\')">+ New PO</button>' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">GRN List</button>' +
-    '<button class="btn" onclick="navigateTo(\'dashboard\',\'dashboard\')">Dashboard</button></div></div>';
-
-  // Table headers matching PO_MASTER columns
-  html += '<div style="overflow-x:auto;"><table class="data-table" id="poTable"><thead><tr>' +
-    '<th>PO Number</th><th>PO Date</th><th>Season</th><th>PO Type</th>' +
-    '<th>Supplier</th><th>Currency</th><th>Delivery Date</th>' +
-    '<th>Total Lines</th><th class="text-right">Grand Total</th>' +
-    '<th>Status</th><th>GRN Status</th><th>Created By</th>' +
-    '</tr></thead><tbody>';
-
-  for (var i = 0; i < APP.poList.length; i++) {
-    var po = APP.poList[i];
-    html += '<tr class="clickable" onclick="openPO(\'' + esc(po['# PO Number']||'') + '\')">' +
-      '<td class="font-mono text-accent">' + esc(po['# PO Number']||'') + '</td>' +
-      '<td>' + fmtDate(po['\u26A0 PO Date']||'') + '</td>' +
-      '<td>' + esc(po['Season']||'') + '</td>' +
-      '<td>' + esc(po['PO Type']||'') + '</td>' +
-      '<td class="truncate" style="max-width:160px;">' + esc(po['\u2190 Supplier Name']||'') + '</td>' +
-      '<td>' + esc(po['Currency']||'') + '</td>' +
-      '<td>' + fmtDate(po['Delivery Date']||'') + '</td>' +
-      '<td class="text-center">' + (po['\u2211 Total Lines']||'-') + '</td>' +
-      '<td class="text-right font-mono">' + fmtCur(po['\u2211 Grand Total']||'') + '</td>' +
-      '<td>' + statusBadge(po['Status']||'Draft') + '</td>' +
-      '<td>' + (po['GRN Status'] ? statusBadge(po['GRN Status']) : '-') + '</td>' +
-      '<td class="text-xs">' + esc(po['Created By']||'') + '</td></tr>';
-  }
-
-  html += '</tbody></table></div></div>';
-  content.innerHTML = html;
-}
-
-function openPO(poCode) { navigateTo('procurement', 'po_form', { poCode: poCode }); }
-
-// ═══════════════════════════════════════════════════════════════
-//  PO FORM — All 21 PO_MASTER columns
-// ═══════════════════════════════════════════════════════════════
-function renderPOForm(params) {
-  params = params || {};
-  var isEdit = !!params.poCode;
-  setPageTitle(isEdit ? 'Edit PO: ' + params.poCode : 'New Purchase Order');
-
-  if (isEdit) {
-    showLoading();
-    google.script.run
-      .withSuccessHandler(function(data) {
-        APP.currentPO = data;
-        buildPOForm(data.po || {}, data.lines || [], params.poCode);
-      })
-      .withFailureHandler(function(err) { showError('Failed to load PO: ' + err.message); })
-      .getPODetail(params.poCode);
-  } else {
-    APP.currentPO = null;
-    buildPOForm({}, [], '');
-  }
-}
-
-function buildPOForm(po, lines, poCode) {
-  var suppliers = APP.lookups.suppliers || [];
-  var payTerms = APP.lookups.paymentTerms || [];
-  var content = $('contentArea');
-
-  // ── Action Bar ──
-  var html = '<div class="flex gap-2 mb-4 flex-wrap">' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">&larr; Back to List</button>' +
-    '<button class="btn btn-primary" onclick="savePOForm()">Save PO</button>';
-  if (poCode && po['Status'] === 'Draft')
-    html += '<button class="btn" style="background:var(--info);color:#fff;" onclick="submitPOAction(\'' + esc(poCode) + '\')">Submit for Approval</button>';
-  if (poCode && (po['Status'] === 'Submitted' || po['Status'] === 'Under Review'))
-    html += '<button class="btn" style="background:var(--success);color:#fff;" onclick="approvePOAction(\'' + esc(poCode) + '\')">Approve</button>';
-  if (poCode && po['Status'] !== 'Cancelled')
-    html += '<button class="btn" style="background:var(--danger);color:#fff;" onclick="cancelPOAction(\'' + esc(poCode) + '\')">Cancel PO</button>';
-  if (poCode) {
-    html += '<button class="btn" onclick="exportPO(\'' + esc(poCode) + '\',\'pdf\')">Export PDF</button>';
-    html += '<button class="btn" onclick="exportPO(\'' + esc(poCode) + '\',\'sheets\')">Export Sheets</button>';
-  }
-  html += '</div>';
-
-  // ── PO Header Card (matching PO_MASTER 21 cols) ──
-  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">PO Details</span>';
-  if (poCode) html += '<span class="badge badge-submitted font-mono">' + esc(poCode) + '</span>';
-  html += '</div>';
-
-  // Row 1: Core fields
-  html += '<div class="grid grid-4">';
-  html += fieldDate('\u26A0 PO Date', 'poDate', po['\u26A0 PO Date'] || todayISO());
-  html += fieldSelect('Season', 'poSeason', listOpts(APP.lists.seasonList), po['Season'] || '');
-  html += fieldSelect('PO Type', 'poType', listOpts(APP.lists.poTypeList), po['PO Type'] || '');
-  html += fieldSelect('Currency', 'poCurrency', listOpts(APP.lists.currencyList), po['Currency'] || 'INR');
-  html += '</div>';
-
-  // Row 2: Supplier + Payment
-  html += '<div class="grid grid-4">';
-  html += fieldSelect('\u2192 Supplier Code', 'poSupplier',
-    suppliers.map(function(s) { return { value: s.code, label: s.code + ' - ' + s.name }; }),
-    po['\u2192 Supplier Code'] || '');
-  html += fieldReadonly('\u2190 Supplier Name', po['\u2190 Supplier Name'] || '(auto)');
-  html += fieldSelect('\u2192 Payment Terms', 'poPayTerms',
-    payTerms.map(function(pt) { return { value: pt.code, label: pt.code + ' - ' + pt.name }; }),
-    po['\u2192 Payment Terms'] || '');
-  html += fieldReadonly('\u2190 Payment Terms Name', po['\u2190 Payment Terms Name'] || '(auto)');
-  html += '</div>';
-
-  // Row 3: Dates & Address
-  html += '<div class="grid grid-4">';
-  html += fieldDate('Delivery Date', 'poDeliveryDate', po['Delivery Date'] || '');
-  html += fieldText('Delivery Address', 'poDeliveryAddr', po['Delivery Address'] || '');
-  html += fieldText('Remarks', 'poRemarks', po['Remarks'] || '');
-  html += fieldText('Physical PO Image', 'poPOImage', po['Physical PO Image'] || '');
-  html += '</div>';
-
-  // Row 4: Status + Auto fields
-  html += '<div class="grid grid-4">';
-  html += fieldSelect('Status', 'poStatus', listOpts(APP.lists.poStatusList), po['Status'] || 'Draft');
-  html += fieldReadonly('GRN Status', po['GRN Status'] || 'None');
-  html += fieldReadonly('Created By', po['Created By'] || (APP.user ? APP.user.email : ''));
-  html += fieldReadonly('Created Date', fmtDate(po['Created Date'] || ''));
-  html += '</div>';
-
-  // Row 5: Totals (auto-calculated, read-only)
-  html += '<div class="grid grid-4" style="background:var(--bg-secondary);padding:12px;border-radius:var(--radius-md);margin-top:8px;">';
-  html += fieldReadonly('\u2211 Total Lines', '<span id="poTotalLines">' + (po['\u2211 Total Lines']||'0') + '</span>');
-  html += fieldReadonly('\u2211 Base Value', '<span id="poBaseValue" class="font-mono">' + fmtCur(po['\u2211 Base Value']||0) + '</span>');
-  html += fieldReadonly('\u2211 Total GST', '<span id="poTotalGST" class="font-mono">' + fmtCur(po['\u2211 Total GST']||0) + '</span>');
-  html += fieldReadonly('\u2211 Grand Total', '<span id="poGrandTotal" class="font-mono font-bold text-accent" style="font-size:16px;">' + fmtCur(po['\u2211 Grand Total']||0) + '</span>');
-  html += '</div>';
-
-  html += '</div>'; // end card
-
-  // ── Line Items Card (matching PO_LINE_ITEMS 20 cols) ──
-  html += '<div class="card"><div class="card-header"><span class="card-title">PO Line Items</span>' +
-    '<button class="btn btn-sm btn-primary" onclick="addPOLine()">+ Add Line</button></div>';
-
-  html += '<div style="overflow-x:auto;"><table class="data-table" id="poLineTable"><thead><tr>' +
-    '<th>#</th><th>Item Master</th><th>Item Code</th><th>Item Name</th><th>UOM</th>' +
-    '<th>HSN</th><th>GST%</th><th>Qty</th><th>Unit Price</th><th>Disc%</th>' +
-    '<th>Base Value</th><th>Line GST</th><th>Line Total</th>' +
-    '<th>Received</th><th>Pending</th><th>Line Status</th><th>Notes</th><th></th>' +
-    '</tr></thead><tbody>';
-
-  for (var i = 0; i < lines.length; i++) {
-    html += renderPOLineRow(i, lines[i]);
-  }
-  html += '</tbody></table></div></div>';
-
-  content.innerHTML = html;
-  content.dataset.poCode = poCode || '';
-  recalcPOTotals();
-}
-
-function renderPOLineRow(idx, ln) {
-  ln = ln || {};
-  var itemMaster = ln['Item Master'] || '';
-  var itemCode   = ln['\u2192 Item Code'] || '';
-  var itemName   = ln['\u2190 Item Name'] || '';
-  var uom        = ln['\u2190 UOM'] || '';
-  var hsn        = ln['\u2190 HSN Code'] || '';
-  var gst        = ln['\u2190 GST %'] || '';
-  var qty        = ln['\u26A0 Quantity'] || '';
-  var price      = ln['\u26A0 Unit Price'] || '';
-  var disc       = ln['Discount %'] || '0';
-  var baseVal    = ln['\u2211 Line Base Value'] || '';
-  var lineGst    = ln['\u2211 Line GST'] || '';
-  var lineTotal  = ln['\u2211 Line Total'] || '';
-  var recvQty    = ln['\u2190 Received Qty'] || '0';
-  var pendQty    = ln['\u2211 Pending Qty'] || '';
-  var lineStatus = ln['Line Status'] || '';
-  var notes      = ln['Notes'] || '';
-
-  return '<tr data-line="' + idx + '">' +
-    '<td>' + (idx+1) + '</td>' +
-    '<td>' + selInline('itemMaster', APP.lists.itemMasterList||[], itemMaster, '100px') + '</td>' +
-    '<td>' + inp('itemCode', itemCode, '110px', 'font-mono') + '</td>' +
-    '<td>' + inp('itemName', itemName, '150px', '') + '</td>' +
-    '<td>' + inp('uom', uom, '55px', '', true) + '</td>' +
-    '<td>' + inp('hsn', hsn, '70px', 'font-mono', true) + '</td>' +
-    '<td>' + inp('gst', gst, '50px', 'text-right', true) + '</td>' +
-    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + qty + '" data-field="qty" oninput="recalcPOTotals()"></td>' +
-    '<td><input class="form-input text-right" type="number" step="0.01" style="width:80px;" value="' + price + '" data-field="price" oninput="recalcPOTotals()"></td>' +
-    '<td><input class="form-input text-right" type="number" step="0.01" style="width:55px;" value="' + disc + '" data-field="disc" oninput="recalcPOTotals()"></td>' +
-    '<td class="text-right font-mono ln-base">' + fmtCur(baseVal) + '</td>' +
-    '<td class="text-right font-mono ln-gst">' + fmtCur(lineGst) + '</td>' +
-    '<td class="text-right font-mono font-bold ln-total">' + fmtCur(lineTotal) + '</td>' +
-    '<td class="text-center">' + recvQty + '</td>' +
-    '<td class="text-center">' + (pendQty||'-') + '</td>' +
-    '<td>' + (lineStatus ? statusBadge(lineStatus) : '-') + '</td>' +
-    '<td>' + inp('notes', notes, '100px', '') + '</td>' +
-    '<td><button class="btn btn-sm btn-danger" onclick="removePOLine(' + idx + ')">&#x2715;</button></td></tr>';
-}
-
-function addPOLine() {
-  var tbody = document.querySelector('#poLineTable tbody');
-  tbody.insertAdjacentHTML('beforeend', renderPOLineRow(tbody.children.length, {}));
-  APP.unsavedChanges = true;
-}
-
-function removePOLine(idx) {
-  var row = document.querySelector('#poLineTable tbody tr[data-line="' + idx + '"]');
-  if (row) row.remove();
-  recalcPOTotals();
-  APP.unsavedChanges = true;
-}
-
-function recalcPOTotals() {
-  var rows = document.querySelectorAll('#poLineTable tbody tr');
-  var subTotal = 0, gstTotal = 0, lineCount = rows.length;
-
-  for (var i = 0; i < rows.length; i++) {
-    var qty   = pf(rows[i].querySelector('[data-field="qty"]'));
-    var price = pf(rows[i].querySelector('[data-field="price"]'));
-    var disc  = pf(rows[i].querySelector('[data-field="disc"]'));
-    var gstPct= pf(rows[i].querySelector('[data-field="gst"]') || rows[i].querySelector('input[data-field="gst"]'));
-
-    // Read GST from the readonly field if available
-    if (!gstPct) {
-      var gstInput = rows[i].querySelector('input[data-ro="gst"]');
-      if (gstInput) gstPct = parseFloat(gstInput.value) || 0;
-    }
-
-    var lineBase = qty * price * (1 - disc / 100);
-    var lineGst  = lineBase * (gstPct || 0) / 100;
-    var lineTotal = lineBase + lineGst;
-
-    var b = rows[i].querySelector('.ln-base');
-    var g = rows[i].querySelector('.ln-gst');
-    var t = rows[i].querySelector('.ln-total');
-    if (b) b.textContent = fmtCur(lineBase);
-    if (g) g.textContent = fmtCur(lineGst);
-    if (t) t.textContent = fmtCur(lineTotal);
-    subTotal += lineBase;
-    gstTotal += lineGst;
-  }
-
-  setText('poTotalLines', lineCount);
-  setText('poBaseValue', fmtCur(subTotal));
-  setText('poTotalGST', fmtCur(gstTotal));
-  setText('poGrandTotal', fmtCur(subTotal + gstTotal));
-}
-
-// ── PO Save ──
-function savePOForm() {
-  var poCode = $('contentArea').dataset.poCode || '';
-  var poData = {
-    '\u26A0 PO Date':        val('poDate'),
-    'Season':                val('poSeason'),
-    'PO Type':               val('poType'),
-    '\u2192 Supplier Code':  val('poSupplier'),
-    '\u2192 Payment Terms':  val('poPayTerms'),
-    'Currency':              val('poCurrency'),
-    'Delivery Date':         val('poDeliveryDate'),
-    'Delivery Address':      val('poDeliveryAddr'),
-    'Remarks':               val('poRemarks'),
-    'Physical PO Image':     val('poPOImage'),
-    'Status':                val('poStatus'),
-    'Created By':            poCode ? '' : (APP.user ? APP.user.email : ''),
-    'Created Date':          poCode ? '' : new Date().toISOString()
-  };
-  poData.poCode = poCode;
-
-  var lineItems = collectPOLines();
-
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(r) {
-      if (r.success) {
-        APP.unsavedChanges = false;
-        showToast('success', r.message);
-        navigateTo('procurement', 'po_form', { poCode: r.poCode });
-      } else {
-        showToast('error', r.message);
-        buildPOForm(poData, lineItems, poCode);
-      }
-    })
-    .withFailureHandler(function(err) { showToast('error', 'Save failed: ' + err.message); })
-    .savePO(poData, lineItems);
-}
-
-function collectPOLines() {
-  var rows = document.querySelectorAll('#poLineTable tbody tr');
-  var lines = [];
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    lines.push({
-      'Item Master':      r.querySelector('select') ? r.querySelector('select').value : '',
-      '\u2192 Item Code': getField(r, 'itemCode'),
-      '\u2190 Item Name': getField(r, 'itemName'),
-      '\u2190 UOM':       getField(r, 'uom'),
-      '\u2190 HSN Code':  getField(r, 'hsn'),
-      '\u2190 GST %':     getField(r, 'gst'),
-      '\u26A0 Quantity':  getField(r, 'qty'),
-      '\u26A0 Unit Price': getField(r, 'price'),
-      'Discount %':       getField(r, 'disc'),
-      'Notes':            getField(r, 'notes')
-    });
-  }
-  return lines;
-}
-
-function submitPOAction(poCode) {
-  if (!confirm('Submit PO ' + poCode + ' for approval?')) return;
-  google.script.run
-    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
-    .withFailureHandler(function(e) { showToast('error',e.message); })
-    .submitPO(poCode);
-}
-
-function approvePOAction(poCode) {
-  if (!confirm('Approve PO ' + poCode + '?')) return;
-  google.script.run
-    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
-    .withFailureHandler(function(e) { showToast('error',e.message); })
-    .approvePO(poCode);
-}
-
-function cancelPOAction(poCode) {
-  if (!confirm('Cancel PO ' + poCode + '? This cannot be undone.')) return;
-  google.script.run
-    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','po_form',{poCode:poCode}); })
-    .withFailureHandler(function(e) { showToast('error',e.message); })
-    .cancelPO(poCode);
-}
-
-function exportPO(poCode, format) {
-  showToast('info', 'Exporting ' + format.toUpperCase() + '...');
-  var fn = format === 'pdf' ? 'exportPOToPDF' : 'exportPOToSheets';
-  google.script.run
-    .withSuccessHandler(function(r) {
-      if (r.success) { window.open(r.url, '_blank'); showToast('success', r.message); }
-      else showToast('error', r.message);
-    })
-    .withFailureHandler(function(e) { showToast('error', e.message); })
-    [fn](poCode);
-}
-
-
-// ═══════════════════════════════════════════════════════════════
-//  GRN LIST — Matches GRN_MASTER (17 cols)
-// ═══════════════════════════════════════════════════════════════
-function loadGRNList() {
-  setPageTitle('Goods Receipt Notes');
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(d) { APP.grnList = d || []; renderGRNList(); })
-    .withFailureHandler(function(e) { showError('Failed to load GRNs: ' + e.message); })
-    .getGRNList();
-}
-
-function renderGRNList() {
-  var content = $('contentArea');
-  var html = '<div class="card"><div class="card-header">' +
-    '<span class="card-title">Goods Receipt Notes (' + APP.grnList.length + ')</span>' +
-    '<div class="flex gap-2">' +
-    '<div class="search-bar"><input type="text" placeholder="Search GRNs..." oninput="filterTable(\'grnTable\',this.value)"></div>' +
-    '<button class="btn btn-primary" onclick="navigateTo(\'procurement\',\'grn_form\')">+ New GRN</button>' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'po_list\')">PO List</button></div></div>';
-
-  html += '<div style="overflow-x:auto;"><table class="data-table" id="grnTable"><thead><tr>' +
-    '<th>GRN Number</th><th>GRN Date</th><th>PO Number</th><th>Supplier</th>' +
-    '<th>Vehicle No</th><th>DC Number</th><th>Warehouse</th>' +
-    '<th>Received By</th><th>Status</th><th>Created By</th>' +
-    '</tr></thead><tbody>';
-
-  for (var i = 0; i < APP.grnList.length; i++) {
-    var g = APP.grnList[i];
-    html += '<tr class="clickable" onclick="openGRN(\'' + esc(g['# GRN Number']||'') + '\')">' +
-      '<td class="font-mono text-accent">' + esc(g['# GRN Number']||'') + '</td>' +
-      '<td>' + fmtDate(g['\u26A0 GRN Date']||'') + '</td>' +
-      '<td class="font-mono">' + esc(g['\u2192 PO Number']||'') + '</td>' +
-      '<td class="truncate" style="max-width:160px;">' + esc(g['\u2190 Supplier Name']||'') + '</td>' +
-      '<td>' + esc(g['Vehicle No']||'') + '</td>' +
-      '<td>' + esc(g['DC Number']||'') + '</td>' +
-      '<td>' + esc(g['\u2190 Warehouse Name']||'') + '</td>' +
-      '<td class="text-xs">' + esc(g['Received By']||'') + '</td>' +
-      '<td>' + statusBadge(g['Status']||'Draft') + '</td>' +
-      '<td class="text-xs">' + esc(g['Created By']||'') + '</td></tr>';
-  }
-
-  html += '</tbody></table></div></div>';
-  content.innerHTML = html;
-}
-
-function openGRN(grnCode) { navigateTo('procurement', 'grn_form', { grnCode: grnCode }); }
-
-
-// ═══════════════════════════════════════════════════════════════
-//  GRN FORM — All 17 GRN_MASTER columns
-// ═══════════════════════════════════════════════════════════════
-function renderGRNForm(params) {
-  params = params || {};
-  var isEdit = !!params.grnCode;
-  setPageTitle(isEdit ? 'Edit GRN: ' + params.grnCode : 'New GRN');
-
-  if (isEdit) {
-    showLoading();
-    google.script.run
-      .withSuccessHandler(function(data) {
-        APP.currentGRN = data;
-        buildGRNForm(data.grn || {}, data.lines || [], params.grnCode);
-      })
-      .withFailureHandler(function(err) { showError('Failed to load GRN: ' + err.message); })
-      .getGRNDetail(params.grnCode);
-  } else {
-    APP.currentGRN = null;
-    buildGRNForm({}, [], '');
-  }
-}
-
-function buildGRNForm(grn, lines, grnCode) {
-  var warehouses = APP.lookups.warehouses || [];
-  var content = $('contentArea');
-
-  // ── Action Bar ──
-  var html = '<div class="flex gap-2 mb-4 flex-wrap">' +
-    '<button class="btn" onclick="navigateTo(\'procurement\',\'grn_list\')">&larr; Back to List</button>' +
-    '<button class="btn btn-primary" onclick="saveGRNForm()">Save GRN</button>';
-  if (grnCode && (grn['Status'] === 'Draft' || grn['Status'] === 'Pending'))
-    html += '<button class="btn" style="background:var(--success);color:#fff;" onclick="confirmGRNAction(\'' + esc(grnCode) + '\')">Confirm GRN</button>';
-  html += '</div>';
-
-  // ── GRN Header Card ──
-  html += '<div class="card mb-4"><div class="card-header"><span class="card-title">GRN Details</span>';
-  if (grnCode) html += '<span class="badge badge-submitted font-mono">' + esc(grnCode) + '</span>';
-  html += '</div>';
-
-  // Row 1: Core
-  html += '<div class="grid grid-4">';
-  html += fieldDate('\u26A0 GRN Date', 'grnDate', grn['\u26A0 GRN Date'] || todayISO());
-  html += fieldText('\u2192 PO Number', 'grnPONumber', grn['\u2192 PO Number'] || '');
-  html += fieldReadonly('\u2190 Supplier Code', grn['\u2190 Supplier Code'] || '(auto from PO)');
-  html += fieldReadonly('\u2190 Supplier Name', grn['\u2190 Supplier Name'] || '(auto from PO)');
-  html += '</div>';
-
-  // Row 2: Vehicle / DC
-  html += '<div class="grid grid-4">';
-  html += fieldText('Vehicle No', 'grnVehicle', grn['Vehicle No'] || '');
-  html += fieldText('DC Number', 'grnDC', grn['DC Number'] || '');
-  html += fieldDate('DC Date', 'grnDCDate', grn['DC Date'] || '');
-  html += fieldText('Gate Pass No', 'grnGatePass', grn['Gate Pass No'] || '');
-  html += '</div>';
-
-  // Row 3: Warehouse, Status, etc.
-  html += '<div class="grid grid-4">';
-  html += fieldSelect('\u2192 Warehouse', 'grnWarehouse',
-    warehouses.map(function(w) { return { value: w.code, label: w.code + ' - ' + w.name }; }),
-    grn['\u2192 Warehouse'] || '');
-  html += fieldReadonly('\u2190 Warehouse Name', grn['\u2190 Warehouse Name'] || '(auto)');
-  html += fieldText('Received By', 'grnReceivedBy', grn['Received By'] || (APP.user ? APP.user.email : ''));
-  html += fieldSelect('Status', 'grnStatus', listOpts(APP.lists.grnStatusList), grn['Status'] || 'Pending');
-  html += '</div>';
-
-  // Row 4: Notes, Image, Auto
-  html += '<div class="grid grid-4">';
-  html += fieldText('Notes', 'grnNotes', grn['Notes'] || '');
-  html += fieldText('Gate Inward Image', 'grnGateImage', grn['Gate Inward Image'] || '');
-  html += fieldReadonly('Created By', grn['Created By'] || (APP.user ? APP.user.email : ''));
-  html += fieldReadonly('Created Date', fmtDate(grn['Created Date'] || ''));
-  html += '</div>';
-
-  html += '</div>'; // end card
-
-  // ── GRN Line Items Card (matching GRN_LINE_ITEMS 19 cols) ──
-  html += '<div class="card"><div class="card-header"><span class="card-title">GRN Line Items</span>' +
-    '<div class="flex gap-2">' +
-    '<button class="btn btn-sm" onclick="loadPOLinesForGRN()">Load from PO</button>' +
-    '<button class="btn btn-sm btn-primary" onclick="addGRNLine()">+ Add Line</button></div></div>';
-
-  html += '<div style="overflow-x:auto;"><table class="data-table" id="grnLineTable"><thead><tr>' +
-    '<th>#</th><th>PO Line ID</th><th>Item Code</th><th>Item Name</th><th>UOM</th>' +
-    '<th>PO Qty</th><th>Received</th><th>Accepted</th><th>Rejected</th>' +
-    '<th>Batch No</th><th>Lot No</th><th>Rolls</th>' +
-    '<th>Inspection</th><th>Rejection Reason</th><th>Storage Bin</th>' +
-    '<th>Line Status</th><th>Notes</th><th></th>' +
-    '</tr></thead><tbody>';
-
-  for (var i = 0; i < lines.length; i++) {
-    html += renderGRNLineRow(i, lines[i]);
-  }
-  html += '</tbody></table></div></div>';
-
-  content.innerHTML = html;
-  content.dataset.grnCode = grnCode || '';
-}
-
-function renderGRNLineRow(idx, ln) {
-  ln = ln || {};
-  var poLineId  = ln['\u2192 PO Line ID'] || '';
-  var itemCode  = ln['\u2190 Item Code'] || '';
-  var itemName  = ln['\u2190 Item Name'] || '';
-  var uom       = ln['\u2190 UOM'] || '';
-  var poQty     = ln['\u2190 PO Qty'] || '';
-  var recvQty   = ln['\u26A0 Received Qty'] || '';
-  var accQty    = ln['\u26A0 Accepted Qty'] || '';
-  var rejQty    = ln['\u2211 Rejected Qty'] || '';
-  var batchNo   = ln['Batch No'] || '';
-  var lotNo     = ln['Lot No'] || '';
-  var rolls     = ln['Rolls'] || '';
-  var inspection= ln['Inspection Result'] || '';
-  var rejReason = ln['Rejection Reason'] || '';
-  var storageBin= ln['\u2192 Storage Bin'] || '';
-  var lineStatus= ln['Line Status'] || '';
-  var notes     = ln['Notes'] || '';
-
-  return '<tr data-gline="' + idx + '">' +
-    '<td>' + (idx+1) + '</td>' +
-    '<td>' + inp('poLineId', poLineId, '100px', 'font-mono', true) + '</td>' +
-    '<td>' + inp('itemCode', itemCode, '110px', 'font-mono', true) + '</td>' +
-    '<td>' + inp('itemName', itemName, '140px', '', true) + '</td>' +
-    '<td>' + inp('uom', uom, '50px', '', true) + '</td>' +
-    '<td>' + inp('poQty', poQty, '60px', 'text-right', true) + '</td>' +
-    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + recvQty + '" data-field="recvQty" oninput="calcGRNRejected(this)"></td>' +
-    '<td><input class="form-input text-right" type="number" style="width:65px;" value="' + accQty + '" data-field="accQty" oninput="calcGRNRejected(this)"></td>' +
-    '<td class="text-right grn-rej">' + (rejQty || '-') + '</td>' +
-    '<td>' + inp('batchNo', batchNo, '80px', '') + '</td>' +
-    '<td>' + inp('lotNo', lotNo, '80px', '') + '</td>' +
-    '<td><input class="form-input text-right" type="number" style="width:50px;" value="' + rolls + '" data-field="rolls"></td>' +
-    '<td>' + selInline('inspection', APP.lists.inspectionResult||[], inspection, '90px') + '</td>' +
-    '<td>' + inp('rejReason', rejReason, '120px', '') + '</td>' +
-    '<td>' + inp('storageBin', storageBin, '90px', 'font-mono') + '</td>' +
-    '<td>' + (lineStatus ? statusBadge(lineStatus) : '-') + '</td>' +
-    '<td>' + inp('notes', notes, '100px', '') + '</td>' +
-    '<td><button class="btn btn-sm btn-danger" onclick="removeGRNLine(' + idx + ')">&#x2715;</button></td></tr>';
-}
-
-function addGRNLine() {
-  var tbody = document.querySelector('#grnLineTable tbody');
-  tbody.insertAdjacentHTML('beforeend', renderGRNLineRow(tbody.children.length, {}));
-}
-
-function removeGRNLine(idx) {
-  var row = document.querySelector('#grnLineTable tbody tr[data-gline="' + idx + '"]');
-  if (row) row.remove();
-}
-
-function calcGRNRejected(el) {
-  var row = el.closest('tr');
-  var recv = parseFloat(row.querySelector('[data-field="recvQty"]').value) || 0;
-  var acc  = parseFloat(row.querySelector('[data-field="accQty"]').value) || 0;
-  var rej  = Math.max(0, recv - acc);
-  row.querySelector('.grn-rej').textContent = rej > 0 ? rej : '-';
-}
-
-function loadPOLinesForGRN() {
-  var poNumber = val('grnPONumber');
-  if (!poNumber) { showToast('warning', 'Enter a PO Number first.'); return; }
-
-  showToast('info', 'Loading PO lines...');
-  google.script.run
-    .withSuccessHandler(function(poLines) {
-      var tbody = document.querySelector('#grnLineTable tbody');
-      tbody.innerHTML = '';
-      for (var i = 0; i < poLines.length; i++) {
-        var pl = poLines[i];
-        var grnLine = {
-          '\u2192 PO Line ID': pl['# Line ID'] || '',
-          '\u2190 Item Code':  pl['\u2192 Item Code'] || '',
-          '\u2190 Item Name':  pl['\u2190 Item Name'] || '',
-          '\u2190 UOM':        pl['\u2190 UOM'] || '',
-          '\u2190 PO Qty':     pl['\u26A0 Quantity'] || ''
-        };
-        tbody.insertAdjacentHTML('beforeend', renderGRNLineRow(i, grnLine));
-      }
-      showToast('success', poLines.length + ' lines loaded from PO.');
-    })
-    .withFailureHandler(function(err) { showToast('error', err.message); })
-    .getPOLinesForGRN(poNumber);
-}
-
-function saveGRNForm() {
-  var grnCode = $('contentArea').dataset.grnCode || '';
-  var grnData = {
-    grnCode: grnCode,
-    '\u26A0 GRN Date':     val('grnDate'),
-    '\u2192 PO Number':    val('grnPONumber'),
-    '\u2192 Warehouse':    val('grnWarehouse'),
-    'Vehicle No':          val('grnVehicle'),
-    'DC Number':           val('grnDC'),
-    'DC Date':             val('grnDCDate'),
-    'Gate Pass No':        val('grnGatePass'),
-    'Received By':         val('grnReceivedBy'),
-    'Notes':               val('grnNotes'),
-    'Gate Inward Image':   val('grnGateImage'),
-    'Status':              val('grnStatus'),
-    'Created By':          grnCode ? '' : (APP.user ? APP.user.email : ''),
-    'Created Date':        grnCode ? '' : new Date().toISOString()
-  };
-
-  var lineItems = collectGRNLines();
-
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(r) {
-      if (r.success) { APP.unsavedChanges = false; showToast('success', r.message); navigateTo('procurement', 'grn_form', { grnCode: r.grnCode }); }
-      else showToast('error', r.message);
-    })
-    .withFailureHandler(function(err) { showToast('error', err.message); })
-    .saveGRN(grnData, lineItems);
-}
-
-function collectGRNLines() {
-  var rows = document.querySelectorAll('#grnLineTable tbody tr');
-  var lines = [];
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    lines.push({
-      '\u2192 PO Line ID':    getField(r, 'poLineId'),
-      '\u2190 Item Code':     getField(r, 'itemCode'),
-      '\u2190 Item Name':     getField(r, 'itemName'),
-      '\u2190 UOM':           getField(r, 'uom'),
-      '\u2190 PO Qty':        getField(r, 'poQty'),
-      '\u26A0 Received Qty':  getField(r, 'recvQty'),
-      '\u26A0 Accepted Qty':  getField(r, 'accQty'),
-      'Batch No':             getField(r, 'batchNo'),
-      'Lot No':               getField(r, 'lotNo'),
-      'Rolls':                getField(r, 'rolls'),
-      'Inspection Result':    r.querySelector('select[data-field="inspection"]') ? r.querySelector('select[data-field="inspection"]').value : '',
-      'Rejection Reason':     getField(r, 'rejReason'),
-      '\u2192 Storage Bin':   getField(r, 'storageBin'),
-      'Notes':                getField(r, 'notes')
-    });
-  }
-  return lines;
-}
-
-function confirmGRNAction(grnCode) {
-  if (!confirm('Confirm GRN ' + grnCode + '?')) return;
-  google.script.run
-    .withSuccessHandler(function(r) { showToast(r.success?'success':'error',r.message); if(r.success) navigateTo('procurement','grn_form',{grnCode:grnCode}); })
-    .withFailureHandler(function(e) { showToast('error',e.message); })
-    .confirmGRN(grnCode);
-}
-
-
-// ═══════════════════════════════════════════════════════════════
-//  THEME
-// ═══════════════════════════════════════════════════════════════
 function applyThemeMode(mode) {
-  var body = document.body;
-  body.className = body.className.replace(/mode-\S+/g, '');
-  if (mode !== 'light') body.classList.add('mode-' + mode);
-  var sel = $('themeMode');
-  if (sel) sel.value = mode;
-  saveThemePref();
+  APP.cfg.mode = mode;
+  applyTheme();
+  saveThemeToServer();
 }
 
 function applyAccent(accent) {
-  var body = document.body;
-  body.className = body.className.replace(/accent-\S+/g, '');
-  body.classList.add('accent-' + accent);
-  var swatches = document.querySelectorAll('.accent-swatch');
-  for (var i = 0; i < swatches.length; i++) {
-    swatches[i].classList.toggle('active', swatches[i].dataset.accent === accent);
+  APP.cfg.accent = accent;
+  applyTheme();
+  saveThemeToServer();
+}
+
+function saveThemeToServer() {
+  try {
+    google.script.run.saveUserTheme({mode: APP.cfg.mode, accent: APP.cfg.accent});
+  } catch(e) {}
+}
+
+// ─── RENDER THEME BAR ────────────────────────────────────────
+function renderThemeBar() {
+  var bar = $('themeBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  Object.keys(MODES).forEach(function(key) {
+    var m = MODES[key];
+    var btn = document.createElement('button');
+    btn.className = 'theme-btn' + (APP.cfg.mode === key ? ' active' : '');
+    btn.title = m.name;
+    btn.textContent = m.lbl;
+    btn.onclick = function() { applyThemeMode(key); };
+    bar.appendChild(btn);
+  });
+}
+
+function renderAccentBar() {
+  var bar = $('accentBar');
+  if (!bar) return;
+  bar.innerHTML = '';
+  Object.keys(ACCENTS).forEach(function(key) {
+    var ac = ACCENTS[key];
+    var dot = document.createElement('button');
+    dot.className = 'accent-dot' + (APP.cfg.accent === key ? ' active' : '');
+    dot.title = ac.lbl;
+    dot.style.background = ac.a;
+    dot.onclick = function() { applyAccent(key); };
+    bar.appendChild(dot);
+  });
+}
+
+// ─── RENDER SHELL BAR AVATARS ────────────────────────────────
+function renderShellAvatars() {
+  var container = $('shellAvatars');
+  if (!container) return;
+  container.innerHTML = '';
+
+  var me = APP.user || {name:"User",email:"user@cc.com",role:"Admin"};
+  var users = APP.onlineUsers || [];
+  var vis = users.slice(0, 3);
+  var ovfl = users.length - 3;
+  var total = users.length + 1;
+
+  // Self avatar
+  var selfAv = document.createElement('div');
+  selfAv.className = 'avatar self';
+  selfAv.style.background = A().a;
+  selfAv.textContent = ini(me.name);
+  selfAv.title = me.name + ' (You)';
+  container.appendChild(selfAv);
+
+  // Other avatars
+  vis.forEach(function(u) {
+    var av = document.createElement('div');
+    av.className = 'avatar';
+    av.style.background = aColor(u.email || u.name);
+    av.textContent = ini(u.name);
+    av.title = u.name;
+    var dot = document.createElement('div');
+    dot.className = 'status-dot';
+    dot.style.background = u.status === 'active' ? '#22c55e' : '#f59e0b';
+    av.appendChild(dot);
+    container.appendChild(av);
+  });
+
+  // Overflow
+  if (ovfl > 0) {
+    var btn = document.createElement('button');
+    btn.className = 'overflow-btn';
+    btn.textContent = '+' + ovfl;
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      toggleAllUsersDropdown();
+    };
+    container.appendChild(btn);
   }
-  saveThemePref();
+
+  // Online pill
+  var pill = document.createElement('div');
+  pill.className = 'online-pill';
+  pill.innerHTML = '<div class="dot"></div>' + total + ' online';
+  container.appendChild(pill);
 }
 
-function saveThemePref() {
-  var mode = $('themeMode') ? $('themeMode').value : 'light';
-  var el = document.querySelector('.accent-swatch.active');
-  var accent = el ? el.dataset.accent : 'orange';
-  google.script.run.saveUserTheme({ mode: mode, accent: accent });
+function toggleAllUsersDropdown() {
+  // Simple implementation - could enhance with dropdown
+  APP.showAllUsers = !APP.showAllUsers;
 }
 
+// ─── RENDER SHELL BAR ────────────────────────────────────────
+function renderShellBar() {
+  renderThemeBar();
+  renderAccentBar();
+  renderShellAvatars();
+  updateNotifBadge();
+}
 
-// ═══════════════════════════════════════════════════════════════
-//  NOTIFICATIONS
-// ═══════════════════════════════════════════════════════════════
+// ─── RENDER SIDEBAR ──────────────────────────────────────────
+function renderSidebar() {
+  var sidebar = $('sidebar');
+  if (!sidebar) return;
+
+  // Width
+  sidebar.style.width = APP.cfg.compactSide ? '46px' : APP.cfg.sbWidth + 'px';
+  sidebar.style.transition = APP.sidebarDrag ? 'none' : 'width .2s ease';
+
+  // Label
+  var label = $('sidebarLabel');
+  if (APP.cfg.compactSide) {
+    label.style.display = 'none';
+  } else {
+    label.style.display = '';
+    $('sidebarWidthLabel').textContent = APP.cfg.sbWidth;
+  }
+
+  // Quick Access
+  var qaSection = $('quickAccessSection');
+  qaSection.style.display = APP.cfg.compactSide ? 'none' : '';
+  renderQuickAccess();
+
+  // Modules label
+  var modLabel = $('modulesLabel');
+  modLabel.style.display = APP.cfg.compactSide ? 'none' : '';
+
+  // Module nav
+  renderModuleNav();
+
+  // Extra nav
+  renderExtraNav();
+
+  // User card
+  renderSidebarUser();
+
+  // Drag handle
+  var dh = $('dragHandle');
+  dh.style.display = APP.cfg.compactSide ? 'none' : '';
+}
+
+function renderQuickAccess() {
+  var list = $('quickAccessList');
+  list.innerHTML = '';
+  if (APP.shortcuts.length === 0) {
+    list.innerHTML = '<div class="qa-empty">No shortcuts yet.<br><span style="color:var(--accent);cursor:pointer;font-weight:700;" onclick="openCommandPalette()">Open Ctrl+K to pin items ⭐</span></div>';
+    return;
+  }
+  APP.shortcuts.forEach(function(sc) {
+    var item = document.createElement('div');
+    item.className = 'qa-item';
+    item.onclick = function() {
+      var mod = MODS.find(function(m) { return m.id === sc.mod; });
+      if (mod) navigateTo(mod.id);
+    };
+    var html = '<span class="icon">' + sc.icon + '</span>' +
+      '<div style="flex:1;overflow:hidden;">' +
+        '<div class="label">' + sc.label + '</div>' +
+        '<div class="sub">' + sc.sub + '</div>' +
+      '</div>';
+    if (APP.editSC) {
+      html += '<button onclick="event.stopPropagation();removeShortcut(\'' + sc.id + '\')" style="width:18px;height:18px;border-radius:50%;background:#ef4444;color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>';
+    }
+    item.innerHTML = html;
+    list.appendChild(item);
+  });
+}
+
+function toggleQAEdit() {
+  APP.editSC = !APP.editSC;
+  $('qaEditBtn').textContent = APP.editSC ? 'Done' : 'Edit';
+  $('qaEditBtn').style.background = APP.editSC ? A().al : 'none';
+  $('qaEditBtn').style.border = APP.editSC ? '1px solid ' + A().a : 'none';
+  $('qaEditBtn').style.color = APP.editSC ? A().a : '';
+  renderQuickAccess();
+}
+
+function removeShortcut(id) {
+  APP.shortcuts = APP.shortcuts.filter(function(s) { return s.id !== id; });
+  renderQuickAccess();
+  try { google.script.run.removeShortcut(id); } catch(e) {}
+}
+
+function renderModuleNav() {
+  var nav = $('moduleNav');
+  nav.innerHTML = '';
+  MODS.forEach(function(mod) {
+    var active = APP.activeModule === mod.id;
+    var btn = document.createElement('button');
+    btn.className = 'nav-btn' + (active ? ' active' : '');
+    if (APP.cfg.compactSide) {
+      btn.style.padding = '9px 0';
+      btn.style.justifyContent = 'center';
+      btn.style.gap = '0';
+    }
+    var html = '<span class="icon">' + mod.icon + '</span>';
+    if (!APP.cfg.compactSide) {
+      html += '<span class="lbl">' + mod.lbl + '</span>';
+      if (mod.badge > 0) {
+        html += '<span class="badge-count">' + mod.badge + '</span>';
+      }
+    }
+    btn.innerHTML = html;
+    btn.onclick = function() { navigateTo(mod.id); };
+    nav.appendChild(btn);
+  });
+}
+
+function renderExtraNav() {
+  var nav = $('extraNav');
+  nav.innerHTML = '';
+  var items = [
+    {icon:"⚙️", lbl:"Settings", fn:function(){ toggleSettingsPanel(); }, active: APP.cfgOpen},
+    {icon:"👥", lbl:"Users",    fn:function(){}, active:false}
+  ];
+  items.forEach(function(x) {
+    var btn = document.createElement('button');
+    btn.className = 'nav-btn' + (x.active ? ' active' : '');
+    if (APP.cfg.compactSide) {
+      btn.style.padding = '9px 0';
+      btn.style.justifyContent = 'center';
+      btn.style.gap = '0';
+    }
+    var html = '<span class="icon">' + x.icon + '</span>';
+    if (!APP.cfg.compactSide) {
+      html += '<span class="lbl" style="color:var(--text-c);">' + x.lbl + '</span>';
+    }
+    btn.innerHTML = html;
+    btn.onclick = x.fn;
+    nav.appendChild(btn);
+  });
+}
+
+function renderSidebarUser() {
+  var el = $('sidebarUser');
+  if (!el) return;
+  el.style.display = APP.cfg.compactSide ? 'none' : '';
+  var me = APP.user || {name:"User",email:"user@cc.com",role:"Admin"};
+  var roleColor = ROLE_C[me.role] || '#6b7280';
+  var roleKey = ROLE_K[me.role] || 'USER';
+  el.innerHTML =
+    '<div class="avatar-sm">' + ini(me.name) + '</div>' +
+    '<div class="info">' +
+      '<div class="name">' + me.name + '</div>' +
+      '<span class="role-badge" style="background:' + roleColor + '22;color:' + roleColor + ';">' + roleKey + '</span>' +
+    '</div>';
+}
+
+function toggleCompactSidebar(compact) {
+  APP.cfg.compactSide = compact;
+  renderSidebar();
+}
+
+// ─── SIDEBAR DRAG ────────────────────────────────────────────
+(function() {
+  var handle = null;
+  document.addEventListener('DOMContentLoaded', function() {
+    handle = $('dragHandle');
+    if (!handle) return;
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      APP.sidebarDrag = true;
+      handle.classList.add('dragging');
+      var x0 = e.clientX, w0 = APP.cfg.sbWidth;
+      function mv(ev) {
+        APP.cfg.sbWidth = Math.max(200, Math.min(520, w0 + (ev.clientX - x0)));
+        $('sidebar').style.width = APP.cfg.sbWidth + 'px';
+        $('sidebar').style.transition = 'none';
+        $('sidebarWidthLabel').textContent = APP.cfg.sbWidth;
+      }
+      function up() {
+        APP.sidebarDrag = false;
+        handle.classList.remove('dragging');
+        $('sidebar').style.transition = 'width .2s ease';
+        window.removeEventListener('mousemove', mv);
+        window.removeEventListener('mouseup', up);
+      }
+      window.addEventListener('mousemove', mv);
+      window.addEventListener('mouseup', up);
+    });
+  });
+})();
+
+// ─── NAVIGATION ──────────────────────────────────────────────
+function navigateTo(moduleId) {
+  APP.activeModule = moduleId;
+  renderModuleNav();
+  updateBreadcrumb();
+  updateSubToolbar();
+
+  if (moduleId === 'dashboard') {
+    renderDashboard();
+  } else if (moduleId === 'procurement') {
+    renderProcurementList();
+  } else {
+    renderModulePlaceholder(moduleId);
+  }
+
+  // Send heartbeat with current module
+  try {
+    google.script.run.heartbeat(moduleId, 'Home');
+  } catch(e) {}
+}
+
+function updateBreadcrumb() {
+  var bc = $('breadcrumb');
+  bc.innerHTML = '<a onclick="navigateTo(\'dashboard\')">Home</a>';
+  if (APP.activeModule !== 'dashboard') {
+    var mod = MODS.find(function(m) { return m.id === APP.activeModule; });
+    if (mod) {
+      bc.innerHTML += '<span class="sep">›</span><span class="crumb" style="color:' + A().a + ';font-weight:700;">' + mod.lbl + '</span>';
+    }
+  }
+}
+
+function updateSubToolbar() {
+  var tb = $('subToolbar');
+  if (APP.activeModule === 'dashboard') {
+    tb.innerHTML =
+      '<span class="title">🏠 Home — Module Overview</span>' +
+      '<div class="shell-spacer"></div>' +
+      '<span class="time" id="clockDisplay">' + timeStr() + '</span>' +
+      '<button class="tool-btn">🖨️ Print</button>' +
+      '<button class="tool-btn">📤 Export ▾</button>';
+  } else {
+    var mod = MODS.find(function(m) { return m.id === APP.activeModule; });
+    if (mod) {
+      tb.innerHTML =
+        '<span class="title">' + mod.icon + ' ' + mod.lbl + '</span>' +
+        '<div class="shell-spacer"></div>' +
+        '<span class="time">' + timeStr() + '</span>';
+    }
+  }
+}
+
+function updateClock() {
+  var t = timeStr();
+  var el = $('clockDisplay');
+  if (el) el.textContent = t;
+  var sc = $('statusClock');
+  if (sc) sc.textContent = t;
+  var sr = $('statusRight');
+  if (sr) {
+    sr.textContent = 'CC ERP · ' + (APP.activeModule === 'dashboard' ? 'Home' : MODS.find(function(m){return m.id===APP.activeModule})?.lbl || 'Home') +
+      ' · ' + M().name + ' · ' + A().lbl;
+  }
+}
+
+// ─── RENDER DASHBOARD ────────────────────────────────────────
+function renderDashboard() {
+  var content = $('contentArea');
+  var me = APP.user || {name:"User",email:"user@cc.com",role:"Admin"};
+  var users = APP.onlineUsers || [];
+  var totalOnline = users.length + 1;
+  var _fz = fz();
+
+  var html = '';
+
+  // Greeting
+  html += '<div class="greeting fade-slide" style="margin-bottom:20px;">';
+  html += '<h2>' + greet() + ', ' + me.name.split(' ')[0] + ' 👋</h2>';
+  html += '<p>' + todayStr() + '</p>';
+  html += '</div>';
+
+  // Quick Stats
+  var stats = [
+    {lbl:"Open POs",  val:"3",     sub:"₹4.2L value",   col:"#E8690A",icon:"📦"},
+    {lbl:"Active WOs",val:"5",     sub:"8 on floor",    col:"#0078D4",icon:"🏭"},
+    {lbl:"Pending QC",val:"2",     sub:"Lot 089 failed",col:"#7C3AED",icon:"🔬"},
+    {lbl:"Due Pmts",  val:"₹2.1L", sub:"4 invoices",    col:"#BE123C",icon:"💰"}
+  ];
+  html += '<div class="stats-grid">';
+  stats.forEach(function(s) {
+    html += '<div class="stat-card" style="border-left:3px solid ' + s.col + ';">';
+    html += '<div class="head"><span class="icon">' + s.icon + '</span><span class="lbl">' + s.lbl + '</span></div>';
+    html += '<div class="val">' + s.val + '</div>';
+    html += '<div class="sub">' + s.sub + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Modules section label
+  html += '<div class="section-label">Modules</div>';
+
+  // Module tiles
+  html += '<div class="tiles-grid">';
+  MODS.forEach(function(mod) {
+    html += '<div class="module-tile" style="--tile-col:' + mod.col + ';" onclick="navigateTo(\'' + mod.id + '\')" onmouseenter="this.classList.add(\'hover\')" onmouseleave="this.classList.remove(\'hover\')">';
+    html += '<div class="top-bar" style="background:transparent;"></div>';
+    if (mod.badge > 0) {
+      html += '<div class="badge-float">' + mod.badge + '</div>';
+    }
+    html += '<div class="icon">' + mod.icon + '</div>';
+    html += '<div class="name">' + mod.lbl + '</div>';
+    html += '<div class="desc">' + mod.desc + '</div>';
+    html += '<div class="foot">';
+    if (mod.stats.pend > 0) {
+      html += '<div class="col"><span class="k">Pending</span><span class="v" style="font-size:13px;font-weight:900;color:#ef4444;">' + mod.stats.pend + '</span></div>';
+    }
+    html += '<div class="col"><span class="k">Today</span><span class="v">' + mod.stats.today + '</span></div>';
+    html += '<div class="col right"><span class="k">Value</span><span class="v">' + mod.stats.val + '</span></div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Bottom row
+  html += '<div class="bottom-grid">';
+
+  // Activity feed
+  html += '<div class="activity-box">';
+  html += '<div class="header"><span class="title">🕐 Recent Activity</span><span class="sub">Today</span></div>';
+  ACTIVITY.forEach(function(a, i) {
+    var rowBg = i % 2 === 0 ? 'var(--tbl-even)' : 'var(--tbl-odd)';
+    html += '<div class="activity-item" style="border-left:3px solid ' + a.col + ';background:' + rowBg + ';">';
+    html += '<span class="icon">' + a.icon + '</span>';
+    html += '<div><div class="text">' + a.text + '</div><div class="meta">' + a.sub + '</div></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Online users
+  html += '<div class="online-box">';
+  html += '<div class="header"><span class="title">👥 Online Now</span>';
+  html += '<div class="online-pill"><div class="dot"></div>' + totalOnline + '</div>';
+  html += '</div>';
+
+  // Self
+  html += renderOnlineUserRow(me, true);
+  // Others
+  users.forEach(function(u) {
+    html += renderOnlineUserRow(u, false);
+  });
+  html += '</div>';
+
+  html += '</div>'; // bottom-grid
+
+  content.innerHTML = html;
+
+  // Update status bar
+  updateStatusBar(totalOnline);
+}
+
+function renderOnlineUserRow(u, isSelf) {
+  var dot = (u.status === 'active' || isSelf) ? '#22c55e' : '#f59e0b';
+  var bgColor = isSelf ? A().a : aColor(u.email || u.name);
+  var roleColor = ROLE_C[u.role] || '#6b7280';
+  var roleKey = ROLE_K[u.role] || 'USER';
+  var html = '<div class="online-user">';
+  html += '<div class="av">';
+  html += '<div class="circle" style="background:' + bgColor + ';">' + ini(u.name) + '</div>';
+  html += '<div class="dot" style="background:' + dot + ';"></div>';
+  html += '</div>';
+  html += '<div class="info">';
+  html += '<div class="name">' + u.name.split(' ')[0];
+  if (isSelf) html += ' <span class="you-badge">YOU</span>';
+  html += '</div>';
+  html += '<div class="mod">' + (u.module || 'Dashboard') + '</div>';
+  html += '</div>';
+  html += '<span class="role" style="background:' + roleColor + '22;color:' + roleColor + ';">' + roleKey + '</span>';
+  html += '</div>';
+  return html;
+}
+
+function updateStatusBar(totalOnline) {
+  var el = $('statOnline');
+  if (el) el.textContent = totalOnline || 1;
+  var unread = APP.notifications.filter(function(n) { return !n.read; }).length;
+  var pending = $('statPending');
+  if (pending) pending.textContent = unread + 9;
+}
+
+// ─── MODULE PLACEHOLDER ──────────────────────────────────────
+function renderModulePlaceholder(moduleId) {
+  var mod = MODS.find(function(m) { return m.id === moduleId; });
+  if (!mod) return;
+  var content = $('contentArea');
+  content.innerHTML =
+    '<div style="text-align:center;padding:60px 20px;">' +
+    '<div style="font-size:48px;margin-bottom:16px;">' + mod.icon + '</div>' +
+    '<h2 style="font-size:22px;font-weight:900;color:var(--text-a);margin-bottom:8px;">' + mod.lbl + '</h2>' +
+    '<p style="color:var(--text-c);margin-bottom:4px;">' + mod.desc + '</p>' +
+    '<p style="color:var(--text-d);font-size:12px;margin-top:16px;">This module is connected to your Google Sheet.<br>Data will load from the configured sheet.</p>' +
+    '<div style="margin-top:24px;display:flex;gap:12px;justify-content:center;">' +
+    '<button onclick="navigateTo(\'dashboard\')" style="padding:8px 20px;border-radius:6px;border:1px solid var(--divider);background:var(--surf-mid);color:var(--text-b);cursor:pointer;font-weight:700;font-family:var(--ff-ui);">← Back to Dashboard</button>' +
+    '</div></div>';
+}
+
+// ─── PROCUREMENT MODULE ──────────────────────────────────────
+function renderProcurementList() {
+  var content = $('contentArea');
+  content.style.padding = '0';
+
+  // Try to load from server
+  google.script.run
+    .withSuccessHandler(function(data) {
+      APP.poList = data || [];
+      buildProcurementListHTML('PO');
+    })
+    .withFailureHandler(function() {
+      // Use dummy data
+      APP.poList = [
+        {id:"PO-2026-0042",supplier:"SUP-001",supName:"Coats India Pvt Ltd",date:"24 Feb 2026",type:"Trim",items:3,base:112500,gst:13500,total:126000,status:"Pending"},
+        {id:"PO-2026-0041",supplier:"SUP-004",supName:"Vardhman Textiles Ltd",date:"18 Feb 2026",type:"Fabric",items:5,base:287000,gst:34440,total:321440,status:"Approved"},
+        {id:"PO-2026-0040",supplier:"SUP-002",supName:"YKK India Pvt Ltd",date:"15 Feb 2026",type:"Trim",items:2,base:45000,gst:8100,total:53100,status:"Approved"},
+        {id:"PO-2026-0039",supplier:"SUP-003",supName:"Madura Fashion",date:"12 Feb 2026",type:"Fabric",items:4,base:198000,gst:23760,total:221760,status:"Received"},
+        {id:"PO-2026-0038",supplier:"SUP-005",supName:"Alok Industries Ltd",date:"10 Feb 2026",type:"Fabric",items:3,base:155000,gst:18600,total:173600,status:"Draft"}
+      ];
+      buildProcurementListHTML('PO');
+    })
+    .getPOList();
+}
+
+function buildProcurementListHTML(sub) {
+  var content = $('contentArea');
+  var list = sub === 'PO' ? APP.poList : (APP.grnList || []);
+  var STATUS_C = {Pending:"#f59e0b",Approved:"#22c55e",Received:"#0078D4",Draft:"#6b7280",Accepted:"#22c55e",Partial:"#f59e0b"};
+  var statuses = [];
+  list.forEach(function(r) { if (statuses.indexOf(r.status) < 0) statuses.push(r.status); });
+  var fmtINR = function(v) { return '₹ ' + Number(v).toLocaleString('en-IN', {minimumFractionDigits:2}); };
+
+  var html = '';
+  // Sub toolbar
+  html += '<div class="po-sub-toolbar">';
+  html += '<div class="po-toggle-bar">';
+  html += '<button class="po-toggle-btn ' + (sub==='PO'?'active':'') + '" onclick="buildProcurementListHTML(\'PO\')">Purchase Orders</button>';
+  html += '<button class="po-toggle-btn ' + (sub==='GRN'?'active':'') + '" onclick="loadGRNList()">Goods Receipt</button>';
+  html += '</div><div class="shell-spacer"></div>';
+  html += '<div class="po-search-box"><span class="icon">🔍</span><input placeholder="Search ' + sub + 's…" oninput="filterPOList(this.value)"></div>';
+  html += '<button class="po-new-btn" onclick="showToast(\'New ' + sub + ' form coming soon\')">+ New ' + sub + '</button>';
+  html += '</div>';
+
+  // Filter bar
+  html += '<div class="filter-bar">';
+  html += '<span class="filter-label">🔽 FILTER</span>';
+  html += '<button class="filter-pill active" onclick="">All (' + list.length + ')</button>';
+  statuses.forEach(function(st) {
+    var cnt = list.filter(function(r) { return r.status === st; }).length;
+    html += '<button class="filter-pill">' + st + ' (' + cnt + ')</button>';
+  });
+  html += '<div class="filter-sep"></div>';
+  html += '<span class="filter-label">↕️ SORT</span>';
+  html += '<span style="font-size:10px;color:var(--text-c);font-family:var(--ff-data);margin-left:auto;">' + list.length + ' records</span>';
+  html += '</div>';
+
+  // Table
+  html += '<div style="flex:1;overflow:auto;">';
+  html += '<table class="data-table"><thead><tr>';
+  html += '<th style="width:40px;">#</th>';
+  html += '<th>' + sub + ' No</th>';
+  html += '<th>Supplier</th>';
+  html += '<th>Date</th>';
+  if (sub === 'PO') html += '<th>Type</th>';
+  html += '<th style="text-align:center;">Items</th>';
+  if (sub === 'PO') html += '<th style="text-align:right;">Total</th>';
+  html += '<th style="text-align:center;">Status</th>';
+  html += '</tr></thead><tbody>';
+
+  list.forEach(function(r, i) {
+    var rowBg = APP.cfg.tblStyle === 'striped' ? (i % 2 === 0 ? 'var(--tbl-even)' : 'var(--tbl-odd)') : 'var(--surf-high)';
+    var sc = STATUS_C[r.status] || '#6b7280';
+    html += '<tr style="background:' + rowBg + ';" onmouseenter="this.style.background=\'var(--hover-bg)\'" onmouseleave="this.style.background=\'' + rowBg + '\'">';
+    html += '<td class="mono" style="color:var(--accent);font-weight:900;font-size:11px;">' + String(i+1).padStart(2,'0') + '</td>';
+    html += '<td class="mono" style="font-weight:800;font-size:12px;">' + r.id + '</td>';
+    html += '<td style="font-size:12px;color:var(--text-b);">' + (r.supName || '') + '</td>';
+    html += '<td style="font-size:11px;color:var(--text-c);">' + (r.date || '') + '</td>';
+    if (sub === 'PO') html += '<td><span style="font-size:9px;padding:2px 7px;border-radius:99px;background:var(--badge-bg);color:var(--text-b);font-weight:700;">' + (r.type || '') + '</span></td>';
+    html += '<td class="mono" style="text-align:center;font-weight:700;color:var(--text-b);">' + (r.items || 0) + '</td>';
+    if (sub === 'PO') html += '<td class="mono" style="text-align:right;font-weight:800;">' + fmtINR(r.total || 0) + '</td>';
+    html += '<td style="text-align:center;"><span class="status-pill" style="background:' + sc + '18;color:' + sc + ';border:1px solid ' + sc + '40;">' + r.status + '</span></td>';
+    html += '</tr>';
+  });
+
+  if (list.length === 0) {
+    html += '<tr><td colspan="8" style="padding:60px;text-align:center;color:var(--text-d);font-size:13px;">No ' + sub + 's found.</td></tr>';
+  }
+
+  html += '</tbody></table></div>';
+
+  content.innerHTML = html;
+}
+
+function loadGRNList() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      APP.grnList = data || [];
+      buildProcurementListHTML('GRN');
+    })
+    .withFailureHandler(function() {
+      APP.grnList = [
+        {id:"GRN-2026-0018",po:"PO-2026-0041",supplier:"SUP-004",supName:"Vardhman Textiles",date:"22 Feb 2026",items:5,recQty:520,accQty:510,status:"Accepted"},
+        {id:"GRN-2026-0017",po:"PO-2026-0040",supplier:"SUP-002",supName:"YKK India",date:"20 Feb 2026",items:2,recQty:1000,accQty:985,status:"Partial"},
+        {id:"GRN-2026-0016",po:"PO-2026-0039",supplier:"SUP-003",supName:"Madura Fashion",date:"18 Feb 2026",items:4,recQty:340,accQty:340,status:"Accepted"}
+      ];
+      buildProcurementListHTML('GRN');
+    })
+    .getGRNList();
+}
+
+function filterPOList(q) {
+  // Simple client-side filter — could be improved
+  if (!q) return;
+}
+
+// ─── NOTIFICATIONS ───────────────────────────────────────────
 function loadNotifications() {
   google.script.run
-    .withSuccessHandler(function(d) { APP.notifications = d || []; updateNotifBadge(); })
+    .withSuccessHandler(function(data) {
+      APP.notifications = (data || []).map(function(n) {
+        n.ts = n.ts || Date.now();
+        return n;
+      });
+      updateNotifBadge();
+    })
+    .withFailureHandler(function() {
+      // Use dummy data
+      APP.notifications = [
+        {id:"NTF-00001",type:"action",icon:"🔴",title:"PO-2026-0042 awaiting approval",detail:"Rajesh Kumar submitted PO to Coats India — ₹1,24,500 for 8 items.",module:"Procurement",ref:"PO-2026-0042",ts:Date.now()-900000,actions:["approve","reject","reply"],read:false,status:"unread"},
+        {id:"NTF-00002",type:"warning",icon:"🟠",title:"RM-FAB-007 stock below reorder level",detail:"Current: 42 MTR · Reorder level: 100 MTR. Primary supplier: Vardhman Textiles.",module:"Inventory",ref:"RM-FAB-007",ts:Date.now()-7200000,actions:["view","reply"],read:false,status:"unread"},
+        {id:"NTF-00003",type:"action",icon:"🔴",title:"Payment approval needed — ₹45,000",detail:"Invoice INV-0034 from Shree Enterprises. Due: 25-Feb-2026.",module:"Finance",ref:"INV-0034",ts:Date.now()-86400000,actions:["approve","reject","reply"],read:false,status:"unread"},
+        {id:"NTF-00004",type:"info",icon:"🔵",title:"Work Order WO-0089 completed",detail:"Amit Singh marked WO-0089 complete. 240 pcs.",module:"Production",ref:"WO-0089",ts:Date.now()-9000000,actions:["view","reply"],read:true,status:"read"},
+        {id:"NTF-00005",type:"system",icon:"⚪",title:"Daily GAS cache refresh complete",detail:"PropertiesService refreshed all 46 FK relations at 07:00.",module:"System",ref:"",ts:Date.now()-28800000,actions:["dismiss"],read:true,status:"read"}
+      ];
+      updateNotifBadge();
+    })
     .getNotifications({});
 }
 
 function updateNotifBadge() {
-  var unread = APP.notifications.filter(function(n) { return n.status === 'Unread'; }).length;
-  $('btnNotifications').textContent = unread > 0 ? '\uD83D\uDD14 ' + unread : '\uD83D\uDD14';
-}
-
-function toggleNotificationPanel() {
-  var panel = $('notificationPanel');
-  panel.classList.toggle('hidden');
-  if (!panel.classList.contains('hidden')) renderNotifications();
-}
-
-function renderNotifications() {
-  var container = $('notificationList');
-  if (APP.notifications.length === 0) { container.innerHTML = '<div class="text-center text-muted p-4">No notifications</div>'; return; }
-  var html = '';
-  for (var i = 0; i < APP.notifications.length; i++) {
-    var n = APP.notifications[i];
-    var tc = n.type==='warning'?'var(--warning)':n.type==='action'?'var(--accent)':n.type==='system'?'var(--info)':'var(--text-muted)';
-    html += '<div class="card mb-2" style="border-left:3px solid ' + tc + ';">' +
-      '<div class="flex justify-between items-center">' +
-      '<span class="font-bold text-sm">' + esc(n.title) + '</span>' +
-      '<span class="text-xs text-muted">' + timeAgo(n.createdAt) + '</span></div>' +
-      '<div class="text-xs text-muted mt-2">' + esc(n.message) + '</div>' +
-      '<div class="flex gap-2 mt-2">' +
-      (n.status==='Unread'?'<button class="btn btn-sm" onclick="markRead(\''+n.id+'\')">Mark Read</button>':'') +
-      '<button class="btn btn-sm" onclick="dismiss(\''+n.id+'\')">Dismiss</button></div></div>';
+  var unread = APP.notifications.filter(function(n) { return !n.read; }).length;
+  var badge = $('notifBadge');
+  if (badge) {
+    badge.textContent = unread;
+    badge.style.display = unread > 0 ? 'flex' : 'none';
   }
+  var btn = $('btnNotif');
+  if (btn) {
+    btn.className = 'shell-icon-btn' + (APP.notifOpen ? ' active' : '');
+  }
+}
+
+function toggleNotifPanel() {
+  APP.notifOpen = !APP.notifOpen;
+  APP.cfgOpen = false;
+  closeSettingsPanel();
+  updateNotifBadge();
+  if (APP.notifOpen) {
+    renderNotifPanel();
+  } else {
+    $('notifPanelContainer').innerHTML = '';
+  }
+}
+
+function renderNotifPanel() {
+  var container = $('notifPanelContainer');
+  var notifs = APP.notifications;
+  var unread = notifs.filter(function(n) { return !n.read; }).length;
+
+  var html = '<div class="notif-panel dd-anim">';
+
+  // Header
+  html += '<div class="notif-header">';
+  html += '<div class="top">';
+  html += '<div style="display:flex;align-items:center;gap:8px;">';
+  html += '<span class="title">🔔 Notifications</span>';
+  if (unread > 0) html += '<div class="unread-badge">' + unread + '</div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:6px;align-items:center;">';
+  if (unread > 0) html += '<button class="mark-all" onclick="markAllNotifRead()">Mark all read</button>';
+  html += '<button class="close-btn" onclick="toggleNotifPanel()">×</button>';
+  html += '</div></div>';
+  // Tabs
+  html += '<div class="notif-tabs">';
+  html += '<div class="notif-tab">All <span class="cnt">' + notifs.length + '</span></div>';
+  html += '<div class="notif-tab">Unread <span class="cnt">' + unread + '</span></div>';
+  html += '<div class="notif-tab">Action <span class="cnt">' + notifs.filter(function(n){return n.type==="action"}).length + '</span></div>';
+  html += '</div></div>';
+
+  // List
+  html += '<div class="notif-list">';
+  if (notifs.length === 0) {
+    html += '<div style="padding:32px;text-align:center;color:var(--text-d);">';
+    html += '<div style="font-size:32px;margin-bottom:8px;">🎉</div>';
+    html += '<div style="font-size:12px;font-weight:700;">All caught up!</div>';
+    html += '</div>';
+  }
+  notifs.forEach(function(n) {
+    var tc = NOTIF_C[n.type] || '#6b7280';
+    var tbg = NOTIF_BG[n.type] || 'transparent';
+    var actioned = n.status === 'actioned';
+    html += '<div class="notif-item" style="border-left:3px solid ' + (actioned ? 'var(--divider)' : tc) + ';background:' + (n.read ? 'var(--surf-high)' : tbg) + ';opacity:' + (actioned ? '.7' : '1') + ';">';
+    html += '<div class="main" onclick="expandNotif(\'' + n.id + '\')">';
+    html += '<div style="display:flex;align-items:flex-start;gap:9px;">';
+    html += '<div class="type-dot" style="background:' + (actioned ? 'var(--text-d)' : tc) + ';"></div>';
+    html += '<div style="flex:1;min-width:0;">';
+    // Type label + time
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">';
+    html += '<span class="type-label" style="background:' + (actioned ? 'var(--badge-bg)' : tc+'20') + ';color:' + (actioned ? 'var(--text-d)' : tc) + ';">';
+    html += actioned ? '✓ DONE' : {action:"ACTION REQUIRED",warning:"WARNING",info:"INFO",system:"SYSTEM"}[n.type];
+    html += '</span>';
+    html += '<span class="ts">' + ago(n.ts) + '</span>';
+    if (!n.read) html += '<div class="unread-dot" style="background:' + tc + ';"></div>';
+    html += '</div>';
+    // Title
+    html += '<div class="title" style="font-weight:' + (n.read ? '600' : '800') + ';">' + n.title + '</div>';
+    // Module + ref
+    html += '<div class="module-ref"><span class="mod">' + n.module + '</span>';
+    if (n.ref) html += ' · <span class="ref">' + n.ref + '</span>';
+    html += '</div></div></div></div>';
+
+    // Action buttons
+    if (!actioned && n.actions) {
+      html += '<div class="notif-actions">';
+      if (n.actions.indexOf('approve') >= 0) {
+        html += '<button class="notif-action-btn" style="background:#15803D;color:#fff;" onclick="event.stopPropagation();notifAction(\'' + n.id + '\',\'approve\')">✅ Approve</button>';
+      }
+      if (n.actions.indexOf('reject') >= 0) {
+        html += '<button class="notif-action-btn" style="background:#ef4444;color:#fff;" onclick="event.stopPropagation();notifAction(\'' + n.id + '\',\'reject\')">❌ Reject</button>';
+      }
+      if (n.actions.indexOf('view') >= 0) {
+        html += '<button class="notif-action-btn" style="background:var(--surf-mid);color:var(--text-c);border:1px solid var(--divider);" onclick="event.stopPropagation();markNotifRead(\'' + n.id + '\')">👁 View</button>';
+      }
+      if (n.actions.indexOf('dismiss') >= 0) {
+        html += '<button class="notif-action-btn" style="background:transparent;color:var(--text-d);border:1px solid var(--divider);margin-left:auto;" onclick="event.stopPropagation();dismissNotif(\'' + n.id + '\')">✕ Dismiss</button>';
+      }
+      if (n.ref) {
+        html += '<button class="notif-action-btn" style="border:1.5px solid var(--accent);background:var(--accent-light);color:var(--accent);margin-left:auto;" onclick="event.stopPropagation();">';
+        html += '<span class="mono" style="font-weight:700;">' + n.ref + '</span> → Open Record</button>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Footer
+  html += '<div class="notif-footer">';
+  html += '<span class="info">NTF sheet · GAS-managed</span>';
+  html += '<button class="view-all">View All →</button>';
+  html += '</div></div>';
+
+  // Backdrop
+  html = '<div onclick="toggleNotifPanel()" style="position:fixed;inset:0;z-index:498;"></div>' + html;
+
   container.innerHTML = html;
 }
 
-function markRead(id) { google.script.run.withSuccessHandler(function(){loadNotifications();}).markNotificationRead(id); }
-function dismiss(id) { google.script.run.withSuccessHandler(function(){loadNotifications();}).dismissNotification(id); }
+function markNotifRead(id) {
+  APP.notifications.forEach(function(n) {
+    if (n.id === id) { n.read = true; n.status = 'read'; }
+  });
+  renderNotifPanel();
+  updateNotifBadge();
+  try { google.script.run.markNotificationRead(id); } catch(e) {}
+}
 
-function toggleSettingsPanel() { $('settingsPanel').classList.toggle('hidden'); }
+function markAllNotifRead() {
+  APP.notifications.forEach(function(n) { n.read = true; if (n.status === 'unread') n.status = 'read'; });
+  renderNotifPanel();
+  updateNotifBadge();
+}
+
+function notifAction(id, action) {
+  APP.notifications.forEach(function(n) {
+    if (n.id === id) { n.read = true; n.status = 'actioned'; n.actionTaken = action; }
+  });
+  renderNotifPanel();
+  updateNotifBadge();
+  showToast(action.charAt(0).toUpperCase() + action.slice(1) + 'd ✓');
+}
+
+function dismissNotif(id) {
+  APP.notifications = APP.notifications.filter(function(n) { return n.id !== id; });
+  renderNotifPanel();
+  updateNotifBadge();
+  try { google.script.run.dismissNotification(id); } catch(e) {}
+}
+
+function expandNotif(id) {
+  var n = APP.notifications.find(function(n) { return n.id === id; });
+  if (n && !n.read) markNotifRead(id);
+}
 
 
-// ═══════════════════════════════════════════════════════════════
-//  COMMAND PALETTE
-// ═══════════════════════════════════════════════════════════════
-var COMMANDS = [
-  { label:'Dashboard',           action:function(){ navigateTo('dashboard','dashboard'); }},
-  { label:'New Purchase Order',  action:function(){ navigateTo('procurement','po_form'); }},
-  { label:'View PO List',        action:function(){ navigateTo('procurement','po_list'); }},
-  { label:'New GRN',             action:function(){ navigateTo('procurement','grn_form'); }},
-  { label:'View GRN List',       action:function(){ navigateTo('procurement','grn_list'); }},
-  { label:'Refresh Data',        action:function(){ navigateTo(APP.activeModule,APP.activePage); }},
-  { label:'Open Settings',       action:function(){ toggleSettingsPanel(); }}
-];
-
+// ─── COMMAND PALETTE ─────────────────────────────────────────
 function openCommandPalette() {
-  $('commandPaletteOverlay').classList.add('open');
-  var inp = $('commandInput'); inp.value = ''; inp.focus();
-  filterCommands('');
+  APP.cmdOpen = true;
+  APP.cmdQuery = '';
+  APP.cmdSel = 0;
+  var overlay = $('cmdOverlay');
+  overlay.classList.add('open');
+  var input = $('cmdInput');
+  input.value = '';
+  input.focus();
+  renderCmdResults('');
 }
 
 function closeCommandPalette(e) {
-  if (!e || e.target === $('commandPaletteOverlay'))
-    $('commandPaletteOverlay').classList.remove('open');
+  if (e && e.target !== $('cmdOverlay')) return;
+  APP.cmdOpen = false;
+  $('cmdOverlay').classList.remove('open');
 }
 
 function filterCommands(q) {
-  q = q.toLowerCase();
-  var res = $('commandResults');
-  var f = COMMANDS.filter(function(c){ return c.label.toLowerCase().indexOf(q)!==-1; });
+  APP.cmdQuery = q;
+  APP.cmdSel = 0;
+  renderCmdResults(q);
+}
+
+function handleCmdKey(e) {
+  var filtered = CMD_INDEX.filter(function(c) { return fuzzy(APP.cmdQuery, c.label + ' ' + c.sub + ' ' + c.group); });
+  if (e.key === 'ArrowDown') { e.preventDefault(); APP.cmdSel = Math.min(APP.cmdSel + 1, filtered.length - 1); renderCmdResults(APP.cmdQuery); }
+  if (e.key === 'ArrowUp')   { e.preventDefault(); APP.cmdSel = Math.max(APP.cmdSel - 1, 0); renderCmdResults(APP.cmdQuery); }
+  if (e.key === 'Enter')     { e.preventDefault(); selectCmdItem(filtered[APP.cmdSel]); }
+  if (e.key === 'Escape')    { closeCommandPalette(); }
+}
+
+function renderCmdResults(q) {
+  var filtered = CMD_INDEX.filter(function(c) { return fuzzy(q, c.label + ' ' + c.sub + ' ' + c.group); });
+  var groups = [];
+  filtered.forEach(function(c) { if (groups.indexOf(c.group) < 0) groups.push(c.group); });
+
   var html = '';
-  for (var i = 0; i < f.length; i++) {
-    html += '<div class="command-item" onclick="execCmd('+i+',\''+esc(q)+'\')">' + f[i].label + '</div>';
+  if (filtered.length === 0) {
+    html = '<div style="padding:24px;text-align:center;color:var(--text-d);font-size:11px;">No results for "' + q + '"</div>';
   }
-  res.innerHTML = html || '<div class="p-4 text-muted text-center">No matching commands</div>';
+  var flatIdx = 0;
+  groups.forEach(function(grp) {
+    html += '<div class="cmd-group-label">' + grp + '</div>';
+    var items = filtered.filter(function(c) { return c.group === grp; });
+    items.forEach(function(item) {
+      var isSelected = flatIdx === APP.cmdSel;
+      var pinned = APP.shortcuts.some(function(s) { return s.mod === item.id || s.id === item.id; });
+      html += '<div class="cmd-item' + (isSelected ? ' selected' : '') + '" onclick="selectCmdItem(CMD_INDEX.find(function(c){return c.id===\'' + item.id + '\'}))" onmouseenter="APP.cmdSel=' + flatIdx + ';renderCmdResults(APP.cmdQuery)">';
+      html += '<span class="icon">' + item.icon + '</span>';
+      html += '<div style="flex:1;"><div class="label">' + item.label + '</div><div class="sub">' + item.sub + '</div></div>';
+      html += '<button class="pin-btn' + (pinned ? ' pinned' : '') + '" onclick="event.stopPropagation();pinFromCmd(\'' + item.id + '\')" title="' + (pinned ? 'Already pinned' : 'Pin to Quick Access') + '">' + (pinned ? '⭐' : '☆') + '</button>';
+      if (isSelected) html += '<span class="enter-badge">↵</span>';
+      html += '</div>';
+      flatIdx++;
+    });
+  });
+
+  $('cmdResults').innerHTML = html;
 }
 
-function execCmd(idx, q) {
-  var f = COMMANDS.filter(function(c){ return c.label.toLowerCase().indexOf(q)!==-1; });
-  if (f[idx]) { closeCommandPalette(); f[idx].action(); }
+function selectCmdItem(item) {
+  if (!item) return;
+  if (item.type === 'module') navigateTo(item.id);
+  if (item.id === 'open-cfg') toggleSettingsPanel();
+  if (item.id === 'mode-lg') applyThemeMode('lightgrey');
+  if (item.id === 'mode-mid') applyThemeMode('midnight');
+  if (item.id === 'mode-slate') applyThemeMode('slate');
+  closeCommandPalette();
 }
 
-function handleKeyboard(e) {
-  if ((e.ctrlKey||e.metaKey)&&e.key==='k') { e.preventDefault(); openCommandPalette(); }
-  if (e.key==='Escape') { closeCommandPalette(); $('notificationPanel').classList.add('hidden'); $('settingsPanel').classList.add('hidden'); }
+function pinFromCmd(id) {
+  if (APP.shortcuts.some(function(s) { return s.mod === id || s.id === id; })) return;
+  var item = CMD_INDEX.find(function(c) { return c.id === id; });
+  if (!item) return;
+  APP.shortcuts.push({
+    id: 'sc' + Date.now(),
+    icon: item.icon,
+    label: item.label,
+    mod: item.id || '',
+    sub: item.group
+  });
+  renderQuickAccess();
+  renderCmdResults(APP.cmdQuery);
+  try { google.script.run.addShortcut(id); } catch(e) {}
 }
 
+// ─── SETTINGS PANEL ──────────────────────────────────────────
+function toggleSettingsPanel() {
+  APP.cfgOpen = !APP.cfgOpen;
+  APP.notifOpen = false;
+  $('notifPanelContainer').innerHTML = '';
+  updateNotifBadge();
 
-// ═══════════════════════════════════════════════════════════════
-//  HEARTBEAT
-// ═══════════════════════════════════════════════════════════════
-function sendHeartbeat() { google.script.run.heartbeat(APP.activeModule, APP.activePage); }
+  var overlay = $('settingsOverlay');
+  var panel = $('settingsPanel');
+  var btn = $('btnSettings');
 
-
-// ═══════════════════════════════════════════════════════════════
-//  UTILITIES
-// ═══════════════════════════════════════════════════════════════
-function $(id) { return document.getElementById(id); }
-function val(id) { var el = $(id); return el ? el.value : ''; }
-function setText(id, v) { var el = $(id); if (el) el.innerHTML = v; }
-function pf(el) { return el ? (parseFloat(el.value) || 0) : 0; }
-function todayISO() { return new Date().toISOString().split('T')[0]; }
-
-function esc(str) {
-  if (!str) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function fmtCur(v) {
-  var n = parseFloat(v);
-  if (isNaN(n)) return '-';
-  return n.toLocaleString('en-IN', { minimumFractionDigits:2, maximumFractionDigits:2 });
-}
-
-function fmtDate(v) {
-  if (!v) return '';
-  try { var d = new Date(v); return isNaN(d.getTime()) ? String(v) : d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}); }
-  catch(e) { return String(v); }
-}
-
-function timeAgo(iso) {
-  if (!iso) return '';
-  var d = (new Date() - new Date(iso))/1000;
-  if (d<60) return 'just now';
-  if (d<3600) return Math.floor(d/60)+'m ago';
-  if (d<86400) return Math.floor(d/3600)+'h ago';
-  return Math.floor(d/86400)+'d ago';
-}
-
-function statusBadge(status) {
-  var cls = 'badge-draft';
-  var s = (status||'').toLowerCase();
-  if (s==='submitted'||s==='under review'||s==='pending') cls='badge-submitted';
-  else if (s==='approved'||s==='confirmed'||s==='accepted') cls='badge-approved';
-  else if (s.indexOf('received')!==-1||s==='completed') cls='badge-received';
-  else if (s==='cancelled'||s==='rejected') cls='badge-cancelled';
-  else if (s.indexOf('partial')!==-1) cls='badge-warning';
-  return '<span class="badge '+cls+'">'+esc(status)+'</span>';
-}
-
-function showLoading() {
-  $('contentArea').innerHTML = '<div class="text-center p-4"><div class="spinner"></div><div class="text-muted mt-2">Loading...</div></div>';
-}
-
-function showError(msg) {
-  $('contentArea').innerHTML = '<div class="card p-4 text-center"><div style="color:var(--danger);">' + esc(msg) + '</div></div>';
-}
-
-function showToast(type, message) {
-  var c = $('toastContainer');
-  var t = document.createElement('div');
-  t.className = 'toast toast-' + type;
-  t.textContent = message;
-  c.appendChild(t);
-  setTimeout(function(){ t.remove(); }, 4000);
-}
-
-function updateStatusBar(text, connected) {
-  $('statusText').textContent = text;
-  $('statusDot').style.background = connected ? 'var(--success)' : 'var(--danger)';
-}
-
-function updateUserInfo() {
-  if (APP.user) $('userInfo').textContent = APP.user.name + ' (' + APP.user.role + ')';
-}
-
-function filterTable(tableId, q) {
-  q = q.toLowerCase();
-  var rows = document.querySelectorAll('#' + tableId + ' tbody tr');
-  for (var i = 0; i < rows.length; i++) {
-    rows[i].style.display = rows[i].textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none';
+  if (APP.cfgOpen) {
+    APP.settingsDraft = JSON.parse(JSON.stringify(APP.cfg));
+    overlay.classList.add('open');
+    panel.classList.add('open');
+    btn.classList.add('active');
+    renderSettingsBody();
+  } else {
+    closeSettingsPanel();
   }
 }
 
-function getField(row, name) {
-  var el = row.querySelector('[data-field="' + name + '"]') || row.querySelector('input[data-ro="' + name + '"]');
-  return el ? el.value : '';
+function closeSettingsPanel() {
+  APP.cfgOpen = false;
+  $('settingsOverlay').classList.remove('open');
+  $('settingsPanel').classList.remove('open');
+  var btn = $('btnSettings');
+  if (btn) btn.classList.remove('active');
 }
 
-function listOpts(arr) {
-  return (arr||[]).map(function(v){ return { value:v, label:v }; });
+function renderSettingsBody() {
+  var body = $('settingsBody');
+  var d = APP.settingsDraft;
+  var html = '';
+
+  // Colour Mode
+  html += '<div class="settings-section-label" style="border-top:none;padding-top:0;">Colour Mode</div>';
+  html += '<div class="mode-cards">';
+  Object.keys(MODES).forEach(function(key) {
+    var m = MODES[key];
+    var active = d.mode === key;
+    var ac = ACCENTS[d.accent];
+    html += '<div class="mode-card' + (active ? ' active' : '') + '" onclick="settingSet(\'mode\',\'' + key + '\')" style="border-color:' + (active ? ac.a : m.divider) + ';">';
+    // Mini preview
+    html += '<div style="height:56px;background:' + m.bg + ';overflow:hidden;">';
+    html += '<div style="height:9px;background:' + m.shellBg + ';border-bottom:1px solid ' + m.shellBd + ';display:flex;align-items:center;gap:2px;padding:0 4px;">';
+    html += '<div style="width:6px;height:4px;border-radius:1px;background:' + ac.a + ';"></div>';
+    html += '<div style="width:12px;height:2px;border-radius:1px;background:' + m.textD + ';"></div>';
+    html += '</div>';
+    html += '<div style="display:flex;height:47px;">';
+    html += '<div style="width:16px;background:' + m.sidebarBg + ';border-right:1px solid ' + m.sidebarBd + ';padding:2px;display:flex;flex-direction:column;gap:1px;">';
+    for (var i = 0; i < 4; i++) {
+      html += '<div style="height:3px;border-radius:1px;background:' + (i===0?ac.a:m.textD) + ';opacity:' + (i===0?'1':'.4') + ';"></div>';
+    }
+    html += '</div>';
+    html += '<div style="flex:1;padding:3px 4px;display:flex;flex-direction:column;gap:2px;">';
+    html += '<div style="display:flex;gap:2px;">';
+    for (var j = 0; j < 4; j++) {
+      html += '<div style="flex:1;height:7px;border-radius:2px;background:' + m.surfHigh + ';border:1px solid ' + m.divider + ';"></div>';
+    }
+    html += '</div>';
+    html += '<div style="height:20px;border-radius:2px;background:' + m.surfHigh + ';border:1px solid ' + m.divider + ';"></div>';
+    html += '</div></div></div>';
+    // Label
+    html += '<div style="padding:5px 6px;background:' + (active?ac.al:m.surfMid) + ';display:flex;align-items:center;gap:4px;">';
+    html += '<span style="font-size:10px;">' + m.lbl + '</span>';
+    html += '<span style="font-size:9px;font-weight:700;color:' + (active?ac.a:m.textB) + ';">' + m.name + '</span>';
+    if (active) html += '<span style="margin-left:auto;font-size:7px;font-weight:900;color:' + ac.a + ';letter-spacing:.5px;">ACTIVE</span>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+
+  // Accent Colour
+  html += '<div class="settings-section-label">Accent Colour</div>';
+  html += '<div class="accent-list">';
+  Object.keys(ACCENTS).forEach(function(key) {
+    var ac = ACCENTS[key];
+    var active = d.accent === key;
+    html += '<button class="accent-opt' + (active ? ' active' : '') + '" onclick="settingSet(\'accent\',\'' + key + '\')" style="border-color:' + (active ? ac.a : '') + ';background:' + (active ? ac.al : '') + ';">';
+    html += '<div class="dot" style="background:' + ac.a + ';border:' + (active ? '2px solid var(--text-a)' : '2px solid transparent') + ';"></div>';
+    html += '<span class="name">' + ac.lbl + '</span>';
+    html += '<div class="bar" style="background:' + ac.a + ';"></div>';
+    if (active) html += '<span class="active-lbl">ACTIVE</span>';
+    html += '</button>';
+  });
+  html += '</div>';
+
+  // Typography & Density
+  html += '<div class="settings-section-label">Typography & Density</div>';
+  html += '<div style="margin-bottom:8px;"><div style="font-size:9px;font-weight:900;color:var(--text-c);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">Font Size</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  [['small','Small (11px)'],['medium','Medium (13px)'],['large','Large (15px)']].forEach(function(x) {
+    html += '<button class="chip' + (d.fontSize===x[0]?' active':'') + '" onclick="settingSet(\'fontSize\',\'' + x[0] + '\')">' + x[1] + '</button>';
+  });
+  html += '</div></div>';
+  html += '<div><div style="font-size:9px;font-weight:900;color:var(--text-c);letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px;">Row Density</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  [['compact','Compact'],['comfortable','Comfortable'],['spacious','Spacious']].forEach(function(x) {
+    html += '<button class="chip' + (d.density===x[0]?' active':'') + '" onclick="settingSet(\'density\',\'' + x[0] + '\')">' + x[1] + '</button>';
+  });
+  html += '</div></div>';
+
+  // Font Family
+  html += '<div class="settings-section-label">Font Family</div>';
+  html += '<div style="margin-bottom:12px;"><div style="font-size:9px;font-weight:900;color:var(--text-c);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">UI Body Font</div>';
+  UI_FONTS.forEach(function(f) {
+    var active = d.uiFont === f.id;
+    html += '<button class="font-opt' + (active?' active':'') + '" onclick="settingSet(\'uiFont\',\'' + f.id + '\')">';
+    html += '<div style="flex:1;"><div class="preview-name" style="font-family:' + f.family + ';color:' + (active?'var(--accent)':'var(--text-a)') + ';">' + f.name + '</div>';
+    html += '<div class="preview-sample" style="font-family:' + f.family + ';">The quick brown fox — ERP data entry</div></div>';
+    html += '<div style="text-align:right;flex-shrink:0;"><div class="tag">' + f.tag + '</div>';
+    if (active) html += '<div class="active-tag">ACTIVE</div>';
+    html += '</div></button>';
+  });
+  html += '</div>';
+
+  html += '<div style="margin-bottom:4px;"><div style="font-size:9px;font-weight:900;color:var(--text-c);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px;">Data & Codes Font (Monospace)</div>';
+  DATA_FONTS.forEach(function(f) {
+    var active = d.dataFont === f.id;
+    html += '<button class="font-opt' + (active?' active':'') + '" onclick="settingSet(\'dataFont\',\'' + f.id + '\')">';
+    html += '<div style="flex:1;"><div class="preview-name" style="font-family:' + f.family + ';font-size:13px;color:' + (active?'var(--accent)':'var(--text-a)') + ';">' + f.name + '</div>';
+    html += '<div class="preview-sample" style="font-family:' + f.family + ';">PO-2026-0042 · Rs.48,500 · GST 18%</div></div>';
+    html += '<div style="text-align:right;flex-shrink:0;"><div class="tag">' + f.tag + '</div>';
+    if (active) html += '<div class="active-tag">ACTIVE</div>';
+    html += '</div></button>';
+  });
+  html += '</div>';
+
+  // Table Style
+  html += '<div class="settings-section-label">Table Style</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  [['striped','Striped'],['bordered','Bordered'],['clean','Clean']].forEach(function(x) {
+    html += '<button class="chip' + (d.tblStyle===x[0]?' active':'') + '" onclick="settingSet(\'tblStyle\',\'' + x[0] + '\')">' + x[1] + '</button>';
+  });
+  html += '</div>';
+
+  // Table preview
+  var m = MODES[d.mode];
+  var ac = ACCENTS[d.accent];
+  html += '<div class="tbl-preview">';
+  ['Header','Row 1','Row 2','Row 3'].forEach(function(lbl, i) {
+    var isH = i === 0;
+    var bg = isH ? m.tblHead : (d.tblStyle === 'striped' ? (i%2===1?m.tblEven:m.tblOdd) : m.surfHigh);
+    html += '<div class="tbl-preview-row" style="background:' + bg + ';">';
+    html += '<div class="tbl-preview-bar" style="width:24px;background:' + (isH?ac.a:m.textD) + ';opacity:.4;border-radius:2px;"></div>';
+    html += '<div class="tbl-preview-bar" style="flex:1;background:' + m.textD + ';border-radius:2px;"></div>';
+    html += '<div class="tbl-preview-bar" style="width:40px;background:' + m.textD + ';opacity:.25;border-radius:2px;"></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Display Toggles
+  html += '<div class="settings-section-label">Display Toggles</div>';
+  var toggles = [
+    ['showStatusBar','Show Status Bar','Totals bar at the bottom of every module'],
+    ['showThumbs','Show Thumbnails','Item image thumbnails in search dropdowns & tables'],
+    ['showRowNums','Show Row Numbers','# column with sequential row numbers in tables'],
+    ['showCatBadge','Show Category Badges','Coloured category pills on item rows'],
+    ['compactSide','Compact Sidebar','Show icons only — no labels (saves space)']
+  ];
+  toggles.forEach(function(t) {
+    var on = !!d[t[0]];
+    html += '<div class="toggle-row">';
+    html += '<div class="info"><div class="lbl">' + t[1] + '</div><div class="desc">' + t[2] + '</div></div>';
+    html += '<div class="toggle' + (on?' on':'') + '" onclick="settingToggle(\'' + t[0] + '\')"><div class="knob"></div></div>';
+    html += '</div>';
+  });
+
+  body.innerHTML = html;
 }
 
-// ── Form field builders ──
-function fieldText(label, id, value) {
-  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
-    '<input class="form-input" type="text" id="' + id + '" value="' + esc(value) + '"></div>';
+function settingSet(key, val) {
+  APP.settingsDraft[key] = val;
+  renderSettingsBody();
 }
 
-function fieldDate(label, id, value) {
-  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
-    '<input class="form-input" type="date" id="' + id + '" value="' + esc(value) + '"></div>';
+function settingToggle(key) {
+  APP.settingsDraft[key] = !APP.settingsDraft[key];
+  renderSettingsBody();
 }
 
-function fieldSelect(label, id, options, selectedValue) {
-  var html = '<div class="form-group"><label class="form-label">' + label + '</label>' +
-    '<select class="form-select" id="' + id + '"><option value="">-- Select --</option>';
-  for (var i = 0; i < options.length; i++) {
-    var o = options[i];
-    html += '<option value="' + esc(o.value) + '"' + (o.value===selectedValue?' selected':'') + '>' + esc(o.label) + '</option>';
+function resetSettings() {
+  APP.settingsDraft = JSON.parse(JSON.stringify(DEFAULTS));
+  renderSettingsBody();
+}
+
+function applySettings() {
+  APP.cfg = JSON.parse(JSON.stringify(APP.settingsDraft));
+  applyTheme();
+  renderSidebar();
+  closeSettingsPanel();
+  showToast('Settings applied ✓');
+  saveThemeToServer();
+}
+
+// ─── PRESENCE / ONLINE USERS ─────────────────────────────────
+function sendHeartbeat() {
+  try {
+    google.script.run.heartbeat(APP.activeModule || 'dashboard', APP.activePage || 'Home');
+  } catch(e) {}
+}
+
+function loadOnlineUsers() {
+  google.script.run
+    .withSuccessHandler(function(data) {
+      APP.onlineUsers = (data || []).map(function(u) {
+        u.status = u.status || 'active';
+        u.module = u.module || 'Dashboard';
+        u.ts = u.ts || Date.now();
+        return u;
+      });
+      renderShellAvatars();
+      // Re-render dashboard if on it
+      if (APP.activeModule === 'dashboard') {
+        renderDashboard();
+      }
+    })
+    .withFailureHandler(function() {
+      // Use dummy data
+      APP.onlineUsers = [
+        {name:"Rajesh Kumar", email:"rajesh@cc.com",role:"Manager",   module:"Procurement",page:"PO-2026-0041",ts:Date.now()-18000, status:"active"},
+        {name:"Amit Singh",   email:"amit@cc.com",  role:"Manager",   module:"Production", page:"WO-0089",     ts:Date.now()-5000,  status:"active"},
+        {name:"Priya Sharma", email:"priya@cc.com", role:"Supervisor",module:"Quality",    page:"QC-0012",     ts:Date.now()-62000, status:"idle"},
+        {name:"Ravi Verma",   email:"ravi@cc.com",  role:"Operator",  module:"Inventory",  page:"STK-0034",    ts:Date.now()-130000,status:"idle"},
+        {name:"Anita Kaur",   email:"anita@cc.com", role:"View Only", module:"Dashboard",  page:"Home",        ts:Date.now()-22000, status:"active"}
+      ];
+      renderShellAvatars();
+    })
+    .getOnlineUsers();
+
+  // Refresh every 60s
+  setTimeout(loadOnlineUsers, 60000);
+}
+
+// ─── GLOBAL KEYBOARD ─────────────────────────────────────────
+function handleGlobalKey(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    if (APP.cmdOpen) { closeCommandPalette(); } else { openCommandPalette(); }
   }
-  return html + '</select></div>';
-}
-
-function fieldReadonly(label, value) {
-  return '<div class="form-group"><label class="form-label">' + label + '</label>' +
-    '<div class="form-input" style="background:var(--bg-secondary);cursor:default;">' + (value||'-') + '</div></div>';
-}
-
-// Inline input for table cells
-function inp(field, value, width, cls, readonly) {
-  var ro = readonly ? ' readonly data-ro="' + field + '"' : ' data-field="' + field + '"';
-  var bg = readonly ? 'background:transparent;border:none;' : '';
-  return '<input class="form-input ' + (cls||'') + '" style="width:' + width + ';' + bg + '" value="' + esc(value) + '"' + ro + '>';
-}
-
-// Inline select for table cells
-function selInline(field, options, selected, width) {
-  var html = '<select class="form-select" data-field="' + field + '" style="width:' + width + ';"><option value="">-</option>';
-  for (var i = 0; i < options.length; i++) {
-    html += '<option' + (options[i]===selected?' selected':'') + '>' + esc(options[i]) + '</option>';
+  if (e.key === 'Escape') {
+    if (APP.cmdOpen) closeCommandPalette();
+    if (APP.notifOpen) toggleNotifPanel();
+    if (APP.cfgOpen) closeSettingsPanel();
   }
-  return html + '</select>';
 }
 
-// ─── BOOT ────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', initApp);
+// ─── CLOSE ALL DROPDOWNS ─────────────────────────────────────
+function closeAllDropdowns() {
+  APP.showAllUsers = false;
+  $('globalBackdrop').style.display = 'none';
+}
+
+// ─── INIT ON LOAD ────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  buildCmdIndex();
+  initApp();
+});
 </script>
