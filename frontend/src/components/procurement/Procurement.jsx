@@ -1,9 +1,10 @@
-import { useState, useCallback } from 'react';
-import { ITEMS, SUPPLIERS, SEASONS, PO_TYPES, PAY_TERMS, WH_LIST, OPEN_POS, DEMO_PO_LIST, DEMO_GRN_LIST } from '../../constants/procurement';
+import { useState, useEffect, useCallback } from 'react';
+import { SEASONS, PO_TYPES, PAY_TERMS, WH_LIST, CAT_ICON, CAT_CLR, ITEM_IMGS } from '../../constants/procurement';
 import { PY_MAP } from '../../constants/defaults';
 import { uiFF } from '../../constants/fonts';
 import { uid, mLine, fmtINR } from '../../utils/helpers';
 import ItemSearch from './ItemSearch';
+import api from '../../services/api';
 
 export default function Procurement({ M, A, cfg, fz, dff }) {
   const uff = uiFF(cfg.uiFont);
@@ -14,6 +15,41 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
   const [view, setView]   = useState("list");  // list | form
   const [sub, setSub]     = useState("PO");    // PO | GRN
   const [editId, setEditId] = useState(null);
+
+  // ─ API data (fetched from Google Sheets via GAS)
+  const [items, setItems]         = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [poList, setPoList]       = useState([]);
+  const [grnList, setGrnList]     = useState([]);
+  const [openPOs, setOpenPOs]     = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  useEffect(()=>{
+    let cancelled = false;
+    async function fetchData(){
+      try {
+        const [itemsRes, suppRes, poRes, grnRes, openRes] = await Promise.allSettled([
+          api.getItems(),
+          api.getSuppliers(),
+          api.getPOList(),
+          api.getGRNList(),
+          api.getOpenPOs(),
+        ]);
+        if (cancelled) return;
+        if (itemsRes.status === "fulfilled" && itemsRes.value) setItems(itemsRes.value);
+        if (suppRes.status === "fulfilled" && suppRes.value) setSuppliers(suppRes.value);
+        if (poRes.status === "fulfilled" && poRes.value) setPoList(poRes.value);
+        if (grnRes.status === "fulfilled" && grnRes.value) setGrnList(grnRes.value);
+        if (openRes.status === "fulfilled" && openRes.value) setOpenPOs(openRes.value);
+      } catch(err) {
+        console.error("Procurement data fetch failed:", err);
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
+    }
+    fetchData();
+    return () => { cancelled = true; };
+  },[]);
 
   // ─ Form state
   const [lines, setLines] = useState([mLine(), mLine()]);
@@ -55,7 +91,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
     window.addEventListener("mousemove", mv); window.addEventListener("mouseup", up);
   }, [cpW]);
 
-  const sup = SUPPLIERS.find(s => s.code === supplier);
+  const sup = suppliers.find(s => s.code === supplier);
   const toggleSec = id => setOpenSec(o => o.includes(id) ? o.filter(x=>x!==id) : [...o, id]);
 
   // ─ Line operations
@@ -65,7 +101,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
 
   // ─ Totals
   const tBase = lines.reduce((s,l) => s + (parseFloat(l.qty)||0)*(parseFloat(l.price)||0)*(1-(parseFloat(l.disc)||0)/100), 0);
-  const tGst  = lines.reduce((s,l) => { const it=ITEMS.find(i=>i.code===l.itemCode); return s+(it?(parseFloat(l.qty)||0)*(parseFloat(l.price)||0)*(1-(parseFloat(l.disc)||0)/100)*(it.gst/100):0); }, 0);
+  const tGst  = lines.reduce((s,l) => { const it=items.find(i=>i.code===l.itemCode); return s+(it?(parseFloat(l.qty)||0)*(parseFloat(l.price)||0)*(1-(parseFloat(l.disc)||0)/100)*(it.gst/100):0); }, 0);
 
   // ─ Input styles
   const inp = { border:`1px solid ${M.inputBd}`, borderRadius:3, background:M.inputBg, color:M.textA, fontSize:fz, fontFamily:"'Nunito Sans',sans-serif", padding:`${sp}px 9px`, width:"100%", outline:"none", transition:"border-color .15s" };
@@ -90,7 +126,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
   const toast = msg => { setToastMsg(msg); setTimeout(() => setToastMsg(null), 3000); };
 
   // ─ Filtered list
-  const listData = sub === "PO" ? DEMO_PO_LIST : DEMO_GRN_LIST;
+  const listData = sub === "PO" ? poList : grnList;
   let filtered = listData.filter(r => {
     if (filterStatus && r.status !== filterStatus) return false;
     if (searchQ) {
@@ -312,7 +348,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
                 <div><span style={lbl}>Against PO *</span>
                   <select style={{ ...selS, borderColor:A.a }} value={poRef} onChange={e=>{setPoRef(e.target.value);setIsDirty(true);}}>
                     <option value="">— Select open PO —</option>
-                    {OPEN_POS.map(p=><option key={p.po} value={p.po}>{p.po} · {p.date}</option>)}
+                    {openPOs.map(p=><option key={p.po} value={p.po}>{p.po} · {p.date}</option>)}
                   </select>
                 </div>
                 <div><span style={lbl}>Vehicle No</span><input style={inp} placeholder="PB-10-AB-1234" value={vehicle} onChange={e=>{setVehicle(e.target.value);setIsDirty(true);}} /></div>
@@ -327,7 +363,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
               <div><span style={lbl}>Select Supplier *</span>
                 <select style={{ ...selS, borderColor: supplier ? A.a : M.inputBd }} value={supplier} onChange={e=>{setSupplier(e.target.value);setIsDirty(true);}}>
                   <option value="">— Select supplier —</option>
-                  {SUPPLIERS.map(s=><option key={s.code} value={s.code}>{s.code} · {s.name}</option>)}
+                  {suppliers.map(s=><option key={s.code} value={s.code}>{s.code} · {s.name}</option>)}
                 </select>
               </div>
               {sup && (
@@ -390,10 +426,10 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
 
           {/* Open POs (GRN) */}
           {sub === "GRN" && (
-            <Accordion id="openpos" icon="📄" title="Open POs" badge={`${OPEN_POS.length}`}>
+            <Accordion id="openpos" icon="📄" title="Open POs" badge={`${openPOs.length}`}>
               <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
-                {OPEN_POS.map(p => {
-                  const s = SUPPLIERS.find(x => x.code === p.sup);
+                {openPOs.map(p => {
+                  const s = suppliers.find(x => x.code === p.sup);
                   const active = poRef === p.po;
                   return (
                     <div key={p.po} onClick={() => { setPoRef(p.po); setIsDirty(true); }} style={{ padding:"9px 11px", background: active ? A.al : M.surfMid, border:`1px solid ${active ? A.a : M.divider}`, borderRadius:4, cursor:"pointer", borderLeft:`3px solid ${active ? A.a : "transparent"}`, transition:"all .15s" }}>
@@ -497,7 +533,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
             </thead>
             <tbody>
               {lines.map((line, idx) => {
-                const it = ITEMS.find(i => i.code === line.itemCode);
+                const it = items.find(i => i.code === line.itemCode);
                 const qty=parseFloat(line.qty)||0, price=parseFloat(line.price)||0, disc=parseFloat(line.disc)||0;
                 const base=qty*price*(1-disc/100), gstAmt=it?base*(it.gst/100):0;
                 const rcv=parseFloat(line.recQty)||0, acc=parseFloat(line.accQty)||0;
@@ -512,7 +548,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
                       </td>
                     )}
                     <td style={{ padding:`${pyV}px 8px`, borderBottom:`1px solid ${M.divider}`, verticalAlign:"top", minWidth:cfg.showThumbs?280:240 }}>
-                      <ItemSearch value={line.itemCode} onChange={v=>updLine(line.id,"itemCode",v)} M={M} A={A} fz={fz} py={pyV} showThumbs={cfg.showThumbs} />
+                      <ItemSearch value={line.itemCode} onChange={v=>updLine(line.id,"itemCode",v)} items={items} M={M} A={A} fz={fz} py={pyV} showThumbs={cfg.showThumbs} />
                     </td>
                     {autoCell(it?.uom||"—", !!it)}
                     {autoCell(it?.hsn||"—", !!it)}
@@ -681,7 +717,7 @@ export default function Procurement({ M, A, cfg, fz, dff }) {
                   </thead>
                   <tbody>
                     {lines.filter(l=>l.itemCode).map((l,i) => {
-                      const it = ITEMS.find(x=>x.code===l.itemCode);
+                      const it = items.find(x=>x.code===l.itemCode);
                       const q2=parseFloat(l.qty)||0, p2=parseFloat(l.price)||0, d2=parseFloat(l.disc)||0;
                       return (
                         <tr key={l.id} style={{ borderBottom:"1px solid #e5e7eb" }}>

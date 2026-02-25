@@ -93,7 +93,15 @@ var API_ROUTES = {
   // Export & Print
   // -------------------------------------------------------------------------
   'exportDocument':       handleExportDocument,
-  'printDocument':        handlePrintDocument
+  'printDocument':        handlePrintDocument,
+
+  // -------------------------------------------------------------------------
+  // Masters Hub (CRUD for all master sheets)
+  // -------------------------------------------------------------------------
+  'getMasterSheetCounts': handleGetMasterSheetCounts,
+  'getMasterData':        handleGetMasterData,
+  'saveMasterRecord':     handleSaveMasterRecord,
+  'deleteMasterRecord':   handleDeleteMasterRecord
 };
 
 
@@ -165,29 +173,47 @@ function handleAPIRequest(e, method) {
     // ------------------------------------------------------------------
     // 1. Extract parameters
     // ------------------------------------------------------------------
+    // All requests come as GET (to avoid GAS 302 redirect POST→GET issue).
+    // Read params from query string. Write data is in ?payload={json}.
     var params = {};
-    var action = '';
 
     if (method === 'GET') {
-      // GET: all params come from the query string
       params = e.parameter || {};
-      action = params.action || '';
     } else {
-      // POST: params may be in the body (JSON) or as form fields
+      // POST fallback: read from body or query string
       if (e.postData && e.postData.type === 'application/json') {
         try {
           params = JSON.parse(e.postData.contents);
         } catch (parseErr) {
           return jsonError('Invalid JSON in request body.', 400);
         }
-      } else if (e.parameter) {
-        params = e.parameter;
       }
-      action = params.action || (e.parameter ? e.parameter.action : '') || '';
+      // Merge query string params (action is always in query string)
+      if (e.parameter) {
+        for (var qk in e.parameter) {
+          if (!params[qk]) params[qk] = e.parameter[qk];
+        }
+      }
+    }
+
+    var action = params.action || '';
+
+    // ------------------------------------------------------------------
+    // 2. Parse payload (JSON-stringified write data in GET param)
+    // ------------------------------------------------------------------
+    if (params.payload) {
+      try {
+        var payload = JSON.parse(params.payload);
+        for (var key in payload) {
+          params[key] = payload[key];
+        }
+      } catch (parseErr) {
+        return jsonError('Invalid JSON in payload parameter.', 400);
+      }
     }
 
     // ------------------------------------------------------------------
-    // 2. Validate action
+    // 3. Validate action
     // ------------------------------------------------------------------
     if (!action) {
       return jsonError('Missing required parameter: action', 400);
@@ -199,12 +225,12 @@ function handleAPIRequest(e, method) {
     }
 
     // ------------------------------------------------------------------
-    // 3. Execute handler
+    // 4. Execute handler
     // ------------------------------------------------------------------
     var result = handler(params);
 
     // ------------------------------------------------------------------
-    // 4. Return success response
+    // 5. Return success response
     // ------------------------------------------------------------------
     var elapsed = new Date().getTime() - startTime;
 
@@ -871,4 +897,261 @@ function handlePrintDocument(params) {
     Logger.log('APIGateway :: handlePrintDocument error: ' + err.message);
     return { success: false, message: 'Error generating print view: ' + err.message };
   }
+}
+
+
+// =============================================================================
+// MASTERS HUB — CRUD for all master sheets
+// =============================================================================
+// Maps sheet keys to actual Google Sheet names.
+// Adjust these to match your real sheet tab names.
+// =============================================================================
+
+var MASTER_SHEET_MAP = {
+  // FILE 1A — Items (tab names from CONFIG.SHEETS)
+  'article_master':      { sheet: 'ARTICLE_MASTER',      file: '1A' },
+  'rm_fabric':           { sheet: 'RM_MASTER_FABRIC',    file: '1A' },
+  'rm_yarn':             { sheet: 'RM_MASTER_YARN',      file: '1A' },
+  'trim_master':         { sheet: 'TRIM_MASTER',         file: '1A' },
+  'consumable_master':   { sheet: 'CONSUMABLE_MASTER',   file: '1A' },
+  'packaging_master':    { sheet: 'PACKAGING_MASTER',    file: '1A' },
+  'color_master':        { sheet: 'COLOR_MASTER',        file: '1A' },
+  'hsn_master':          { sheet: 'HSN_MASTER',          file: '1A' },
+  'uom_master':          { sheet: 'UOM_MASTER',          file: '1A' },
+  'size_master':         { sheet: 'SIZE_MASTER',         file: '1A' },
+  'fabric_type_master':  { sheet: 'FABRIC_TYPE_MASTER',  file: '1A' },
+  'tag_master':          { sheet: 'TAG_MASTER',          file: '1A' },
+
+  // FILE 1B — Factory (tab names from CONFIG.SHEETS_1B)
+  'user_master':         { sheet: 'USER_MASTER',         file: '1B' },
+  'role_master':         { sheet: 'ROLE_MASTER',         file: '1B' },
+  'department_master':   { sheet: 'DEPARTMENT_MASTER',   file: '1B' },
+  'machine_master':      { sheet: 'MACHINE_MASTER',      file: '1B' },
+  'supplier_master_1b':  { sheet: 'CUSTOMER_MASTER',     file: '1B' },
+  'item_supplier_rates': { sheet: 'ITEM_SUPPLIER_RATES', file: '1B' },
+  'warehouse_master':    { sheet: 'WAREHOUSE_MASTER',    file: '1B' },
+  'contractor_master':   { sheet: 'CONTRACTOR_MASTER',   file: '1B' },
+  'process_master':      { sheet: 'PROCESS_MASTER',      file: '1B' },
+
+  // FILE 1C — Finance (tab names from CONFIG.SHEETS_1C)
+  'supplier_master_1c':  { sheet: 'SUPPLIER_MASTER',       file: '1C' },
+  'payment_terms':       { sheet: 'PAYMENT_TERMS_MASTER',  file: '1C' },
+  'tax_master':          { sheet: 'TAX_MASTER',            file: '1C' },
+  'bank_master':         { sheet: 'BANK_MASTER',           file: '1C' },
+  'cost_center':         { sheet: 'COST_CENTER_MASTER',    file: '1C' },
+  'account_master':      { sheet: 'ACCOUNT_MASTER',        file: '1C' }
+};
+
+
+/**
+ * Returns an object mapping each sheet key to its record count.
+ * Example: { "article_master": 24, "rm_fabric": 18, ... }
+ */
+function handleGetMasterSheetCounts(params) {
+  var result = {};
+  var ssCache = {};
+
+  for (var key in MASTER_SHEET_MAP) {
+    try {
+      var info  = MASTER_SHEET_MAP[key];
+      var ssId  = getMasterFileId_(info.file);
+      if (!ssId) { result[key] = 0; continue; }
+
+      if (!ssCache[ssId]) ssCache[ssId] = SpreadsheetApp.openById(ssId);
+      var sh = ssCache[ssId].getSheetByName(info.sheet);
+      // Row 1=title, Row 2=headers, Row 3=descriptions → data starts at row 4
+      result[key] = sh ? Math.max(0, sh.getLastRow() - 3) : 0;
+    } catch (e) {
+      result[key] = 0;
+    }
+  }
+  return result;
+}
+
+
+/**
+ * Returns all rows from a master sheet as an array of objects.
+ * Sheet structure: Row 1=title, Row 2=column headers, Row 3=descriptions, Row 4+=data.
+ * Keys are the RAW header strings from row 2 (frontend maps them via schema).
+ */
+function handleGetMasterData(params) {
+  var sheetKey = params.sheet || '';
+  var info = MASTER_SHEET_MAP[sheetKey];
+  if (!info) return [];
+
+  var ssId = getMasterFileId_(info.file);
+  if (!ssId) return [];
+
+  var ss = SpreadsheetApp.openById(ssId);
+  var sh = ss.getSheetByName(info.sheet);
+  if (!sh) return [];
+
+  var lastRow = sh.getLastRow();
+  var lastCol = sh.getLastColumn();
+  if (lastRow < 4 || lastCol < 1) return [];  // no data rows
+
+  // Row 2 = column headers
+  var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+
+  // Row 4+ = data rows
+  var numDataRows = lastRow - 3;
+  if (numDataRows < 1) return [];
+
+  var data = sh.getRange(4, 1, numDataRows, lastCol).getValues();
+  var rows = [];
+
+  for (var i = 0; i < data.length; i++) {
+    var row = {};
+    var hasContent = false;
+    for (var j = 0; j < headers.length; j++) {
+      if (!headers[j]) continue;  // skip blank headers
+      var val = data[i][j];
+      if (val instanceof Date) {
+        val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd MMM yyyy');
+      }
+      row[headers[j]] = val;
+      if (val !== '' && val !== null && val !== undefined) hasContent = true;
+    }
+    if (hasContent) rows.push(row);  // skip completely empty rows
+  }
+  return rows;
+}
+
+
+/**
+ * Saves (creates or updates) a record in a master sheet.
+ * Sheet structure: Row 1=title, Row 2=headers, Row 3=descriptions, Row 4+=data.
+ * Record keys are RAW header strings (matching row 2 headers exactly).
+ * If params.isEdit is true, updates the row where column A matches the first header's value.
+ */
+function handleSaveMasterRecord(params) {
+  var sheetKey = params.sheet || '';
+  var record   = params.record || {};
+  var isEdit   = params.isEdit || false;
+  var info     = MASTER_SHEET_MAP[sheetKey];
+  if (!info) return { saved: false, message: 'Unknown sheet: ' + sheetKey };
+
+  var ssId = getMasterFileId_(info.file);
+  if (!ssId) return { saved: false, message: 'File not found for: ' + info.file };
+
+  var ss = SpreadsheetApp.openById(ssId);
+  var sh = ss.getSheetByName(info.sheet);
+  if (!sh) return { saved: false, message: 'Sheet not found: ' + info.sheet };
+
+  var lastCol = sh.getLastColumn();
+  // Row 2 = column headers
+  var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+
+  // The code/ID column is the first header
+  var codeHeader = headers[0];
+  var codeValue  = record[codeHeader] || '';
+
+  if (isEdit && codeValue) {
+    // Search data rows (row 4+) for matching code in column A
+    var lastRow = sh.getLastRow();
+    var numDataRows = Math.max(1, lastRow - 3);
+    var codes = sh.getRange(4, 1, numDataRows, 1).getValues();
+    for (var i = 0; i < codes.length; i++) {
+      if (String(codes[i][0]).trim() === String(codeValue).trim()) {
+        var rowNum = i + 4;  // offset: data starts at row 4
+        var rowData = headers.map(function(h) {
+          return record[h] !== undefined ? record[h] : '';
+        });
+        sh.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+        return { saved: true, code: codeValue, action: 'updated' };
+      }
+    }
+    return { saved: false, message: 'Record not found: ' + codeValue };
+  } else {
+    // Append new row
+    var newRow = headers.map(function(h) {
+      return record[h] !== undefined ? record[h] : '';
+    });
+    sh.appendRow(newRow);
+    return { saved: true, action: 'created' };
+  }
+}
+
+
+/**
+ * Deletes a record from a master sheet by code (column A match).
+ * Data rows start at row 4 (row 1=title, row 2=headers, row 3=descriptions).
+ */
+function handleDeleteMasterRecord(params) {
+  var sheetKey = params.sheet || '';
+  var code     = params.code  || '';
+  var info     = MASTER_SHEET_MAP[sheetKey];
+  if (!info) return { deleted: false, message: 'Unknown sheet: ' + sheetKey };
+
+  var ssId = getMasterFileId_(info.file);
+  if (!ssId) return { deleted: false, message: 'File not found.' };
+
+  var ss = SpreadsheetApp.openById(ssId);
+  var sh = ss.getSheetByName(info.sheet);
+  if (!sh) return { deleted: false, message: 'Sheet not found.' };
+
+  var lastRow = sh.getLastRow();
+  var numDataRows = Math.max(1, lastRow - 3);
+  var codes = sh.getRange(4, 1, numDataRows, 1).getValues();
+  for (var i = 0; i < codes.length; i++) {
+    if (String(codes[i][0]).trim() === String(code).trim()) {
+      sh.deleteRow(i + 4);  // offset: data starts at row 4
+      return { deleted: true, code: code };
+    }
+  }
+  return { deleted: false, message: 'Record not found: ' + code };
+}
+
+
+// ── Helper: Get spreadsheet ID for each file ──
+// These should match your actual Google Sheets file IDs.
+// You can set them in CONFIG or PropertiesService.
+function getMasterFileId_(fileCode) {
+  // Try CONFIG first (if defined in Config.gs)
+  try {
+    if (typeof CONFIG !== 'undefined' && CONFIG.FILE_IDS) {
+      if (fileCode === '1A' && CONFIG.FILE_IDS.FILE_1A) return CONFIG.FILE_IDS.FILE_1A;
+      if (fileCode === '1B' && CONFIG.FILE_IDS.FILE_1B) return CONFIG.FILE_IDS.FILE_1B;
+      if (fileCode === '1C' && CONFIG.FILE_IDS.FILE_1C) return CONFIG.FILE_IDS.FILE_1C;
+    }
+  } catch (e) {}
+
+  // Fallback: try PropertiesService
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return props.getProperty('FILE_' + fileCode + '_ID') || '';
+  } catch (e) {}
+
+  // Last resort: if this IS file 1A, use active spreadsheet
+  if (fileCode === '1A') {
+    try { return SpreadsheetApp.getActiveSpreadsheet().getId(); } catch (e) {}
+  }
+  return '';
+}
+
+
+// ── Helper: Convert header string to camelCase key ──
+// "Item Code" → "code",  "Name / Description" → "name", etc.
+// For simplicity, maps common headers; falls back to lowercase-no-spaces.
+function headerToKey_(header) {
+  var h = String(header).trim().toLowerCase();
+  var MAP = {
+    'code': 'code', 'item code': 'code', 'article code': 'code', 'supplier code': 'code',
+    'name': 'name', 'item name': 'name', 'description': 'name', 'name / description': 'name', 'article name': 'name', 'supplier name': 'name',
+    'category': 'category', 'cat': 'category', 'type': 'category',
+    'status': 'status',
+    'gsm': 'extra', 'weight': 'extra', 'rate': 'extra', 'value': 'extra',
+    'updated': 'updated', 'last updated': 'updated', 'modified': 'updated', 'date': 'updated',
+    'uom': 'uom', 'unit': 'uom',
+    'hsn': 'hsn', 'hsn code': 'hsn',
+    'gst': 'gst', 'gst %': 'gst', 'gst rate': 'gst',
+    'city': 'city', 'location': 'city',
+    'gstin': 'gstin',
+    'credit': 'credit', 'credit days': 'credit',
+    'rating': 'rating',
+    'remarks': 'remarks', 'notes': 'remarks'
+  };
+  return MAP[h] || h.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
 }

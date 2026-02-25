@@ -1,26 +1,33 @@
-const BASE_URL = import.meta.env.VITE_GAS_URL || '';
+/**
+ * API Service — talks to GAS Web App backend.
+ *
+ * KEY DESIGN DECISION: ALL requests use GET.
+ * GAS web apps return a 302 redirect. Browsers convert POST→GET on redirect,
+ * losing the request body. To avoid this, we send everything as GET and
+ * pass "write" data as a JSON-stringified `payload` query parameter.
+ *
+ * The GAS backend parses: e.parameter.action + e.parameter.payload (JSON string)
+ */
 
-async function request(action, method = 'GET', body = null) {
-  const url = new URL(BASE_URL, window.location.origin);
+const GAS_URL = import.meta.env.VITE_GAS_URL || '';
+
+async function request(action, payload = null) {
+  if (!GAS_URL) {
+    throw new Error('VITE_GAS_URL is not configured in .env');
+  }
+
+  const url = new URL(GAS_URL);
   url.searchParams.set('action', action);
 
-  const opts = {
-    method,
-    headers: { 'Content-Type': 'application/json' },
-  };
-
-  if (method === 'POST' && body) {
-    opts.body = JSON.stringify(body);
+  // For write operations, JSON-stringify the data into a payload param
+  if (payload) {
+    url.searchParams.set('payload', JSON.stringify(payload));
   }
 
-  if (method === 'GET' && body) {
-    Object.entries(body).forEach(([k, v]) => {
-      url.searchParams.set(k, typeof v === 'object' ? JSON.stringify(v) : v);
-    });
-  }
+  const res = await fetch(url.toString(), { redirect: 'follow' });
 
-  const res = await fetch(url.toString(), opts);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
+
   const json = await res.json();
   if (!json.success) throw new Error(json.error?.message || 'Unknown API error');
   return json.data;
@@ -29,41 +36,47 @@ async function request(action, method = 'GET', body = null) {
 const api = {
   // UI Bootstrap
   getUIBootstrap: () => request('getUIBootstrap'),
-  saveUserTheme: (config) => request('saveUserTheme', 'POST', { args: [config] }),
+  saveUserTheme: (config) => request('saveUserTheme', config),
 
   // Presence
-  heartbeat: (mod, page) => request('heartbeat', 'POST', { args: [mod, page] }),
+  heartbeat: (mod, page) => request('heartbeat', { module: mod, page }),
   getOnlineUsers: () => request('getOnlineUsers'),
 
   // Notifications
-  getNotifications: (params = {}) => request('getNotifications', 'GET', params),
-  markNotificationRead: (id) => request('markNotificationRead', 'POST', { args: [id] }),
-  dismissNotification: (id) => request('dismissNotification', 'POST', { args: [id] }),
+  getNotifications: (params = {}) => request('getNotifications', Object.keys(params).length ? params : null),
+  markNotificationRead: (id) => request('markNotificationRead', { notificationId: id }),
+  dismissNotification: (id) => request('dismissNotification', { notificationId: id }),
 
   // Quick Access
   getUserShortcuts: () => request('getUserShortcuts'),
-  addShortcut: (shortcut) => request('addShortcut', 'POST', { args: [shortcut] }),
-  removeShortcut: (id) => request('removeShortcut', 'POST', { args: [id] }),
+  addShortcut: (shortcut) => request('addShortcut', { shortcutId: shortcut }),
+  removeShortcut: (id) => request('removeShortcut', { shortcutId: id }),
 
   // Procurement
   getPOList: () => request('getPOList'),
   getGRNList: () => request('getGRNList'),
-  savePO: (data, lines) => request('savePO', 'POST', { args: [data, lines] }),
-  saveGRN: (data, lines) => request('saveGRN', 'POST', { args: [data, lines] }),
+  savePO: (data, lines) => request('savePO', { poData: data, lineItems: lines }),
+  saveGRN: (data, lines) => request('saveGRN', { grnData: data, lineItems: lines }),
   getOpenPOs: () => request('getOpenPOs'),
 
   // Master Data
   getItems: () => request('getItems'),
   getSuppliers: () => request('getSuppliers'),
-  searchItems: (query) => request('searchItems', 'GET', { query }),
+  searchItems: (query) => request('searchItems', { query }),
+
+  // Masters Hub
+  getMasterSheetCounts: () => request('getMasterSheetCounts'),
+  getMasterData: (sheet, file) => request('getMasterData', { sheet, file }),
+  saveMasterRecord: (sheet, file, record, isEdit) => request('saveMasterRecord', { sheet, file, record, isEdit }),
+  deleteMasterRecord: (sheet, file, code) => request('deleteMasterRecord', { sheet, file, code }),
 
   // Dashboard
   getActivityFeed: () => request('getActivityFeed'),
   getDashboardStats: () => request('getDashboardStats'),
 
   // Export & Print
-  exportDocument: (type, id, format) => request('exportDocument', 'POST', { args: [type, id, format] }),
-  printDocument: (type, id) => request('printDocument', 'GET', { type, id }),
+  exportDocument: (type, id, format) => request('exportDocument', { documentType: type, documentCode: id, format }),
+  printDocument: (type, id) => request('printDocument', { documentType: type, documentCode: id }),
 };
 
 export default api;

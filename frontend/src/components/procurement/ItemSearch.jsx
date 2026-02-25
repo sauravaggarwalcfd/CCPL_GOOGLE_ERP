@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { ITEMS, ITEM_IMGS, CAT_ICON, CAT_CLR } from '../../constants/procurement';
+import { ITEM_IMGS, CAT_ICON, CAT_CLR } from '../../constants/procurement';
 
-export default function ItemSearch({ value, onChange, M, A, fz, py: pyV, showThumbs }) {
+export default function ItemSearch({ value, onChange, items = [], M, A, fz, py: pyV, showThumbs }) {
   const [q, setQ]       = useState("");
   const [open, setOpen] = useState(false);
   const [errs, setErrs] = useState({});
   const ref = useRef(null);
-  const selItem = ITEMS.find(i => i.code === value);
+  const selItem = items.find(i => i.code === value);
   const filtered = q.length >= 1
-    ? ITEMS.filter(i => i.code.toLowerCase().includes(q.toLowerCase()) || i.name.toLowerCase().includes(q.toLowerCase()))
-    : ITEMS;
+    ? items.filter(i => i.code.toLowerCase().includes(q.toLowerCase()) || i.name.toLowerCase().includes(q.toLowerCase()))
+    : items;
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NOTIF_C, NOTIF_BG } from '../../constants/roles';
 import { ago } from '../../utils/helpers';
+import api from '../../services/api';
 
 export default function NotifPanel({notifs,setNotifs,M,A,uff,fz,onClose}){
   const [replyId,  setReplyId]  = useState(null);
@@ -9,12 +10,12 @@ export default function NotifPanel({notifs,setNotifs,M,A,uff,fz,onClose}){
 
   const unread = notifs.filter(n=>!n.read).length;
 
-  const markRead  = id => setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"read"}:n));
-  const dismiss   = id => setNotifs(ns=>ns.filter(n=>n.id!==id));
-  const approve   = id => { setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"approve"}:n)); };
-  const reject    = id => { setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"reject"}:n)); };
-  const sendReply = id => { if(!replyTxt.trim())return; setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"reply",replyText:replyTxt}:n)); setReplyId(null); setReplyTxt(""); };
-  const markAllRead = () => setNotifs(ns=>ns.map(n=>({...n,read:true,status:n.status==="unread"?"read":n.status})));
+  const markRead  = id => { setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"read"}:n)); api.markNotificationRead(id).catch(()=>{}); };
+  const dismiss   = id => { setNotifs(ns=>ns.filter(n=>n.id!==id)); api.dismissNotification(id).catch(()=>{}); };
+  const approve   = id => { setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"approve"}:n)); api.markNotificationRead(id).catch(()=>{}); };
+  const reject    = id => { setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"reject"}:n)); api.markNotificationRead(id).catch(()=>{}); };
+  const sendReply = id => { if(!replyTxt.trim())return; setNotifs(ns=>ns.map(n=>n.id===id?{...n,read:true,status:"actioned",actionTaken:"reply",replyText:replyTxt}:n)); api.markNotificationRead(id).catch(()=>{}); setReplyId(null); setReplyTxt(""); };
+  const markAllRead = () => { setNotifs(ns=>ns.map(n=>({...n,read:true,status:n.status==="unread"?"read":n.status}))); notifs.filter(n=>!n.read).forEach(n=>api.markNotificationRead(n.id).catch(()=>{})); };
 
   const TYPE_L = {action:"ACTION REQUIRED",warning:"WARNING",info:"INFO",system:"SYSTEM"};
 

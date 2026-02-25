@@ -6,11 +6,11 @@
 ┌─────────────────────┐     HTTPS/JSON      ┌──────────────────────┐     Read/Write     ┌─────────────────┐
 │   React Frontend    │ ◄──────────────────► │   GAS API Gateway    │ ◄────────────────► │  Google Sheets  │
 │   (Vite + React)    │    ?action=XXX       │   (APIGateway.gs)    │   SpreadsheetApp   │  (Files 1A-2)   │
-│   Standalone App    │                      │   API-only (no HTML) │                    │  23+ sheets     │
+│   localhost:9090    │                      │   API-only (no HTML) │                    │  23+ sheets     │
 └─────────────────────┘                      └──────────────────────┘                    └─────────────────┘
         │                                              │
         │  Dev: Vite proxy /api → GAS URL              │  GAS serves ONLY JSON — zero HTML load
-        │  Prod: Direct fetch to GAS URL               │  All UI runs in the React app
+        │  Prod: PM2 + Vite on port 9090               │  All UI runs in the React app
 ```
 
 ### Single Webapp Architecture
@@ -19,42 +19,202 @@
 - **Reduced GAS load**: GAS does not serve HTML/CSS/JS. It only processes API calls to Google Sheets.
 - **All updates happen in React**: Any UI change is made in the `frontend/` codebase only.
 
+### GAS Files — What to Keep / Delete
+
+**DELETE from App Script** (old HTML frontend — replaced by React):
+| File | Reason |
+|------|--------|
+| `index.html` | Old HTML webapp UI — replaced by React |
+| `scripts.html` | Old JavaScript (66KB) — replaced by React components |
+| `styles.html` | Old CSS (42KB) — replaced by React inline styles |
+
+**KEEP in App Script** (backend + API):
+| File | Purpose |
+|------|---------|
+| `APIGateway.gs` | **NEW** — Routes API calls from React to GAS functions |
+| `Code.gs` | **UPDATED** — doGet/doPost are API-only (no HTML serving) |
+| `Config.gs` | Config & constants |
+| `Cache.gs` | Caching layer |
+| `MasterSetup.gs` | Sheet setup utilities |
+| `Module1_CodeGen.gs` | Code generation logic |
+| `Module2_FKEngine.gs` | Foreign key engine |
+| `Module3_AttrSync.gs` | Attribute sync |
+| `Module4_ChangeLog.gs` | Change log tracking |
+| `Module5_AccessControl.gs` | Access control / roles |
+| `Module6_ColorSwatch.gs` | Color swatch logic |
+| `Module7_ReorderAlert.gs` | Reorder alerts |
+| `Module8_ISR.gs` | ISR module |
+| `Module9_Export.gs` | Export (PDF/Excel) |
+| `Module10_Presence.gs` | Online user tracking |
+| `Module11_UIBootstrap.gs` | Bootstrap data for React app |
+| `Module12_Notifications.gs` | Notification CRUD |
+| `Module13_QuickAccess.gs` | Shortcuts/quick access |
+| `Module14_ProcurementAPI.gs` | Procurement data operations |
+| `SheetSetup.gs` | Sheet creation (1A) |
+| `SheetSetup_1B.gs` | Sheet creation (1B) |
+| `SheetSetup_1C.gs` | Sheet creation (1C) |
+| `SheetSetup_F2.gs` | Sheet creation (F2) |
+| `CreateNewSidebar.html` | Spreadsheet sidebar (inside Sheets, not webapp) |
+| `SupplierSidebar.html` | Spreadsheet sidebar |
+| `TagSidebar.html` | Spreadsheet sidebar |
+| `appsscript.json` | GAS project manifest |
+| `.clasp.json` | clasp deployment config |
+
 ## Project Structure
 
 ```
-frontend/
-├── package.json                  # React 18, Vite 6
-├── vite.config.js                # Dev proxy, port 3000
-├── index.html                    # Vite entry
-├── .env                          # VITE_GAS_URL (production)
-├── .env.development              # VITE_GAS_URL=/api (proxied)
-└── src/
-    ├── main.jsx                  # ReactDOM entry
-    ├── App.jsx                   # Root component (shell + routing)
-    ├── styles/
-    │   ├── fonts.css             # Google Fonts @import
-    │   └── global.css            # Animations, scrollbar, resets
-    ├── constants/
-    │   ├── index.js              # Barrel export
-    │   ├── themes.js             # MODES (6), ACCENTS (6)
-    │   ├── defaults.js           # DEFAULTS, FS_MAP, PY_MAP
-    │   ├── modules.js            # MODS, CMD_INDEX, ACTIVITY
-    │   ├── roles.js              # ROLE_C, ROLE_K, ME, OTHERS, NOTIF_INIT
-    │   ├── fonts.js              # UI_FONTS, DATA_FONTS, uiFF(), dataFF()
-    │   └── procurement.js        # ITEMS, SUPPLIERS, catalogs, demo data
-    ├── services/
-    │   └── api.js                # Central fetch-based API client
-    ├── hooks/
-    │   ├── useHeartbeat.js       # 30s presence heartbeat
-    │   └── useKeyboard.js        # Ctrl+K, Escape handlers
-    ├── utils/
-    │   └── helpers.js            # aColor, ini, ago, greet, fmtINR, etc.
-    └── components/
-        ├── ui/                   # Chip, Toggle, ModeCard, SDiv, Avatar
-        ├── panels/               # NotifPanel, CmdPalette, SettingsPanel
-        ├── modules/              # Tile
-        └── procurement/          # Procurement, ItemSearch
+C:\CCPL_GOOGLE_ERP\                      ← Local Windows folder
+├── START.bat                            # Launch script (git pull + PM2 start)
+├── SETUP_FIRST_TIME.bat                 # One-time setup (installs PM2, auto-boot)
+├── ecosystem.config.cjs                 # PM2 process config (port 9090)
+├── logs/                                # PM2 runtime logs
+│   ├── cc-erp-out.log
+│   └── cc-erp-error.log
+├── CC_ERP_ARCHITECTURE_V6.md            # This file
+├── CC_ERP_Main.jsx                      # Original monolithic reference (read-only)
+├── CC_ERP_UI_SPEC_V6.md                 # UI spec document
+├── gas/
+│   └── File1A/                          # GAS backend files (deploy to App Script)
+│       ├── APIGateway.gs                # NEW — API router (22 routes)
+│       ├── Code.gs                      # UPDATED — API-only doGet/doPost
+│       ├── Config.gs
+│       ├── Cache.gs
+│       ├── Module1-14_*.gs              # All business logic modules
+│       ├── SheetSetup*.gs               # Sheet creation scripts
+│       ├── *Sidebar.html                # Spreadsheet sidebars (keep)
+│       ├── appsscript.json
+│       └── .clasp.json
+└── frontend/                            # React webapp (the ONLY UI)
+    ├── package.json                     # React 18, Vite 6
+    ├── vite.config.js                   # Port 9090, dev proxy
+    ├── index.html                       # Vite entry
+    ├── .env                             # VITE_GAS_URL (production GAS URL)
+    ├── .env.development                 # VITE_GAS_URL=/api (proxied)
+    └── src/
+        ├── main.jsx                     # ReactDOM entry
+        ├── App.jsx                      # Root component (shell + routing)
+        ├── styles/
+        │   ├── fonts.css                # Google Fonts @import
+        │   └── global.css               # Animations, scrollbar, resets
+        ├── constants/
+        │   ├── index.js                 # Barrel export
+        │   ├── themes.js                # MODES (6), ACCENTS (6)
+        │   ├── defaults.js              # DEFAULTS, FS_MAP, PY_MAP
+        │   ├── modules.js               # MODS, CMD_INDEX, ACTIVITY
+        │   ├── roles.js                 # ROLE_C, ROLE_K, ME, OTHERS, NOTIF_INIT
+        │   ├── fonts.js                 # UI_FONTS, DATA_FONTS, uiFF(), dataFF()
+        │   └── procurement.js           # ITEMS, SUPPLIERS, catalogs, demo data
+        ├── services/
+        │   └── api.js                   # Central fetch-based API client (22 endpoints)
+        ├── hooks/
+        │   ├── useHeartbeat.js          # 30s presence heartbeat
+        │   └── useKeyboard.js           # Ctrl+K, Escape handlers
+        ├── utils/
+        │   └── helpers.js               # aColor, ini, ago, greet, fmtINR, etc.
+        └── components/
+            ├── ui/                      # Chip, Toggle, ModeCard, SDiv, Avatar
+            ├── panels/                  # NotifPanel, CmdPalette, SettingsPanel
+            ├── modules/                 # Tile
+            └── procurement/             # Procurement, ItemSearch
 ```
+
+## Server & Deployment
+
+### Port
+**9090** — configured in `vite.config.js`, `package.json`, and `ecosystem.config.cjs`.
+
+### PM2 Process Manager
+The app runs as a background service via PM2:
+
+| Setting | Value |
+|---------|-------|
+| Process name | `cc-erp` |
+| Port | 9090 |
+| Host | `0.0.0.0` (accessible from LAN) |
+| Auto-restart | Yes (on crash) |
+| Max restarts | 10 |
+| Restart delay | 3 seconds |
+| Boot start | Yes (via `pm2-windows-startup`) |
+| Logs | `logs/cc-erp-out.log`, `logs/cc-erp-error.log` |
+
+### PM2 Commands
+```bash
+pm2 status              # See all running processes
+pm2 logs cc-erp         # Live log output
+pm2 restart cc-erp      # Restart server
+pm2 stop cc-erp         # Stop server
+pm2 delete cc-erp       # Remove from PM2
+pm2 save                # Save process list for boot recovery
+```
+
+### First-Time Setup (run once on new machine)
+
+**Prerequisites**: Node.js 18+, Git, Windows OS
+
+```
+1. git clone https://github.com/sauravaggarwalcfd/CCPL_GOOGLE_ERP.git C:\CCPL_GOOGLE_ERP
+2. Double-click:  C:\CCPL_GOOGLE_ERP\SETUP_FIRST_TIME.bat
+```
+
+`SETUP_FIRST_TIME.bat` does:
+- Verifies Node.js and Git are installed
+- Installs PM2 and `pm2-windows-startup` globally
+- Configures PM2 to auto-start on every Windows boot
+- Runs `npm install` in the frontend folder
+
+### Daily Launch / Update
+
+```
+Double-click:  C:\CCPL_GOOGLE_ERP\START.bat
+```
+
+`START.bat` does:
+1. `git fetch --all` + `git reset --hard origin/main` — pulls latest from GitHub
+2. `npm install` — installs any new dependencies
+3. `npm run build` — builds production bundle
+4. `pm2 delete cc-erp` — clears old process
+5. `pm2 start ecosystem.config.cjs` — starts server on port 9090
+6. `pm2 save` — saves for boot recovery
+
+After running, open **http://localhost:9090** in browser.
+
+### Environment Variables
+| File | Variable | Value |
+|------|----------|-------|
+| `.env` | `VITE_GAS_URL` | `https://script.google.com/macros/s/DEPLOY_ID/exec` |
+| `.env.development` | `VITE_GAS_URL` | `/api` (proxied by Vite) |
+
+### CORS Handling
+- **Development**: Vite's built-in proxy routes `/api` requests to the GAS URL, bypassing CORS
+- **Production**: Direct fetch to the deployed GAS web app URL (GAS handles CORS via ContentService)
+
+## GAS Deployment
+
+### Adding APIGateway.gs to App Script
+1. Open the Apps Script editor for File 1A
+2. Create a new script file named `APIGateway`
+3. Paste the contents of `gas/File1A/APIGateway.gs`
+4. Delete `index.html`, `scripts.html`, `styles.html` from the project
+5. Update `Code.gs` with the new API-only `doGet`/`doPost`
+
+### Deploying as Web App
+1. In Apps Script editor: Deploy → New Deployment
+2. Type: Web App
+3. Execute as: User accessing the web app
+4. Who has access: Anyone within your domain
+5. Copy the deployment URL and update `frontend/.env`
+
+### Code.gs — doGet / doPost (API-only)
+```javascript
+function doGet(e) {
+  return handleAPIRequest(e, 'GET');
+}
+
+function doPost(e) {
+  return handleAPIRequest(e, 'POST');
+}
+```
+No HTML is served. All requests route to `APIGateway.gs`.
 
 ## API Reference
 
@@ -108,71 +268,6 @@ Error responses:
   "meta": { "timestamp": "..." }
 }
 ```
-
-## Development Setup
-
-### Prerequisites
-- Node.js 18+
-- npm or yarn
-
-### Quick Start
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The dev server starts at `http://localhost:3000` with hot module replacement.
-
-### Environment Variables
-- `.env` — Production GAS URL: `VITE_GAS_URL=https://script.google.com/macros/s/DEPLOY_ID/exec`
-- `.env.development` — Dev proxy: `VITE_GAS_URL=/api`
-
-### CORS Handling
-- **Development**: Vite's built-in proxy routes `/api` requests to the GAS URL, bypassing CORS
-- **Production**: Direct fetch to the deployed GAS web app URL (GAS handles CORS via ContentService)
-
-## GAS Deployment
-
-### Adding APIGateway.gs
-1. Open the Apps Script editor for File 1A
-2. Create a new script file named `APIGateway`
-3. Paste the contents of `gas/File1A/APIGateway.gs`
-4. The modified `Code.gs` already routes `?action=` requests to the gateway
-
-### Deploying as Web App
-1. In Apps Script editor: Deploy → New Deployment
-2. Type: Web App
-3. Execute as: User accessing the web app
-4. Who has access: Anyone within your domain
-5. Copy the deployment URL and update `frontend/.env`
-
-## Build & Deploy
-
-### Build for Production
-```bash
-cd frontend
-npm run build
-```
-
-Output goes to `frontend/dist/`. Deploy to any static hosting:
-- GitHub Pages
-- Netlify
-- Vercel
-- Firebase Hosting
-- Google Cloud Storage
-
-### Preview Production Build
-```bash
-npm run preview
-```
-
-## Architecture Notes
-
-- **No GAS HTML webapp**: GAS `doGet` and `doPost` only handle API requests (JSON). No HTML is served.
-- **Single source of truth**: The React frontend in `frontend/` is the only UI. All changes happen here.
-- **GAS load reduced**: App Script only processes data operations — no HTML rendering, no HtmlService templating.
-- **Google Sheets unchanged**: No changes to sheet structure or data format.
 
 ## Theme System
 
@@ -239,4 +334,4 @@ App
 
 ---
 
-Built with React 18 + Vite 6 · GAS Backend · Google Sheets Data Layer
+Built with React 18 + Vite 6 · Port 9090 · PM2 · GAS API Backend · Google Sheets Data Layer
