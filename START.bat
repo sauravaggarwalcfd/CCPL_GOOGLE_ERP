@@ -24,8 +24,12 @@ if errorlevel 1 (
 
 :: ── Pull latest from GitHub ──
 echo [1/5] Fetching latest updates from GitHub...
-git fetch --all
-git reset --hard origin/main
+git fetch origin
+git pull origin main
+if errorlevel 1 (
+    echo [WARN] Pull failed — resetting to match remote...
+    git reset --hard origin/main
+)
 echo      Done.
 echo.
 

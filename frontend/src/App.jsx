@@ -100,7 +100,21 @@ export default function App(){
           setActivity(activityData.value);
         }
         if (statsData.status === "fulfilled" && statsData.value) {
-          setDashStats(statsData.value);
+          const s = statsData.value;
+          // Transform API object {po:{...}, grn:{...}} into card array for dashboard
+          const cards = [];
+          if (s.po) cards.push({lbl:"Open POs", val:String(s.po.total||0), sub:`${s.po.draft||0} draft · ${s.po.approved||0} approved`, col:"#E8690A", icon:"📦"});
+          if (s.grn) cards.push({lbl:"GRN", val:String(s.grn.total||0), sub:`${s.grn.pending||0} pending · ${s.grn.accepted||0} accepted`, col:"#0078D4", icon:"📥"});
+          if (s.notifications) cards.push({lbl:"Notifications", val:String(s.notifications.total||0), sub:`${s.notifications.unread||0} unread`, col:"#7C3AED", icon:"🔔"});
+          cards.push({lbl:"Online", val:String(s.onlineUsers||0), sub:"Active users", col:"#15803D", icon:"👥"});
+          setDashStats(cards);
+          // Update module badges with real counts
+          if (s.po) {
+            setMods(prev => prev.map(m => {
+              if (m.id === "procurement") return {...m, badge: (s.po.draft||0) + (s.po.approved||0) + (s.po.sent||0)};
+              return m;
+            }));
+          }
         }
         if (shortcutData.status === "fulfilled" && shortcutData.value) {
           setShortcuts(shortcutData.value);
@@ -161,8 +175,8 @@ export default function App(){
     api.removeShortcut(id).catch(()=>{});
   };
 
-  // ─ Default user when API hasn't loaded yet
-  const user = me || {name:"Loading…",email:"",role:"Admin",dept:""};
+  // ─ Default user when API hasn't loaded or returns empty
+  const user = (me && me.name) ? me : {name:"User",email:"user@cc.com",role:"Admin",dept:""};
 
   // ─ Loading screen
   if (loading) {
@@ -471,12 +485,12 @@ export default function App(){
             </div>
 
             {/* Quick stats */}
-            <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12,marginBottom:20}}>
+            <div style={{display:"grid",gridTemplateColumns:`repeat(${Math.min(dashStats.length||4,4)},1fr)`,gap:12,marginBottom:20}}>
               {(dashStats.length > 0 ? dashStats : [
-                {lbl:"Open POs",  val:"—", sub:"Loading…", col:"#E8690A",icon:"📦"},
-                {lbl:"Active WOs",val:"—", sub:"Loading…", col:"#0078D4",icon:"🏭"},
-                {lbl:"Pending QC",val:"—", sub:"Loading…", col:"#7C3AED",icon:"🔬"},
-                {lbl:"Due Pmts",  val:"—", sub:"Loading…", col:"#BE123C",icon:"💰"},
+                {lbl:"Open POs",  val:"0", sub:"No data yet", col:"#E8690A",icon:"📦"},
+                {lbl:"GRN",       val:"0", sub:"No data yet", col:"#0078D4",icon:"📥"},
+                {lbl:"Notifications",val:"0", sub:"No data yet", col:"#7C3AED",icon:"🔔"},
+                {lbl:"Online",    val:"0", sub:"No data yet", col:"#15803D",icon:"👥"},
               ]).map((s,i)=>(
                 <div key={i} style={{background:M.surfHigh,border:`1px solid ${M.divider}`,borderRadius:8,padding:"13px 14px",borderLeft:`3px solid ${s.col}`}}>
                   <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:7}}><span style={{fontSize:16}}>{s.icon}</span><span style={{fontSize:9,fontWeight:900,color:M.textD,textTransform:"uppercase",letterSpacing:.5}}>{s.lbl}</span></div>
