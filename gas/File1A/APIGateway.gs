@@ -923,6 +923,14 @@ var MASTER_SHEET_MAP = {
   'fabric_type_master':  { sheet: 'FABRIC_TYPE_MASTER',  file: '1A' },
   'tag_master':          { sheet: 'TAG_MASTER',          file: '1A' },
   'item_categories':     { sheet: 'ITEM_CATEGORIES',     file: '1A' },
+  'trim_attr_names':     { sheet: 'TRIM_ATTR_NAMES',     file: '1A' },
+  'trim_attr_values':    { sheet: 'TRIM_ATTR_VALUES',    file: '1A' },
+  'con_attr_names':      { sheet: 'CON_ATTR_NAMES',      file: '1A' },
+  'con_attr_values':     { sheet: 'CON_ATTR_VALUES',     file: '1A' },
+  'pkg_attr_names':      { sheet: 'PKG_ATTR_NAMES',      file: '1A' },
+  'pkg_attr_values':     { sheet: 'PKG_ATTR_VALUES',     file: '1A' },
+  'item_change_log':     { sheet: 'ITEM_CHANGE_LOG',     file: '1A' },
+  'master_relations':    { sheet: 'MASTER_RELATIONS',    file: '1A' },
 
   // FILE 1B — Factory (tab names from CONFIG.SHEETS_1B)
   'user_master':          { sheet: 'USER_MASTER',          file: '1B' },
@@ -945,6 +953,10 @@ var MASTER_SHEET_MAP = {
   'spare_parts_master':   { sheet: 'SPARE_PARTS_MASTER',   file: '1B' },
   'work_center_master':   { sheet: 'WORK_CENTER_MASTER',   file: '1B' },
   'jobwork_party_master': { sheet: 'JOBWORK_PARTY_MASTER', file: '1B' },
+  'presence':             { sheet: 'PRESENCE',             file: '1B' },
+  'notifications':        { sheet: 'NOTIFICATIONS',        file: '1B' },
+  'role_permissions':     { sheet: 'ROLE_PERMISSIONS',     file: '1B' },
+  'notification_templates': { sheet: 'NOTIFICATION_TEMPLATES', file: '1B' },
 
   // FILE 1C — Finance (tab names from CONFIG.SHEETS_1C)
   'supplier_master_1c':  { sheet: 'SUPPLIER_MASTER',       file: '1C' },
