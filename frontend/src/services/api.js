@@ -70,6 +70,31 @@ const api = {
   saveMasterRecord: (sheet, file, record, isEdit) => request('saveMasterRecord', { sheet, file, record, isEdit }),
   deleteMasterRecord: (sheet, file, code) => request('deleteMasterRecord', { sheet, file, code }),
 
+  // Procurement — PO detail
+  getPODetail: (poCode) => request('getPODetail', { poCode }),
+  getLineItems: (poCode) => request('getLineItems', { poCode }),
+  updatePOStatus: (poCode, newStatus) => request('updatePOStatus', { poCode, newStatus }),
+
+  // Workflow
+  getWorkflow: (module) => request('getWorkflow', { module }),
+
+  // Rollups
+  getRollups: (parentSheet, parentCode) => request('getRollups', { parentSheet, parentCode }),
+
+  // Embedded Views (Linked DB)
+  getEmbeddedViewData: (parentRef, viewId) => request('getEmbeddedViewData', { parentRef, viewId }),
+
+  // Comments
+  getComments: (recordType, recordCode) => request('getComments', { recordType, recordCode }),
+  addComment: (recordType, recordCode, text) => request('addComment', { recordType, recordCode, text }),
+
+  // Templates
+  getTemplates: (module) => request('getTemplates', { module }),
+
+  // Help System
+  getHelpContent: (role, module) => request('getHelpContent', { role, module }),
+  searchHelp: (query, role) => request('searchHelp', { query, role }),
+
   // Dashboard
   getActivityFeed: () => request('getActivityFeed'),
   getDashboardStats: () => request('getDashboardStats'),

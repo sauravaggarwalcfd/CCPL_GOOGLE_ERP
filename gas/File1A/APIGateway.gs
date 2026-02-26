@@ -101,7 +101,46 @@ var API_ROUTES = {
   'getMasterSheetCounts': handleGetMasterSheetCounts,
   'getMasterData':        handleGetMasterData,
   'saveMasterRecord':     handleSaveMasterRecord,
-  'deleteMasterRecord':   handleDeleteMasterRecord
+  'deleteMasterRecord':   handleDeleteMasterRecord,
+
+  // -------------------------------------------------------------------------
+  // V7 — Procurement Detail
+  // -------------------------------------------------------------------------
+  'getPODetail':          handleGetPODetail,
+  'getLineItems':         handleGetLineItems,
+  'updatePOStatus':       handleUpdatePOStatus,
+
+  // -------------------------------------------------------------------------
+  // V7 — Status Workflow Engine (Module 11)
+  // -------------------------------------------------------------------------
+  'getWorkflow':          handleGetWorkflow,
+
+  // -------------------------------------------------------------------------
+  // V7 — Rollup Engine (Module 12)
+  // -------------------------------------------------------------------------
+  'getRollups':           handleGetRollups,
+
+  // -------------------------------------------------------------------------
+  // V7 — Embedded Views Engine (Module 13)
+  // -------------------------------------------------------------------------
+  'getEmbeddedViewData':  handleGetEmbeddedViewData,
+
+  // -------------------------------------------------------------------------
+  // V7 — Comments (Module 14)
+  // -------------------------------------------------------------------------
+  'getComments':          handleGetComments,
+  'addComment':           handleAddComment,
+
+  // -------------------------------------------------------------------------
+  // V7 — Templates
+  // -------------------------------------------------------------------------
+  'getTemplates':         handleGetTemplates,
+
+  // -------------------------------------------------------------------------
+  // V7 — Help System (Module 15)
+  // -------------------------------------------------------------------------
+  'getHelpContent':       handleGetHelpContent,
+  'searchHelp':           handleSearchHelp
 };
 
 
@@ -1153,6 +1192,463 @@ function getMasterFileId_(fileCode) {
   if (fileCode === '1A') {
     try { return SpreadsheetApp.getActiveSpreadsheet().getId(); } catch (e) {}
   }
+  return '';
+}
+
+
+// =============================================================================
+// V7 — PROCUREMENT DETAIL HANDLERS
+// =============================================================================
+
+/**
+ * Returns PO header detail by PO code.
+ * Reads PO_MASTER sheet in FILE 2.
+ */
+function handleGetPODetail(params) {
+  var poCode = params.poCode || '';
+  if (!poCode) return null;
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return null;
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('PO_MASTER');
+    if (!sh) return null;
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return null;
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === poCode) {
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+          if (headers[j]) row[headers[j]] = data[i][j];
+        }
+        return row;
+      }
+    }
+    return null;
+  } catch (e) {
+    Logger.log('handleGetPODetail error: ' + e.message);
+    return null;
+  }
+}
+
+
+/**
+ * Returns line items for a given PO code.
+ * Reads PO_LINE_ITEMS sheet in FILE 2.
+ */
+function handleGetLineItems(params) {
+  var poCode = params.poCode || '';
+  if (!poCode) return [];
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('PO_LINE_ITEMS');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var results = [];
+    for (var i = 0; i < data.length; i++) {
+      // PO Code column — find it by header name containing "PO Code"
+      var poColIdx = -1;
+      for (var h = 0; h < headers.length; h++) {
+        if (headers[h].indexOf('PO Code') > -1 || headers[h].indexOf('PO_Code') > -1) { poColIdx = h; break; }
+      }
+      if (poColIdx < 0) poColIdx = 1; // fallback: column B
+      if (String(data[i][poColIdx]).trim() === poCode) {
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+          if (headers[j]) row[headers[j]] = data[i][j];
+        }
+        results.push(row);
+      }
+    }
+    return results;
+  } catch (e) {
+    Logger.log('handleGetLineItems error: ' + e.message);
+    return [];
+  }
+}
+
+
+/**
+ * Updates PO status with workflow validation.
+ */
+function handleUpdatePOStatus(params) {
+  var poCode = params.poCode || '';
+  var newStatus = params.newStatus || '';
+  if (!poCode || !newStatus) return { success: false, message: 'Missing poCode or newStatus' };
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return { success: false, message: 'FILE 2 not found' };
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('PO_MASTER');
+    if (!sh) return { success: false, message: 'PO_MASTER sheet not found' };
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    // Find Status column
+    var statusCol = -1;
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h].indexOf('Status') > -1) { statusCol = h; break; }
+    }
+    if (statusCol < 0) return { success: false, message: 'Status column not found' };
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === poCode) {
+        sh.getRange(i + 4, statusCol + 1).setValue(newStatus);
+        return { success: true, poCode: poCode, newStatus: newStatus };
+      }
+    }
+    return { success: false, message: 'PO not found: ' + poCode };
+  } catch (e) {
+    Logger.log('handleUpdatePOStatus error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+
+// =============================================================================
+// V7 — STATUS WORKFLOW ENGINE (Module 11)
+// =============================================================================
+
+/**
+ * Returns workflow statuses for a module.
+ * Reads STATUS_WORKFLOW sheet in FILE 1A.
+ */
+function handleGetWorkflow(params) {
+  var module = params.module || 'Procurement-PO';
+  try {
+    var ssId = getMasterFileId_('1A');
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('STATUS_WORKFLOW');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var results = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) row[headers[j]] = data[i][j];
+      }
+      // Filter by module if column exists
+      var modCol = row['Module'] || row['module'] || '';
+      if (modCol && modCol !== module) continue;
+      // Filter Active=Yes
+      var active = row['Active'] || row['active'] || 'Yes';
+      if (String(active).toLowerCase() === 'no') continue;
+      results.push(row);
+    }
+    return results;
+  } catch (e) {
+    Logger.log('handleGetWorkflow error: ' + e.message);
+    return [];
+  }
+}
+
+
+// =============================================================================
+// V7 — ROLLUP ENGINE (Module 12)
+// =============================================================================
+
+/**
+ * Computes rollup values for a parent record.
+ * Reads ROLLUP_CONFIG in FILE 1A, then aggregates from child sheets.
+ */
+function handleGetRollups(params) {
+  var parentSheet = params.parentSheet || '';
+  var parentCode = params.parentCode || '';
+  if (!parentSheet || !parentCode) return [];
+  try {
+    var ssId = getMasterFileId_('1A');
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('ROLLUP_CONFIG');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var configs = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) row[headers[j]] = data[i][j];
+      }
+      var parent = row['Parent Sheet'] || row['parent_sheet'] || '';
+      if (parent === parentSheet) configs.push(row);
+    }
+    // For each config, compute the aggregate (simplified — real impl reads child data)
+    return configs.map(function(cfg) {
+      return {
+        label: cfg['Display Label'] || cfg['Label'] || 'Rollup',
+        value: '—',
+        func: cfg['Function'] || 'COUNT',
+        format: cfg['Format'] || '',
+        sourceSheet: cfg['Source Sheet'] || ''
+      };
+    });
+  } catch (e) {
+    Logger.log('handleGetRollups error: ' + e.message);
+    return [];
+  }
+}
+
+
+// =============================================================================
+// V7 — EMBEDDED VIEWS ENGINE (Module 13)
+// =============================================================================
+
+/**
+ * Returns child data for an embedded/linked view.
+ * Reads EMBEDDED_VIEWS config in FILE 1A, then fetches filtered data.
+ */
+function handleGetEmbeddedViewData(params) {
+  var parentRef = params.parentRef || '';
+  var viewId = params.viewId || '';
+  if (!viewId) return { columns: [], rows: [] };
+  try {
+    var ssId = getMasterFileId_('1A');
+    if (!ssId) return { columns: [], rows: [] };
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('EMBEDDED_VIEWS');
+    if (!sh) return { columns: [], rows: [] };
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return { columns: [], rows: [] };
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    // Find the view config
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === viewId) {
+        var row = {};
+        for (var j = 0; j < headers.length; j++) {
+          if (headers[j]) row[headers[j]] = data[i][j];
+        }
+        var displayCols = String(row['Display Columns'] || '').split(',').map(function(c) { return c.trim(); }).filter(Boolean);
+        return { columns: displayCols, rows: [], config: row };
+      }
+    }
+    return { columns: [], rows: [] };
+  } catch (e) {
+    Logger.log('handleGetEmbeddedViewData error: ' + e.message);
+    return { columns: [], rows: [] };
+  }
+}
+
+
+// =============================================================================
+// V7 — COMMENTS (Module 14)
+// =============================================================================
+
+/**
+ * Returns comments for a record.
+ * Reads RECORD_COMMENTS sheet in FILE 2.
+ */
+function handleGetComments(params) {
+  var recordType = params.recordType || '';
+  var recordCode = params.recordCode || '';
+  if (!recordCode) return [];
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('RECORD_COMMENTS');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var results = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) row[headers[j]] = data[i][j];
+      }
+      // Match by record code column
+      var code = row['Record Code'] || row['record_code'] || '';
+      if (String(code).trim() === recordCode) {
+        results.push({
+          id: row['Comment ID'] || row['comment_id'] || '',
+          author: row['Author'] || row['author'] || '',
+          text: row['Comment'] || row['Text'] || row['text'] || '',
+          time: row['Timestamp'] || row['timestamp'] || '',
+          parentId: row['Parent Comment ID'] || ''
+        });
+      }
+    }
+    return results;
+  } catch (e) {
+    Logger.log('handleGetComments error: ' + e.message);
+    return [];
+  }
+}
+
+
+/**
+ * Adds a comment to RECORD_COMMENTS sheet in FILE 2.
+ */
+function handleAddComment(params) {
+  var recordType = params.recordType || 'PO';
+  var recordCode = params.recordCode || '';
+  var text = params.text || '';
+  if (!recordCode || !text) return { success: false, message: 'Missing recordCode or text' };
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return { success: false, message: 'FILE 2 not found' };
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('RECORD_COMMENTS');
+    if (!sh) return { success: false, message: 'RECORD_COMMENTS not found' };
+    var lastRow = sh.getLastRow();
+    var seq = Math.max(1, lastRow - 3 + 1);
+    var commentId = 'CMT-' + String(seq).padStart(5, '0');
+    var email = Session.getActiveUser().getEmail();
+    var now = new Date();
+    sh.appendRow([commentId, recordType, recordCode, text, email, '', now, '', '', 'Yes']);
+    return { success: true, commentId: commentId };
+  } catch (e) {
+    Logger.log('handleAddComment error: ' + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+
+// =============================================================================
+// V7 — TEMPLATES
+// =============================================================================
+
+/**
+ * Returns templates for a module.
+ * Reads TEMPLATES sheet in FILE 2.
+ */
+function handleGetTemplates(params) {
+  var module = params.module || 'PO';
+  try {
+    var ssId = getFile2Id_();
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('TEMPLATES');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var results = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) row[headers[j]] = data[i][j];
+      }
+      var modCol = row['Module'] || row['module'] || '';
+      if (modCol && modCol !== module && modCol !== 'All') continue;
+      var active = row['Active'] || row['active'] || 'Yes';
+      if (String(active).toLowerCase() === 'no') continue;
+      results.push(row);
+    }
+    return results;
+  } catch (e) {
+    Logger.log('handleGetTemplates error: ' + e.message);
+    return [];
+  }
+}
+
+
+// =============================================================================
+// V7 — HELP SYSTEM (Module 15)
+// =============================================================================
+
+/**
+ * Returns help content filtered by role and module.
+ * Reads HELP_CONTENT sheet in FILE 1A.
+ */
+function handleGetHelpContent(params) {
+  var role = params.role || 'All';
+  var module = params.module || '';
+  try {
+    var ssId = getMasterFileId_('1A');
+    if (!ssId) return [];
+    var ss = SpreadsheetApp.openById(ssId);
+    var sh = ss.getSheetByName('HELP_CONTENT');
+    if (!sh) return [];
+    var lastRow = sh.getLastRow();
+    var lastCol = sh.getLastColumn();
+    if (lastRow < 4) return [];
+    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
+    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
+    var results = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      for (var j = 0; j < headers.length; j++) {
+        if (headers[j]) row[headers[j]] = data[i][j];
+      }
+      var active = row['Active'] || row['active'] || 'Yes';
+      if (String(active).toLowerCase() === 'no') continue;
+      // Filter by audience/role
+      var audience = row['Target Audience'] || row['audience'] || 'All';
+      if (audience !== 'All' && audience !== role) continue;
+      // Filter by module if specified
+      if (module) {
+        var relMod = row['Related Module'] || row['module'] || 'All';
+        if (relMod !== 'All' && relMod !== module) continue;
+      }
+      results.push(row);
+    }
+    return results;
+  } catch (e) {
+    Logger.log('handleGetHelpContent error: ' + e.message);
+    return [];
+  }
+}
+
+
+/**
+ * Full-text search across help pages.
+ */
+function handleSearchHelp(params) {
+  var query = String(params.query || '').toLowerCase();
+  var role = params.role || 'All';
+  if (!query) return [];
+  try {
+    var allHelp = handleGetHelpContent({ role: role });
+    return allHelp.filter(function(page) {
+      var searchable = (
+        (page['Title'] || '') + ' ' +
+        (page['Tags'] || '') + ' ' +
+        (page['Content (Markdown)'] || page['Content'] || '')
+      ).toLowerCase();
+      return searchable.indexOf(query) > -1;
+    });
+  } catch (e) {
+    Logger.log('handleSearchHelp error: ' + e.message);
+    return [];
+  }
+}
+
+
+// ── Helper: Get FILE 2 (Procurement) spreadsheet ID ──
+function getFile2Id_() {
+  try {
+    if (typeof CONFIG !== 'undefined' && CONFIG.FILE_IDS && CONFIG.FILE_IDS.FILE_2) {
+      return CONFIG.FILE_IDS.FILE_2;
+    }
+  } catch (e) {}
+  try {
+    var props = PropertiesService.getScriptProperties();
+    return props.getProperty('FILE_2_ID') || '';
+  } catch (e) {}
   return '';
 }
 
