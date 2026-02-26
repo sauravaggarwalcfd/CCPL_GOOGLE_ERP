@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { uiFF, dataFF } from '../../constants/fonts';
-import { PY_MAP } from '../../constants/defaults';
+import { uiFF } from '../../constants/fonts';
 import { SCHEMA_MAP } from '../../constants/masterSchemas';
 import api from '../../services/api';
 
@@ -101,6 +100,7 @@ function DetailView({ sheet, allSheets, fileColor, fileName, onClose, onSelectSh
   const [search, setSearch]   = useState("");
   const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [formData, setFormData] = useState({});
   const [saving, setSaving]   = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -116,6 +116,7 @@ function DetailView({ sheet, allSheets, fileColor, fileName, onClose, onSelectSh
     setLoading(true);
     setRows([]);
     setSearch("");
+    setFetchError(null);
     api.getMasterData(sheet.key, fileName)
       .then(data => {
         if (Array.isArray(data)) {
@@ -123,7 +124,10 @@ function DetailView({ sheet, allSheets, fileColor, fileName, onClose, onSelectSh
           setRows(data.map(r => mapRawToSchema(r, schema)));
         }
       })
-      .catch(err => console.error("getMasterData:", err))
+      .catch(err => {
+        console.error("getMasterData:", err);
+        setFetchError(err.message || "Failed to fetch data");
+      })
       .finally(() => setLoading(false));
   }, [sheet.key, fileName]);
 
@@ -252,7 +256,17 @@ function DetailView({ sheet, allSheets, fileColor, fileName, onClose, onSelectSh
 
           {/* Table */}
           <div style={{ flex: 1, overflowY: "auto", padding: 24 }}>
-            {loading ? (
+            {fetchError ? (
+              <div style={{ textAlign: "center", padding: 60, background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8 }}>
+                <div style={{ fontSize: 28, marginBottom: 12 }}>⚠️</div>
+                <div style={{ fontSize: 14, fontWeight: 800, color: "#991b1b", marginBottom: 6, fontFamily: uff }}>Failed to load data</div>
+                <div style={{ fontSize: 11, color: "#b91c1c", marginBottom: 16, fontFamily: uff, maxWidth: 400, margin: "0 auto 16px" }}>{fetchError}</div>
+                <div style={{ fontSize: 10, color: "#6b7280", fontFamily: uff, lineHeight: 1.6 }}>
+                  Check that GAS web app is deployed and VITE_GAS_URL is correct.<br/>
+                  Open browser console for more details.
+                </div>
+              </div>
+            ) : loading ? (
               <div style={{ textAlign: "center", padding: 60, color: M.textD, fontSize: 13, fontFamily: uff }}>Loading records…</div>
             ) : (
               <div style={{ background: M.surfHigh, border: `1px solid ${M.divider}`, borderRadius: 8, overflow: "hidden" }}>
@@ -386,16 +400,23 @@ function DetailView({ sheet, allSheets, fileColor, fileName, onClose, onSelectSh
 export default function Masters({ M, A, cfg, fz, dff }) {
   const uff = uiFF(cfg.uiFont);
   const [collapsed, setCollapsed] = useState({});
-  const [hovered, setHovered]     = useState(null);
   const [detailView, setDetailView] = useState(null);
   const [search, setSearch]       = useState("");
   const [sheetCounts, setSheetCounts] = useState({});
+  const [countsLoading, setCountsLoading] = useState(true);
+  const [countsError, setCountsError] = useState(null);
 
   // Fetch sheet counts on mount
   useEffect(() => {
+    setCountsLoading(true);
+    setCountsError(null);
     api.getMasterSheetCounts()
       .then(data => { if (data) setSheetCounts(data); })
-      .catch(() => {});
+      .catch(err => {
+        console.error("getMasterSheetCounts:", err);
+        setCountsError(err.message || "Failed to load sheet counts from API");
+      })
+      .finally(() => setCountsLoading(false));
   }, []);
 
   const toggleCollapse = (groupKey) => {
@@ -449,6 +470,27 @@ export default function Masters({ M, A, cfg, fz, dff }) {
           {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: M.textD, fontSize: 14 }}>✕</button>}
         </div>
       </div>
+
+      {/* ── API STATUS ── */}
+      {countsError && (
+        <div style={{ background: "#fef2f2", borderBottom: `1px solid #fecaca`, padding: "10px 28px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 14 }}>⚠️</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#991b1b", fontFamily: uff }}>API Connection Failed</div>
+            <div style={{ fontSize: 10, color: "#b91c1c", fontFamily: uff }}>{countsError}</div>
+          </div>
+          <button onClick={() => { setCountsError(null); setCountsLoading(true); api.getMasterSheetCounts().then(data => { if (data) setSheetCounts(data); setCountsError(null); }).catch(err => setCountsError(err.message)).finally(() => setCountsLoading(false)); }}
+            style={{ padding: "6px 14px", background: "#dc2626", border: "none", borderRadius: 6, fontSize: 11, fontWeight: 800, color: "#fff", cursor: "pointer", fontFamily: uff }}>
+            🔄 Retry
+          </button>
+        </div>
+      )}
+      {countsLoading && !countsError && (
+        <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: "8px 28px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 12 }}>⏳</span>
+          <span style={{ fontSize: 11, fontWeight: 700, color: M.textC, fontFamily: uff }}>Loading sheet counts from Google Sheets...</span>
+        </div>
+      )}
 
       {/* ── GROUPS ── */}
       <div style={{ flex: 1, overflowY: "auto", padding: "24px 28px" }}>

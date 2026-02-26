@@ -33,6 +33,7 @@ export default function App(){
   const [mods,     setMods]     = useState(MODS_INIT);
   const [dashStats,setDashStats]= useState([]);
   const [loading,  setLoading]  = useState(true);
+  const [apiError, setApiError] = useState(null);
 
   const M   = MODES[cfg.mode];
   const A   = ACCENTS[cfg.accent];
@@ -77,8 +78,17 @@ export default function App(){
         if (bootstrap.status === "fulfilled" && bootstrap.value) {
           const b = bootstrap.value;
           if (b.user) setMe(b.user);
-          if (b.config) setCfg(prev => ({...prev, ...b.config}));
-          if (b.modules) setMods(b.modules);
+          // Server returns preferences.theme (not config)
+          const serverTheme = b.config || (b.preferences && b.preferences.theme);
+          if (serverTheme) setCfg(prev => ({...prev, ...serverTheme}));
+          // Merge server modules with client MODS_INIT to preserve UI properties
+          // (lbl, icon emoji, badge, col, desc, stats) that the server doesn't return
+          if (b.modules && Array.isArray(b.modules)) {
+            setMods(prev => prev.map(clientMod => {
+              const serverMod = b.modules.find(sm => sm.id === clientMod.id);
+              return serverMod ? { ...clientMod, ...serverMod, icon: clientMod.icon, lbl: clientMod.lbl, col: clientMod.col, desc: clientMod.desc, badge: serverMod.badge ?? clientMod.badge, stats: clientMod.stats } : clientMod;
+            }));
+          }
         }
         if (onlineUsers.status === "fulfilled" && onlineUsers.value) {
           setOthers(onlineUsers.value);
@@ -95,8 +105,14 @@ export default function App(){
         if (shortcutData.status === "fulfilled" && shortcutData.value) {
           setShortcuts(shortcutData.value);
         }
+        // Check if ALL calls failed (API unreachable)
+        const allFailed = [bootstrap, onlineUsers, notifData, activityData, statsData, shortcutData].every(r => r.status === "rejected");
+        if (allFailed) {
+          setApiError("Cannot connect to GAS API. Check VITE_GAS_URL and that the GAS web app is deployed.");
+        }
       } catch(err) {
         console.error("Failed to load data from API:", err);
+        setApiError(err.message);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -280,6 +296,15 @@ export default function App(){
           </div>
         </div>
       </div>
+
+      {/* API ERROR BANNER */}
+      {apiError && (
+        <div style={{background:"#fef2f2",borderBottom:"1px solid #fecaca",padding:"8px 20px",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+          <span style={{fontSize:14}}>⚠️</span>
+          <span style={{fontSize:11,fontWeight:700,color:"#991b1b",flex:1}}>{apiError}</span>
+          <button onClick={()=>setApiError(null)} style={{background:"none",border:"none",color:"#991b1b",cursor:"pointer",fontSize:14}}>✕</button>
+        </div>
+      )}
 
       {/* BODY */}
       <div style={{flex:1,display:"flex",overflow:"hidden"}}>

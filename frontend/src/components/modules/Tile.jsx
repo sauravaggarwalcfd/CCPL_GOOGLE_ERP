@@ -7,7 +7,7 @@ export default function Tile({mod,M,A,fz,onClick,hov,onHov}){
       <div style={{fontSize:26,marginBottom:8}}>{mod.icon}</div>
       <div style={{fontSize:fz,fontWeight:900,color:M.textA,marginBottom:2}}>{mod.lbl}</div>
       <div style={{fontSize:fz-2,color:M.textC,marginBottom:10,lineHeight:1.4}}>{mod.desc}</div>
-      <div style={{display:"flex",gap:10,borderTop:`1px solid ${M.divider}`,paddingTop:8}}>
+      {mod.stats && <div style={{display:"flex",gap:10,borderTop:`1px solid ${M.divider}`,paddingTop:8}}>
         {mod.stats.pend>0&&<div style={{display:"flex",flexDirection:"column",gap:1}}>
           <span style={{fontSize:8,fontWeight:900,color:M.textD,letterSpacing:.5,textTransform:"uppercase"}}>Pending</span>
           <span style={{fontSize:13,fontWeight:900,color:"#ef4444",fontFamily:"'IBM Plex Mono',monospace"}}>{mod.stats.pend}</span>
@@ -20,7 +20,7 @@ export default function Tile({mod,M,A,fz,onClick,hov,onHov}){
           <span style={{fontSize:8,fontWeight:900,color:M.textD,letterSpacing:.5,textTransform:"uppercase"}}>Value</span>
           <span style={{fontSize:11,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace",color:hov?mod.col:M.textB,transition:"color .18s"}}>{mod.stats.val}</span>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

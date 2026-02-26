@@ -26,7 +26,7 @@ var CONFIG = {
     FILE_1A: '1eaDbKEJpty6c7_FrVm5wElOce_z4yHRMr3E-SAskdMc',
     FILE_1B: '1WjtpBhXwYVBVnPSDbzTWm8X0nyVhzsailBpRqXi7Se4',
     FILE_1C: '1t3zHrORAjZJ2cVr8bru4HE4kUvyYdm5RDICA8NkiDX8',
-    FILE_2:  'YOUR_FILE_2_SPREADSHEET_ID'
+    FILE_2:  '1KfeKzO-djdMn6YFSNOoyLeKOZfdcFCyHLzf7jpm6Pls'
   },
 
   // ===========================================================================
