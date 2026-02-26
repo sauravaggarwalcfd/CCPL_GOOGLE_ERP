@@ -411,6 +411,43 @@ export default function App(){
           <Procurement M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod === "masters" ? (
           <Masters M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
+        ) : actMod && actMod !== "dashboard" ? (
+          /* ── Placeholder for modules under development ── */
+          (() => {
+            const mod = mods.find(m => m.id === actMod);
+            return (
+              <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:M.bg}}>
+                <div style={{height:40,flexShrink:0,background:M.surfHigh,borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",padding:"0 14px",gap:8}}>
+                  <span style={{fontSize:fz,fontWeight:900,color:M.textA}}>{mod?.icon} {mod?.lbl || actMod}</span>
+                  <div style={{flex:1}}/>
+                  <button onClick={()=>setActMod(null)} style={{padding:"4px 10px",borderRadius:5,border:`1px solid ${M.divider}`,background:M.surfMid,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer",fontFamily:uff}}>Back to Home</button>
+                </div>
+                {apiError ? (
+                  <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{textAlign:"center",maxWidth:420,padding:40}}>
+                      <div style={{width:64,height:64,borderRadius:16,background:"#fef2f2",display:"flex",alignItems:"center",justifyContent:"center",fontSize:32,margin:"0 auto 20px",border:"1px solid #fecaca"}}>!</div>
+                      <div style={{fontSize:18,fontWeight:900,color:"#991b1b",marginBottom:8,fontFamily:uff}}>Connection Error</div>
+                      <div style={{fontSize:12,color:"#b91c1c",marginBottom:20,lineHeight:1.6,fontFamily:uff}}>{apiError}</div>
+                      <div style={{fontSize:11,color:M.textD,lineHeight:1.6,fontFamily:uff}}>Check that the GAS web app is deployed and VITE_GAS_URL is correct.</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                    <div style={{textAlign:"center",maxWidth:420,padding:40}}>
+                      <div style={{width:72,height:72,borderRadius:18,background:`${mod?.col || A.a}14`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:36,margin:"0 auto 20px",border:`1px solid ${mod?.col || A.a}30`}}>{mod?.icon || "🔧"}</div>
+                      <div style={{fontSize:20,fontWeight:900,color:M.textA,marginBottom:6,fontFamily:uff}}>{mod?.lbl || actMod}</div>
+                      <div style={{fontSize:12,color:M.textC,marginBottom:20,fontFamily:uff}}>{mod?.desc}</div>
+                      <div style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 24px",background:`${mod?.col || A.a}10`,border:`1px solid ${mod?.col || A.a}30`,borderRadius:10}}>
+                        <div style={{width:8,height:8,borderRadius:"50%",background:mod?.col || A.a,animation:"pulse 1.5s ease-in-out infinite"}}/>
+                        <span style={{fontSize:13,fontWeight:800,color:mod?.col || A.a,fontFamily:uff}}>Working on this module</span>
+                      </div>
+                      <div style={{marginTop:20,fontSize:11,color:M.textD,lineHeight:1.6,fontFamily:uff}}>This module is under active development and will be available soon.</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()
         ) : (
         <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:M.bg}}>
 
