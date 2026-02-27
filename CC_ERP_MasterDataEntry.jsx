@@ -632,6 +632,213 @@ function RecordsTab({master,M,A,fz,pyV,onLoad}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════
+//  BULK MASTER ENTRY  (Spreadsheet-style grid tab)
+// ═══════════════════════════════════════════════════════════════════════
+function BulkMasterEntry({master,M,A,fz,pyV,visibleCols}){
+  const [rows,setRows]           = useState(()=>(master.mockRecords||[]).map((r,i)=>({...r,_id:i})));
+  const [sortCol,setSortCol]     = useState(null);
+  const [sortDir,setSortDir]     = useState("asc");
+  const [editCell,setEditCell]   = useState(null);
+  const [selectedRows,setSelected]= useState(new Set());
+
+  const fields = visibleCols.map(c=>master.fields.find(f=>f.col===c)).filter(Boolean);
+
+  const TYPE_BADGE={
+    manual:  {bg:"#e0f2fe",tx:"#0369a1",label:"Manual"},
+    autocode:{bg:"#fff7ed",tx:"#c2410c",label:"Manual"},
+    text:    {bg:"#f1f5f9",tx:"#475569",label:"Text"},
+    textarea:{bg:"#f1f5f9",tx:"#475569",label:"Text"},
+    url:     {bg:"#dcfce7",tx:"#15803d",label:"URL"},
+    auto:    {bg:"#fff7ed",tx:"#c2410c",label:"Auto"},
+    calc:    {bg:"#faf5ff",tx:"#7c3aed",label:"∑ Calc"},
+    fk:      {bg:"#eff6ff",tx:"#2563eb",label:"FK"},
+    multifk: {bg:"#f5f3ff",tx:"#6d28d9",label:"Multi-FK"},
+    dropdown:{bg:"#f0fdf4",tx:"#15803d",label:"Select"},
+    number:  {bg:"#f8fafc",tx:"#475569",label:"Num"},
+    currency:{bg:"#fefce8",tx:"#a16207",label:"₹"},
+  };
+
+  const addRow=()=>setRows(prev=>[...prev,{_id:Date.now()}]);
+  const handleCell=(id,col,val)=>setRows(prev=>prev.map(r=>r._id===id?{...r,[col]:val}:r));
+  const toggleRow=(id)=>setSelected(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleAll=()=>setSelected(selectedRows.size===rows.length?new Set():new Set(rows.map(r=>r._id)));
+
+  const sorted=[...rows].sort((a,b)=>{
+    if(!sortCol)return 0;
+    const av=a[sortCol]||"",bv=b[sortCol]||"";
+    return sortDir==="asc"?av.localeCompare(bv):bv.localeCompare(av);
+  });
+
+  return(
+    <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
+
+      {/* ── Toolbar ── */}
+      <div style={{padding:"8px 14px",borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",gap:8,background:M.surfMid,flexShrink:0,flexWrap:"wrap"}}>
+        <button onClick={addRow} style={{display:"flex",alignItems:"center",gap:5,padding:"6px 14px",background:A.a,border:"none",borderRadius:5,color:"#fff",fontSize:11,fontWeight:900,cursor:"pointer"}}>
+          <span style={{fontSize:15,lineHeight:1}}>+</span> Add Row
+        </button>
+        <div style={{width:1,height:20,background:M.divider}}/>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          🔍 Filter
+        </button>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          ↕ Sort
+        </button>
+        <div style={{display:"flex",alignItems:"center",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,overflow:"hidden"}}>
+          <select style={{padding:"5px 26px 5px 10px",background:"transparent",border:"none",color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer",outline:"none",appearance:"none",WebkitAppearance:"none"}}>
+            <option value="">Group by...</option>
+            {fields.filter(f=>["fk","dropdown"].includes(f.type)).map(f=>(
+              <option key={f.col} value={f.col}>{f.h}</option>
+            ))}
+          </select>
+          <span style={{marginLeft:-22,pointerEvents:"none",fontSize:9,color:M.textD,paddingRight:8}}>▾</span>
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          ⊞ Columns
+        </button>
+        <div style={{flex:1}}/>
+        <span style={{fontSize:9,color:M.textD,fontFamily:"'IBM Plex Mono',monospace",whiteSpace:"nowrap"}}>{rows.length} rows · {master.cols} cols</span>
+      </div>
+
+      {/* ── Views bar ── */}
+      <div style={{padding:"5px 14px",borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",gap:8,background:M.surfHigh,flexShrink:0}}>
+        <span style={{fontSize:9,fontWeight:900,color:M.textD,letterSpacing:.8,textTransform:"uppercase"}}>VIEWS:</span>
+        <div style={{display:"flex",alignItems:"center",gap:0,background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:4,overflow:"hidden"}}>
+          <span style={{padding:"3px 10px",fontSize:9.5,fontWeight:900,color:"#dc2626",display:"flex",alignItems:"center",gap:5}}>
+            <span style={{width:8,height:8,borderRadius:"50%",background:"#dc2626",display:"inline-block",flexShrink:0}}/>
+            Default
+          </span>
+          <span style={{padding:"2px 8px",background:"#dc2626",color:"#fff",fontSize:7.5,fontWeight:900,letterSpacing:.8,lineHeight:"20px"}}>LOCKED</span>
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:4,padding:"3px 10px",background:M.inputBg,border:`1px dashed ${M.inputBd}`,borderRadius:4,color:M.textB,fontSize:9.5,fontWeight:700,cursor:"pointer"}}>
+          + Save View
+        </button>
+      </div>
+
+      {/* ── Spreadsheet Grid ── */}
+      <div style={{flex:1,overflow:"auto"}}>
+        <table style={{borderCollapse:"collapse",tableLayout:"fixed",minWidth:"100%"}}>
+          <colgroup>
+            <col style={{width:32}}/>
+            <col style={{width:36}}/>
+            {fields.map(f=>(
+              <col key={f.col} style={{width:
+                f.type==="url"||f.type==="multifk" ? 160 :
+                f.type==="textarea" ? 200 :
+                f.type==="manual"||f.type==="autocode" ? 120 :
+                f.type==="text"&&f.h.length>15 ? 180 :
+                150
+              }}/>
+            ))}
+          </colgroup>
+
+          {/* ── Column Headers ── */}
+          <thead style={{position:"sticky",top:0,zIndex:10}}>
+            <tr style={{background:M.tblHead}}>
+              {/* Checkbox */}
+              <th style={{padding:`${pyV}px 8px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                <div onClick={toggleAll} style={{width:15,height:15,borderRadius:3,border:`2px solid ${selectedRows.size===rows.length&&rows.length>0?A.a:M.inputBd}`,background:selectedRows.size===rows.length&&rows.length>0?A.a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .1s"}}>
+                  {selectedRows.size===rows.length&&rows.length>0&&<span style={{color:"#fff",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
+                </div>
+              </th>
+              {/* # */}
+              <th style={{padding:`${pyV}px 6px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,fontSize:9,fontWeight:900,color:M.textD,textAlign:"center"}}>#</th>
+              {/* Field headers */}
+              {fields.map((f,fi)=>{
+                const tb=TYPE_BADGE[f.type]||TYPE_BADGE.text;
+                const isSort=sortCol===f.col;
+                const isFirst=fi===0;
+                return(
+                  <th key={f.col}
+                    onClick={()=>{setSortCol(f.col);setSortDir(p=>isSort&&p==="asc"?"desc":"asc");}}
+                    style={{padding:`${pyV}px 8px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,textAlign:"left",cursor:"pointer",userSelect:"none",background:M.tblHead,whiteSpace:"nowrap"}}
+                    onMouseEnter={e=>e.currentTarget.style.background=M.hoverBg}
+                    onMouseLeave={e=>e.currentTarget.style.background=M.tblHead}>
+                    <div style={{display:"flex",alignItems:"center",gap:4}}>
+                      {f.req&&<span style={{color:"#ef4444",fontSize:8,fontWeight:900,flexShrink:0}}>⚠</span>}
+                      <span style={{fontSize:fz-2,fontWeight:700,color:isFirst?A.a:M.textA,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>{f.h}</span>
+                      <span style={{background:tb.bg,color:tb.tx,borderRadius:3,padding:"1px 5px",fontSize:7,fontWeight:900,whiteSpace:"nowrap",flexShrink:0,letterSpacing:.3}}>{tb.label}</span>
+                      <span style={{fontSize:9,color:isSort?A.a:M.textD,flexShrink:0}}>{isSort?(sortDir==="asc"?"↑":"↓"):"↕"}</span>
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+
+          {/* ── Rows ── */}
+          <tbody>
+            {sorted.map((row,i)=>(
+              <tr key={row._id}
+                style={{background:selectedRows.has(row._id)?A.al:i%2===0?M.tblEven:M.tblOdd,borderBottom:`1px solid ${M.divider}`}}
+                onMouseEnter={e=>{if(!selectedRows.has(row._id))e.currentTarget.style.background=M.hoverBg;}}
+                onMouseLeave={e=>{if(!selectedRows.has(row._id))e.currentTarget.style.background=i%2===0?M.tblEven:M.tblOdd;}}>
+                {/* Checkbox */}
+                <td style={{padding:`${pyV}px 8px`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                  <div onClick={()=>toggleRow(row._id)} style={{width:15,height:15,borderRadius:3,border:`2px solid ${selectedRows.has(row._id)?A.a:M.inputBd}`,background:selectedRows.has(row._id)?A.a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .1s"}}>
+                    {selectedRows.has(row._id)&&<span style={{color:"#fff",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
+                  </div>
+                </td>
+                {/* Row # */}
+                <td style={{padding:`${pyV}px 6px`,borderRight:`1px solid ${M.divider}`,fontFamily:"'IBM Plex Mono',monospace",fontSize:9,color:M.textD,textAlign:"center"}}>{String(i+1).padStart(2,"0")}</td>
+                {/* Data cells */}
+                {fields.map((f,fi)=>{
+                  const isAuto=f.auto||["calc","autocode"].includes(f.type);
+                  const val=row[f.col];
+                  const isEditing=editCell?.rowId===row._id&&editCell?.col===f.col;
+                  const isFirst=fi===0;
+                  return(
+                    <td key={f.col}
+                      onClick={()=>!isAuto&&setEditCell({rowId:row._id,col:f.col})}
+                      style={{padding:`${pyV-1}px 8px`,borderRight:`1px solid ${M.divider}`,cursor:isAuto?"default":"text",maxWidth:200,overflow:"hidden"}}>
+                      {isAuto?(
+                        <span style={{display:"inline-block",background:A.al,color:A.a,borderRadius:3,padding:"2px 8px",fontSize:fz-3,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace"}}>{val||"auto"}</span>
+                      ):isEditing?(
+                        <input autoFocus defaultValue={val||""}
+                          onBlur={e=>{handleCell(row._id,f.col,e.target.value);setEditCell(null);}}
+                          onKeyDown={e=>{if(e.key==="Enter"||e.key==="Escape"){handleCell(row._id,f.col,e.target.value);setEditCell(null);}}}
+                          style={{width:"100%",border:`1.5px solid ${A.a}`,borderRadius:3,padding:"2px 6px",fontSize:fz-2,outline:"none",background:M.inputBg,color:M.textA,fontFamily:["manual","autocode"].includes(f.type)?"'IBM Plex Mono',monospace":"inherit"}}/>
+                      ):val?(
+                        <span style={{fontSize:fz-2,color:isFirst?A.a:M.textA,fontWeight:isFirst?700:400,fontFamily:["manual","autocode"].includes(f.type)?"'IBM Plex Mono',monospace":"inherit",display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{val}</span>
+                      ):(
+                        <span style={{fontSize:fz-3,color:M.textD,fontStyle:"italic"}}>{f.req?"⚠ required":"—"}</span>
+                      )}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            {/* Add new row */}
+            <tr>
+              <td colSpan={fields.length+2} style={{padding:`${pyV}px 14px`,borderBottom:`1px solid ${M.divider}`}}>
+                <button onClick={addRow} style={{display:"flex",alignItems:"center",gap:5,background:"transparent",border:"none",color:M.textC,fontSize:11,fontWeight:700,cursor:"pointer",padding:"2px 0"}}>
+                  <span style={{fontSize:14,lineHeight:1,color:M.textC}}>+</span> Add new row
+                </button>
+              </td>
+            </tr>
+          </tbody>
+
+          {/* ── AGG Footer ── */}
+          <tfoot>
+            <tr style={{background:M.surfMid,borderTop:`2px solid ${M.divider}`}}>
+              <td style={{padding:`${pyV}px 8px`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                <span style={{fontSize:10,fontWeight:900,color:M.textD}}>Σ</span>
+              </td>
+              <td style={{padding:`${pyV}px 6px`,borderRight:`1px solid ${M.divider}`,fontSize:8,fontWeight:900,color:M.textD,textAlign:"center",whiteSpace:"nowrap"}}>AGG</td>
+              {fields.map(f=>(
+                <td key={f.col} style={{padding:`${pyV-1}px 4px`,borderRight:`1px solid ${M.divider}`}}>
+                  <button style={{fontSize:8.5,color:M.textD,background:"transparent",border:`1px dashed ${M.inputBd}`,borderRadius:3,padding:"2px 8px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>+ Calculate</button>
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
 //  VIEW BUILDER MODAL  (create / edit a view)
 // ═══════════════════════════════════════════════════════════════════════
 function ViewBuilder({master,editView,onSave,onCancel,M,A,fz}){
@@ -1002,9 +1209,10 @@ export default function App(){
   };
 
   const MAIN_TABS=[
-    {id:"entry",   label:"✍ Data Entry",  badge:isDirty?"●":null},
-    {id:"specs",   label:"📋 Field Specs", badge:`${master?.cols}`},
-    {id:"records", label:"📊 Records",     badge:`${(master?.mockRecords||[]).length}`},
+    {id:"entry",   label:"✍ Data Entry",       badge:isDirty?"●":null},
+    {id:"specs",   label:"📋 Field Specs",      badge:`${master?.cols}`},
+    {id:"records", label:"📊 Records",          badge:`${(master?.mockRecords||[]).length}`},
+    {id:"bulk",    label:"⚡ Bulk Master Entry", badge:null},
   ];
 
   const EntryFooter=()=>(
@@ -1205,6 +1413,7 @@ export default function App(){
             )}
             {mainTab==="specs"&&<SpecTable master={master} M={M} A={A} fz={fz} pyV={pyV} tblStyle={cfg.tblStyle}/>}
             {mainTab==="records"&&<RecordsTab master={master} M={M} A={A} fz={fz} pyV={pyV} onLoad={loadRecord}/>}
+            {mainTab==="bulk"&&<BulkMasterEntry master={master} M={M} A={A} fz={fz} pyV={pyV} visibleCols={visibleCols}/>}
           </div>
 
           {/* STATUS BAR */}
