@@ -64,13 +64,13 @@ var FK_MAX_DROPDOWN_ITEMS = 500;
 var FK_MULTI_SELECT_SEP = ', ';
 
 /** Cache key for parsed MASTER_RELATIONS data */
-var FK_RELATIONS_CACHE_KEY = CONFIG.CACHE.KEYS.MASTER_RELATIONS;
+var FK_RELATIONS_CACHE_KEY = 'CACHE_MASTER_RELATIONS';
 
 /** Data rows start at row 4 (rows 1-3: banner, header, description) */
-var FK_DATA_START_ROW = CONFIG.ROW_STRUCTURE.DATA_START_ROW;
+var FK_DATA_START_ROW = 4;
 
 /** Header row is row 2 */
-var FK_HEADER_ROW = CONFIG.ROW_STRUCTURE.HEADER_ROW;
+var FK_HEADER_ROW = 2;
 
 
 // ---------------------------------------------------------------------------

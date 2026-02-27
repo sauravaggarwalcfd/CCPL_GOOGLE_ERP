@@ -308,8 +308,8 @@ function setCacheData(sheetName, data) {
  * read from 1C and tag it as the single SUPPLIER_MASTER property.
  */
 function refreshCrossFileProperties() {
-  var file1bId = CONFIG.FILE_1B_ID;
-  var file1cId = CONFIG.FILE_1C_ID;
+  var file1bId = CONFIG.FILE_IDS.FILE_1B;
+  var file1cId = CONFIG.FILE_IDS.FILE_1C;
 
   // --- FILE 1C sheets (finance — authoritative for SUPPLIER_MASTER) ---
   for (var i = 0; i < CROSS_FILE_1C_SHEETS.length; i++) {
