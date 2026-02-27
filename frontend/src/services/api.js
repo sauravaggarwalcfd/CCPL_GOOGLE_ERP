@@ -95,6 +95,13 @@ const api = {
   getHelpContent: (role, module) => request('getHelpContent', { role, module }),
   searchHelp: (query, role) => request('searchHelp', { query, role }),
 
+  // Users & Roles
+  getUsers: () => request('getUsers'),
+  saveUser: (userData) => request('saveUser', userData),
+  updateUser: (userId, userData) => request('updateUser', { userId, ...userData }),
+  deleteUser: (userId) => request('deleteUser', { userId }),
+  updateUserPermissions: (userId, permissions) => request('updateUserPermissions', { userId, permissions }),
+
   // Dashboard
   getActivityFeed: () => request('getActivityFeed'),
   getDashboardStats: () => request('getDashboardStats'),

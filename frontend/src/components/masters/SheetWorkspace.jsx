@@ -3,6 +3,7 @@ import { SCHEMA_MAP } from '../../constants/masterSchemas';
 import { enrichSchema } from './helpers/enrichSchema';
 import { makeDefaultViews } from './helpers/viewDefaults';
 import DataEntryTab from './DataEntryTab';
+import BulkEntryTab from './BulkEntryTab';
 import FieldSpecsTab from './FieldSpecsTab';
 import RecordsTab from './RecordsTab';
 import ViewsBar from './ViewsBar';
@@ -31,9 +32,10 @@ const FALLBACK_SCHEMA = [
 ];
 
 const MAIN_TABS = [
-  { id: "entry",   label: "Data Entry",  icon: "✍" },
-  { id: "specs",   label: "Field Specs", icon: "📋" },
   { id: "records", label: "Records",     icon: "📊" },
+  { id: "entry",   label: "Data Entry",  icon: "✍" },
+  { id: "bulk",    label: "Bulk Entry",  icon: "📑" },
+  { id: "specs",   label: "Field Specs", icon: "📋" },
 ];
 
 /**
@@ -42,7 +44,7 @@ const MAIN_TABS = [
  */
 export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, dff, sheetCounts }) {
   // ── Tab state ──
-  const [mainTab, setMainTab] = useState("entry");
+  const [mainTab, setMainTab] = useState("records");
   const [entryMode, setEntryMode] = useState("form");
 
   // ── Entry form state ──
@@ -69,7 +71,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     setErrors({});
     setIsDirty(false);
     setActiveViewId(null);
-    setMainTab("entry");
+    setMainTab("records");
     // Initialize views for this sheet if not already done
     setViewsMap(prev => {
       if (prev[sheet.key]) return prev;
@@ -130,6 +132,26 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     setFormData({});
     setErrors({});
     setIsDirty(false);
+  };
+
+  // ── Bulk save handler ──
+  const handleBulkSave = async (rowsData) => {
+    setSaving(true);
+    let saved = 0;
+    try {
+      for (const row of rowsData) {
+        const rawRecord = mapSchemaToRaw(row, schema);
+        await api.saveMasterRecord(sheet.key, fileLabel, rawRecord, false);
+        saved++;
+      }
+      setToast(`${saved} record${saved > 1 ? "s" : ""} saved to sheet`);
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      setToast(`Saved ${saved} records. Error: ${err.message}`);
+      setTimeout(() => setToast(null), 5000);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── View CRUD ──
@@ -232,7 +254,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
                 display: "flex", alignItems: "center", gap: 6,
               }}>
                 <span style={{ fontSize: 11, fontWeight: active ? 900 : 700, color: active ? A.a : M.textC, fontFamily: uff }}>{t.icon} {t.label}</span>
-                {t.id === "entry" && isDirty && <span style={{ background: "#f59e0b", width: 6, height: 6, borderRadius: "50%" }} />}
+                {(t.id === "entry" || t.id === "bulk") && isDirty && <span style={{ background: "#f59e0b", width: 6, height: 6, borderRadius: "50%" }} />}
                 {t.id === "records" && (
                   <span style={{ background: active ? A.a : M.surfMid, color: active ? "#fff" : M.textD, borderRadius: 10, padding: "1px 6px", fontSize: 9, fontWeight: 900 }}>
                     {sheetCounts?.[sheet.key] ?? "—"}
@@ -283,7 +305,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
       </div>
 
       {/* ── Active View Banner ── */}
-      {currentView && mainTab === "entry" && (
+      {currentView && (mainTab === "entry" || mainTab === "bulk") && (
         <div style={{ padding: "5px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${M.divider}`, background: `${currentView.color}09`, flexShrink: 0 }}>
           <div style={{ width: 3, height: 14, background: currentView.color, borderRadius: 2, flexShrink: 0 }} />
           <span style={{ fontSize: 10, fontWeight: 900, color: currentView.color, fontFamily: uff }}>VIEW:</span>
@@ -297,8 +319,8 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         </div>
       )}
 
-      {/* ── Views Bar (Data Entry tab only) ── */}
-      {mainTab === "entry" && (
+      {/* ── Views Bar (Data Entry / Bulk Entry tab) ── */}
+      {(mainTab === "entry" || mainTab === "bulk") && (
         <ViewsBar
           views={currentViews}
           activeViewId={activeViewId}
@@ -322,6 +344,15 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
             visibleKeys={visibleKeys}
             onClear={handleClear}
             onSave={handleSave}
+            saving={saving}
+            M={M} A={A} uff={uff} dff={dff}
+          />
+        )}
+        {mainTab === "bulk" && (
+          <BulkEntryTab
+            enriched={enriched}
+            visibleKeys={visibleKeys}
+            onSaveBulk={handleBulkSave}
             saving={saving}
             M={M} A={A} uff={uff} dff={dff}
           />

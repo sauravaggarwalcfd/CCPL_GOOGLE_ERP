@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { uiFF, dataFF } from '../../constants/fonts';
+import api from '../../services/api';
 
 /* ─────────────────────────────────────────────────────────────────────────────
    CC ERP — USERS & ROLES  ·  CONCEPT 2 — PROFILE CARD GRID
@@ -577,7 +578,8 @@ function EditPanel({ user, users, onSave, onClose, M, A, uff, dff }) {
 export default function UsersPanel({ M, A, cfg, fz, dff }) {
   const uff = uiFF(cfg.uiFont);
 
-  const [users, setUsers]             = useState(INIT_USERS);
+  const [users, setUsers]             = useState([]);
+  const [loading, setLoading]         = useState(true);
   const [roleFilter, setRoleFilter]   = useState("All");
   const [search, setSearch]           = useState("");
   const [editUser, setEditUser]       = useState(null);  // null = closed, false = new, object = editing
@@ -590,29 +592,74 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
     setTimeout(() => setToast(null), 3000);
   };
 
+  // ── Fetch users from Google Sheet ──
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.getUsers();
+      if (data && Array.isArray(data) && data.length > 0) {
+        // Normalize data from Sheet: ensure arrays for permission fields
+        const normalized = data.map(u => ({
+          ...u,
+          customMods:   Array.isArray(u.customMods)   ? u.customMods   : u.customMods   ? String(u.customMods).split(",").map(s=>s.trim()).filter(Boolean) : [],
+          extraActions: Array.isArray(u.extraActions)  ? u.extraActions  : u.extraActions  ? String(u.extraActions).split(",").map(s=>s.trim()).filter(Boolean) : [],
+          deniedActions:Array.isArray(u.deniedActions) ? u.deniedActions : u.deniedActions ? String(u.deniedActions).split(",").map(s=>s.trim()).filter(Boolean) : [],
+          deniedFields: Array.isArray(u.deniedFields)  ? u.deniedFields  : u.deniedFields  ? String(u.deniedFields).split(",").map(s=>s.trim()).filter(Boolean) : [],
+          sessions:     Number(u.sessions) || 0,
+          initials:     u.initials || (u.name ? u.name.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase() : "??"),
+        }));
+        setUsers(normalized);
+      } else {
+        // Fallback to demo data if API returns empty
+        setUsers(INIT_USERS);
+      }
+    } catch (err) {
+      console.warn("Users API unavailable, using demo data:", err.message);
+      setUsers(INIT_USERS);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
   const filtered = users.filter(u => {
     const matchRole   = roleFilter === "All" || u.role === roleFilter;
     const matchSearch = !search || u.name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase());
     return matchRole && matchSearch;
   });
 
-  const handleSaveUser = (form) => {
+  const handleSaveUser = async (form) => {
     if (!form.name || !form.email) { showToast("Name and email are required", "error"); return; }
-    if (form.id) {
-      setUsers(us => us.map(u => u.id === form.id ? { ...u, ...form } : u));
-      showToast(`${form.name} updated successfully`);
-    } else {
-      const id = `USR-${String(users.length + 1).padStart(3,"0")}`;
-      setUsers(us => [...us, { ...form, id, sessions:0, lastLogin:"Never",
-        customMods:[], extraActions:[], deniedActions:[], deniedFields:[] }]);
-      showToast(`${form.name} added`);
+    try {
+      if (form.id) {
+        // Update existing user
+        await api.updateUser(form.id, form).catch(() => {});
+        setUsers(us => us.map(u => u.id === form.id ? { ...u, ...form } : u));
+        showToast(`${form.name} updated successfully`);
+      } else {
+        // Add new user
+        const id = `USR-${String(users.length + 1).padStart(3,"0")}`;
+        const newUser = { ...form, id, sessions:0, lastLogin:"Never",
+          customMods:[], extraActions:[], deniedActions:[], deniedFields:[] };
+        await api.saveUser(newUser).catch(() => {});
+        setUsers(us => [...us, newUser]);
+        showToast(`${form.name} added`);
+      }
+    } catch (err) {
+      showToast(`Error: ${err.message}`, "error");
     }
     setEditUser(null);
   };
 
-  const handleSavePerms = (draft) => {
-    setUsers(us => us.map(u => u.id === permUser.id ? { ...u, ...draft } : u));
-    showToast(`Permissions saved for ${permUser.name}`);
+  const handleSavePerms = async (draft) => {
+    try {
+      await api.updateUserPermissions(permUser.id, draft).catch(() => {});
+      setUsers(us => us.map(u => u.id === permUser.id ? { ...u, ...draft } : u));
+      showToast(`Permissions saved for ${permUser.name}`);
+    } catch (err) {
+      showToast(`Error: ${err.message}`, "error");
+    }
     setPermUser(null);
   };
 
@@ -671,6 +718,14 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
 
       {/* Card grid */}
       <div style={{ flex:1, overflow:"auto", padding:"20px 24px" }}>
+        {loading ? (
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", gap:12 }}>
+            <div style={{ fontSize:28, animation:"spin 1s linear infinite" }}>⏳</div>
+            <div style={{ fontSize:13, color:M.textC, fontFamily:uff, fontWeight:700 }}>Loading users from Google Sheet…</div>
+            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+          </div>
+        ) : (
+        <>
         <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:14 }}>
           {filtered.map(u => {
             const r         = ROLE_DEFS[u.role];
@@ -805,6 +860,8 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
             <div style={{ fontSize:40, marginBottom:12 }}>👥</div>
             <div style={{ fontSize:14, color:M.textC }}>No users match your filter</div>
           </div>
+        )}
+        </>
         )}
       </div>
 
