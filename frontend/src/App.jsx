@@ -10,6 +10,7 @@ import { Tile } from './components/modules';
 import { NotifPanel, CmdPalette, SettingsPanel } from './components/panels';
 import Procurement from './components/procurement/Procurement';
 import { Masters } from './components/masters';
+import { UsersPanel } from './components/users';
 import api from './services/api';
 
 export default function App(){
@@ -209,7 +210,7 @@ export default function App(){
         {/* Breadcrumb */}
         <div style={{display:"flex",alignItems:"center",gap:5,padding:"0 14px",flexShrink:0,fontSize:11}}>
           <span style={{color:A.a,fontWeight:700,cursor:"pointer"}} onClick={()=>setActMod(null)}>Home</span>
-          {actMod&&<><span style={{color:M.textD}}>›</span><span style={{color:actMod==="procurement"?A.a:M.textB,fontWeight:actMod==="procurement"?700:600,cursor:"pointer"}}>{mods.find(m=>m.id===actMod)?.lbl}</span></>}
+          {actMod&&<><span style={{color:M.textD}}>›</span><span style={{color:A.a,fontWeight:700,cursor:"pointer"}}>{actMod==="users"?"👥 Users & Roles":mods.find(m=>m.id===actMod)?.lbl}</span></>}
         </div>
 
         {/* Ctrl+K search pill */}
@@ -393,7 +394,7 @@ export default function App(){
 
             <div style={{height:1,background:M.divider,margin:"4px 10px"}}/>
             {[{icon:"⚙️",lbl:"Settings",fn:()=>setCfgOpen(true),act:cfgOpen},
-              {icon:"👥",lbl:"Users",    fn:()=>{},              act:false}].map((x,i)=>(
+              {icon:"👥",lbl:"Users",    fn:()=>setActMod("users"),act:actMod==="users"}].map((x,i)=>(
               <button key={i} onClick={x.fn} style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:9,padding:collapsed?"9px 0":"7px 12px",justifyContent:collapsed?"center":"flex-start",background:x.act?`${A.a}12`:"transparent",borderLeft:x.act?`3px solid ${A.a}`:"3px solid transparent",border:"none",cursor:"pointer",fontFamily:uff}}>
                 <span style={{fontSize:15}}>{x.icon}</span>
                 {!collapsed&&<span style={{fontSize:fz-1,fontWeight:700,color:M.textC}}>{x.lbl}</span>}
@@ -425,6 +426,8 @@ export default function App(){
           <Procurement M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod === "masters" ? (
           <Masters M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
+        ) : actMod === "users" ? (
+          <UsersPanel M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod && actMod !== "dashboard" ? (
           /* ── Placeholder for modules under development ── */
           (() => {

@@ -270,9 +270,9 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
                     <button key={v.id} onClick={() => setEntryMode(v.id)} style={{
                       padding: "4px 12px", border: "none", cursor: "pointer", fontSize: 9.5,
                       fontWeight: entryMode === v.id ? 900 : 700,
-                      background: entryMode === v.id ? A.a : "transparent",
+                      background: entryMode === v.id ? A.a : M.surfLow || M.bg,
                       color: entryMode === v.id ? "#fff" : M.textC,
-                      fontFamily: uff,
+                      fontFamily: uff, transition: "all .15s",
                     }}>{v.label}</button>
                   ))}
                 </div>

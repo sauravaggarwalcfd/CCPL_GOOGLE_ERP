@@ -1,5 +1,6 @@
 import { SCHEMA_MAP } from '../../../constants/masterSchemas';
 import { FIELD_META } from '../../../constants/masterFieldMeta';
+import { FK_DATA, DROPDOWN_OPTS } from '../../../constants/masterLookupData';
 
 const FALLBACK_SCHEMA = [
   { key: "code",     label: "Code",     w: "140px", mono: true, auto: true },
@@ -42,13 +43,29 @@ export function enrichSchema(sheetKey) {
   const enrichedFields = schema.map((field, i) => {
     const col = colLetter(i);
     const fm = meta?.fields?.[field.key] || {};
+    const fieldType = fm.fieldType || inferFieldType(field);
+
+    // Resolve dropdown options: from FIELD_META opts key → DROPDOWN_OPTS array
+    let resolvedOpts = null;
+    if (fm.opts && DROPDOWN_OPTS[fm.opts]) {
+      resolvedOpts = DROPDOWN_OPTS[fm.opts];
+    }
+
+    // Resolve FK lookup data
+    let fkData = null;
+    if (fm.fk && FK_DATA[fm.fk]) {
+      fkData = FK_DATA[fm.fk];
+    }
+
     return {
       ...field,
       col,
       ico: fm.ico || (field.auto ? '←' : field.required ? '⚠' : '—'),
       fk: fm.fk || null,
+      fkData,
       hint: fm.hint || field.header || `Enter ${field.label}`,
-      fieldType: fm.fieldType || inferFieldType(field),
+      fieldType,
+      opts: resolvedOpts,
     };
   });
 

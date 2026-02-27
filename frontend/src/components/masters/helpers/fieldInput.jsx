@@ -57,7 +57,7 @@ export function IcoCell({ ico, A }) {
 /**
  * Render a form input for an enriched field.
  * Props: { field, val, onChange, M, A, uff, dff, compact, hasError }
- *   field  — enriched field object from enrichSchema
+ *   field  — enriched field object from enrichSchema (includes fieldType, fk, fkData, opts)
  *   val    — current value
  *   onChange — (newVal) => void
  */
@@ -75,7 +75,8 @@ export function FieldInput({ field, val, onChange, M, A, uff, dff, compact, hasE
     background: isAuto ? A.al : M.inputBg,
     color: isAuto ? A.a : M.textA,
     fontFamily: f.mono ? (dff || "'IBM Plex Mono', monospace") : (uff || "'Nunito Sans', sans-serif"),
-    fontWeight: f.mono ? 700 : 400,
+    fontWeight: f.mono || f.fieldType === "manual" ? 700 : 400,
+    letterSpacing: f.fieldType === "manual" ? 1.5 : 0,
     cursor: isAuto ? "not-allowed" : "text",
     boxSizing: "border-box",
   };
@@ -105,7 +106,17 @@ export function FieldInput({ field, val, onChange, M, A, uff, dff, compact, hasE
     );
   }
 
-  // Select / dropdown
+  // Dropdown from enriched opts (FIELD_META → DROPDOWN_OPTS)
+  if (f.fieldType === "dropdown" && f.opts) {
+    return (
+      <select style={{ ...base, cursor: "pointer" }} value={val || ""} onChange={e => onChange(e.target.value)}>
+        <option value="">— select —</option>
+        {f.opts.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    );
+  }
+
+  // Select from base schema options (string array)
   if (f.type === "select" && f.options) {
     return (
       <select style={{ ...base, cursor: "pointer" }} value={val || ""} onChange={e => onChange(e.target.value)}>
@@ -115,7 +126,17 @@ export function FieldInput({ field, val, onChange, M, A, uff, dff, compact, hasE
     );
   }
 
-  // FK field (Phase 1: text input with FK label)
+  // FK field with lookup data → dropdown
+  if ((f.fieldType === "fk" || f.fieldType === "multifk") && f.fkData && f.fkData.length > 0) {
+    return (
+      <select style={{ ...base, cursor: "pointer" }} value={val || ""} onChange={e => onChange(e.target.value)}>
+        <option value="">— {f.fk || "select"} —</option>
+        {f.fkData.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+      </select>
+    );
+  }
+
+  // FK field without lookup data → text input with FK badge
   if (f.fk) {
     return (
       <div style={{ position: "relative" }}>
@@ -134,6 +155,20 @@ export function FieldInput({ field, val, onChange, M, A, uff, dff, compact, hasE
           FK
         </span>
       </div>
+    );
+  }
+
+  // Currency
+  if (f.fieldType === "currency") {
+    return (
+      <input
+        type="number"
+        step="0.01"
+        style={base}
+        value={val || ""}
+        onChange={e => onChange(e.target.value)}
+        placeholder="₹ 0.00"
+      />
     );
   }
 
