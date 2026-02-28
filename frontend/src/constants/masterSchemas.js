@@ -220,11 +220,15 @@ export const SCHEMA_RM_WOVEN = [
 ];
 
 export const SCHEMA_ITEM_CATEGORIES = [
-  { key:"l1",     header:"L1 Division",          label:"Division",    w:"140px", required:true },
-  { key:"l2",     header:"L2 Product Category",  label:"Category",    w:"1fr",   required:true },
-  { key:"l3",     header:"L3 Sub-Category",      label:"Sub-Cat",     w:"1fr" },
-  { key:"active", header:"Active",               label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",  header:"Notes",                label:"Notes",       w:"0",     hidden:true, type:"textarea" },
+  { key:"code",      header:"Category Code",       label:"Code",        w:"100px", mono:true, auto:true },
+  { key:"l1",        header:"L1 Division",          label:"Division",    w:"140px", required:true },
+  { key:"l2",        header:"L2 Type",              label:"Type",        w:"1fr",   required:true },
+  { key:"l3",        header:"L3 Style",             label:"Style",       w:"1fr",   required:true },
+  { key:"master",    header:"Item Master Sheet",    label:"Master",      w:"130px", required:true, type:"select", options:["ARTICLE","RM-FABRIC","RM-YARN","RM-WOVEN","TRIM","CONSUMABLE","PACKAGING"] },
+  { key:"hsn",       header:"Default HSN",          label:"HSN",         w:"80px" },
+  { key:"active",    header:"Active",               label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
+  { key:"remarks",   header:"Remarks",              label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"behavior",  header:"L1 Behavior",          label:"Behavior",    w:"90px",  auto:true },
 ];
 
 

@@ -7,12 +7,20 @@
 // ── FK Lookup Tables ──────────────────────────────────────────────────────────
 export const FK_DATA = {
   item_categories: [
-    { v: "TOPS-POLO", l: "Tops - Polo" },
-    { v: "TOPS-TEE",  l: "Tops - Tee" },
-    { v: "SWEAT",     l: "Sweatshirt" },
-    { v: "HOOD",      l: "Hoodie" },
-    { v: "TRACK",     l: "Tracksuit" },
-    { v: "BOTT-JOGGER", l: "Bottoms - Jogger" },
+    { v: "CAT-001", l: "CAT-001 — Pique Polo (Men's Apparel)" },
+    { v: "CAT-004", l: "CAT-004 — Round Neck Tee (Men's Apparel)" },
+    { v: "CAT-007", l: "CAT-007 — Hoodie (Men's Apparel)" },
+    { v: "CAT-010", l: "CAT-010 — Full Tracksuit (Men's Apparel)" },
+    { v: "CAT-013", l: "CAT-013 — Jogger (Men's Apparel)" },
+    { v: "CAT-015", l: "CAT-015 — Round Neck Tee (Women's Apparel)" },
+    { v: "CAT-019", l: "CAT-019 — Round Neck Tee (Kids Apparel)" },
+    { v: "CAT-030", l: "CAT-030 — Single Jersey (RM-FABRIC)" },
+    { v: "CAT-040", l: "CAT-040 — Cotton Combed (RM-YARN)" },
+    { v: "CAT-050", l: "CAT-050 — Fusible Interlining (RM-WOVEN)" },
+    { v: "CAT-060", l: "CAT-060 — Sewing Thread (TRIM)" },
+    { v: "CAT-064", l: "CAT-064 — Main Label (TRIM)" },
+    { v: "CAT-090", l: "CAT-090 — Reactive Dye (CONSUMABLE)" },
+    { v: "CAT-100", l: "CAT-100 — LDPE Polybag (PACKAGING)" },
   ],
   rm_fabric: [
     { v: "RM-FAB-001", l: "RM-FAB-001 — SJ 180GSM Cotton" },

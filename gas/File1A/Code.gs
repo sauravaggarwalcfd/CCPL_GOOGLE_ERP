@@ -171,6 +171,7 @@ function buildCustomMenu_(ui, role) {
     menu.addItem('📊 Setup All Triggers', 'menuSetupAllTriggers');
     menu.addItem('🗑️ Clear All Caches', 'menuClearAllCaches');
     menu.addItem('📋 View Change Log', 'menuViewChangeLog');
+    menu.addItem('🗂 Seed Item Categories', 'seedItemCategories');
     menu.addSeparator();
   }
 

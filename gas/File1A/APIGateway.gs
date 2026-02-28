@@ -140,7 +140,14 @@ var API_ROUTES = {
   // V7 — Help System (Module 15)
   // -------------------------------------------------------------------------
   'getHelpContent':       handleGetHelpContent,
-  'searchHelp':           handleSearchHelp
+  'searchHelp':           handleSearchHelp,
+
+  // -------------------------------------------------------------------------
+  // Item Categories (dedicated CRUD)
+  // -------------------------------------------------------------------------
+  'getAllCategories':      handleGetAllCategories,
+  'createCategory':       handleCreateCategory,
+  'updateCategory':       handleUpdateCategory
 };
 
 
@@ -1675,4 +1682,130 @@ function headerToKey_(header) {
     'remarks': 'remarks', 'notes': 'remarks'
   };
   return MAP[h] || h.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+}
+
+
+// =============================================================================
+// ITEM CATEGORIES — Dedicated CRUD Handlers
+// =============================================================================
+
+/**
+ * GET all categories from ITEM_CATEGORIES sheet.
+ * Params: { includeInactive: true|false }
+ */
+function handleGetAllCategories(params) {
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
+  var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
+  if (!sheet) return [];
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 4) return [];
+
+  var data = sheet.getRange(4, 1, lastRow - 3, 9).getValues();
+  var includeInactive = params && params.includeInactive;
+
+  var result = [];
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue; // skip empty rows
+    var active = String(row[6]).trim();
+    if (!includeInactive && active !== 'Yes') continue;
+    result.push({
+      code:     String(row[0]).trim(),
+      l1:       String(row[1]).trim(),
+      l2:       String(row[2]).trim(),
+      l3:       String(row[3]).trim(),
+      master:   String(row[4]).trim(),
+      hsn:      String(row[5]).trim(),
+      active:   active,
+      remarks:  String(row[7]).trim(),
+      behavior: String(row[8]).trim()
+    });
+  }
+  return result;
+}
+
+/**
+ * CREATE a new category row in ITEM_CATEGORIES.
+ * Params: { code, l1, l2, l3, master, hsn, active, remarks, behavior }
+ */
+function handleCreateCategory(params) {
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
+  var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
+  if (!sheet) throw new Error('ITEM_CATEGORIES sheet not found');
+
+  // Auto-generate code if not provided
+  var code = params.code;
+  if (!code) {
+    var lastRow = sheet.getLastRow();
+    var maxNum = 0;
+    if (lastRow >= 4) {
+      var codes = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+      for (var i = 0; i < codes.length; i++) {
+        var num = parseInt(String(codes[i][0]).replace('CAT-', ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    }
+    code = 'CAT-' + ('000' + (maxNum + 1)).slice(-3);
+  }
+
+  var newRow = [
+    code,
+    params.l1 || '',
+    params.l2 || '',
+    params.l3 || '',
+    params.master || '',
+    params.hsn || '',
+    params.active || 'Yes',
+    params.remarks || '',
+    params.behavior || ''
+  ];
+
+  sheet.appendRow(newRow);
+
+  // Invalidate cache
+  try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
+
+  return { saved: true, code: code, action: 'created' };
+}
+
+/**
+ * UPDATE an existing category row by catCode.
+ * Params: { catCode, l1, l2, l3, master, hsn, active, remarks, behavior }
+ */
+function handleUpdateCategory(params) {
+  var catCode = params.catCode;
+  if (!catCode) throw new Error('catCode is required');
+
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
+  var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
+  if (!sheet) throw new Error('ITEM_CATEGORIES sheet not found');
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 4) throw new Error('No data in sheet');
+
+  var codes = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+  var rowIndex = -1;
+  for (var i = 0; i < codes.length; i++) {
+    if (String(codes[i][0]).trim() === catCode) { rowIndex = i + 4; break; }
+  }
+  if (rowIndex === -1) throw new Error('Category not found: ' + catCode);
+
+  // Update fields (skip code in col 1)
+  var updates = [
+    params.l1 || '',
+    params.l2 || '',
+    params.l3 || '',
+    params.master || '',
+    params.hsn || '',
+    params.active || 'Yes',
+    params.remarks || '',
+    params.behavior || ''
+  ];
+  sheet.getRange(rowIndex, 2, 1, 8).setValues([updates]);
+
+  // Invalidate cache
+  try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
+
+  return { saved: true, code: catCode, action: 'updated' };
 }

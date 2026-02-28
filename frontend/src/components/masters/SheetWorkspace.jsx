@@ -10,6 +10,7 @@ import ViewsBar from './ViewsBar';
 import ViewBuilder from './ViewBuilder';
 import ViewsPanel from './ViewsPanel';
 import StatusBar from './StatusBar';
+import ItemCategoryTab from './ItemCategoryTab';
 import api from '../../services/api';
 
 // ── Mapping: raw → schema keys ──
@@ -212,6 +213,11 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     fk: enriched.fields.filter(f => f.fk).length,
     filled: Object.keys(formData).filter(k => formData[k]).length,
   };
+
+  // ── Dedicated UI for Item Categories ──
+  if (sheet.key === "item_categories") {
+    return <ItemCategoryTab M={M} A={A} uff={uff} dff={dff} />;
+  }
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>

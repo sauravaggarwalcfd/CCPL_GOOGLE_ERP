@@ -469,30 +469,164 @@ function setupPkgAttrValues_(ss) {
 function setupItemCategories_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.ITEM_CATEGORIES);
   var headers = [
-    'L1 Division', 'L2 Product Category', 'L3 Sub-Category', 'Active', 'Notes'
+    'Category Code', 'L1 Division', 'L2 Type', 'L3 Style',
+    'Item Master Sheet', 'Default HSN', 'Active', 'Remarks', 'L1 Behavior'
   ];
   var descriptions = [
-    'Top level: Apparel', 'Tops-Polo/Tee/Sweatshirt etc', 'Specific sub-type', 'Yes/No', 'Notes'
+    'AUTO. Format: CAT-001.',
+    'Fixed: Apparel / RM / Trim / Consumable / Packaging',
+    'Product family within L1.',
+    'Most specific level.',
+    'Which master. ARTICLE/RM-FABRIC/RM-YARN/RM-WOVEN/TRIM/CONSUMABLE/PACKAGING',
+    'Default HSN for items in this category.',
+    'Dropdown: Yes / No',
+    '',
+    'FIXED = auto-set per master. SELECTABLE = user picks (Apparel only).'
   ];
   applyStandardFormat_(sheet,
-    'CC ERP FILE 1A — ITEM_CATEGORIES — 3-Level Category Tree',
+    'CC ERP FILE 1A — ITEM_CATEGORIES — 3-Level Category Tree. L1 Division / L2 Type / L3 Style.',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  // Pre-populate categories
-  var catData = [
-    ['Apparel', 'Tops-Polo', 'Polo T-Shirt', 'Yes', ''],
-    ['Apparel', 'Tops-Tee', 'Round Neck T-Shirt', 'Yes', ''],
-    ['Apparel', 'Tops-Tee', 'V-Neck T-Shirt', 'Yes', ''],
-    ['Apparel', 'Sweatshirt', 'Crew Neck Sweatshirt', 'Yes', ''],
-    ['Apparel', 'Sweatshirt', 'Hoodie', 'Yes', ''],
-    ['Apparel', 'Tracksuit', 'Tracksuit Set', 'Yes', ''],
-    ['Apparel', 'Tracksuit', 'Track Pants', 'Yes', ''],
-    ['Apparel', 'Bottoms', 'Jogger', 'Yes', ''],
-    ['Apparel', 'Bottoms', 'Shorts', 'Yes', '']
-  ];
+  // Pre-populate full category seed data (from CC_ERP_Masters_V8_updated.xlsx)
+  var catData = getItemCategorySeedData_();
   if (sheet.getLastRow() < 4) {
     sheet.getRange(4, 1, catData.length, catData[0].length).setValues(catData);
   }
+
+  // Data validations
+  var lastRow = Math.max(sheet.getLastRow(), 100);
+  // Active column (G) dropdown
+  var activeRule = SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No'], true).build();
+  sheet.getRange(4, 7, lastRow - 3, 1).setDataValidation(activeRule);
+  // Master column (E) dropdown
+  var masterRule = SpreadsheetApp.newDataValidation()
+    .requireValueInList(['ARTICLE', 'RM-FABRIC', 'RM-YARN', 'RM-WOVEN', 'TRIM', 'CONSUMABLE', 'PACKAGING'], true).build();
+  sheet.getRange(4, 5, lastRow - 3, 1).setDataValidation(masterRule);
+  // Behavior column (I) dropdown
+  var behaviorRule = SpreadsheetApp.newDataValidation().requireValueInList(['FIXED', 'SELECTABLE'], true).build();
+  sheet.getRange(4, 9, lastRow - 3, 1).setDataValidation(behaviorRule);
+}
+
+/**
+ * Returns the full 83-row seed data array for ITEM_CATEGORIES.
+ * Columns: Code, L1, L2, L3, Master, HSN, Active, Remarks, Behavior
+ * Can also be called standalone to re-seed the sheet.
+ */
+function getItemCategorySeedData_() {
+  return [
+    // ── ARTICLE — SELECTABLE L1 ──
+    ['CAT-001', "Men's Apparel", 'Tops - Polo', 'Pique Polo', 'ARTICLE', '6105', 'Yes', 'Classic polo', 'SELECTABLE'],
+    ['CAT-002', "Men's Apparel", 'Tops - Polo', 'Autostriper Polo', 'ARTICLE', '6105', 'Yes', '', 'SELECTABLE'],
+    ['CAT-003', "Men's Apparel", 'Tops - Polo', 'Jacquard Polo', 'ARTICLE', '6105', 'Yes', '', 'SELECTABLE'],
+    ['CAT-004', "Men's Apparel", 'Tops - Tee', 'Round Neck Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-005', "Men's Apparel", 'Tops - Tee', 'V-Neck Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-006', "Men's Apparel", 'Tops - Tee', 'Henley Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-007', "Men's Apparel", 'Sweatshirt', 'Hoodie', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    ['CAT-008', "Men's Apparel", 'Sweatshirt', 'Crew Neck Sweatshirt', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    ['CAT-009', "Men's Apparel", 'Sweatshirt', 'Quarter Zip', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    ['CAT-010', "Men's Apparel", 'Tracksuit', 'Full Tracksuit', 'ARTICLE', '6112', 'Yes', '', 'SELECTABLE'],
+    ['CAT-011', "Men's Apparel", 'Tracksuit', 'Track Jacket', 'ARTICLE', '6112', 'Yes', '', 'SELECTABLE'],
+    ['CAT-012', "Men's Apparel", 'Tracksuit', 'Track Pant', 'ARTICLE', '6112', 'Yes', '', 'SELECTABLE'],
+    ['CAT-013', "Men's Apparel", 'Bottoms', 'Jogger', 'ARTICLE', '6103', 'Yes', '', 'SELECTABLE'],
+    ['CAT-014', "Men's Apparel", 'Bottoms', 'Shorts', 'ARTICLE', '6103', 'Yes', '', 'SELECTABLE'],
+    ['CAT-015', "Women's Apparel", 'Tops - Tee', 'Round Neck Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-016', "Women's Apparel", 'Tops - Tee', 'Crop Top', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-017', "Women's Apparel", 'Sweatshirt', 'Hoodie', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    ['CAT-018', "Women's Apparel", 'Bottoms', 'Jogger', 'ARTICLE', '6103', 'Yes', '', 'SELECTABLE'],
+    ['CAT-019', 'Kids Apparel', 'Tops - Tee', 'Round Neck Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-020', 'Kids Apparel', 'Sweatshirt', 'Hoodie', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    ['CAT-021', 'Unisex Apparel', 'Tops - Tee', 'Oversized Tee', 'ARTICLE', '6109', 'Yes', '', 'SELECTABLE'],
+    ['CAT-022', 'Unisex Apparel', 'Sweatshirt', 'Hoodie', 'ARTICLE', '6110', 'Yes', '', 'SELECTABLE'],
+    // ── RM-FABRIC — FIXED L1 ──
+    ['CAT-030', 'Raw Material', 'Knit Fabric', 'Single Jersey', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-031', 'Raw Material', 'Knit Fabric', 'Pique', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-032', 'Raw Material', 'Knit Fabric', 'Fleece', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-033', 'Raw Material', 'Knit Fabric', 'French Terry', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-034', 'Raw Material', 'Knit Fabric', 'Rib', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-035', 'Raw Material', 'Knit Fabric', 'Interlock', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    ['CAT-036', 'Raw Material', 'Knit Fabric', 'Lycra Jersey', 'RM-FABRIC', '6006', 'Yes', '', 'FIXED'],
+    // ── RM-YARN — FIXED L1 ──
+    ['CAT-040', 'Raw Material', 'Yarn', 'Cotton Combed', 'RM-YARN', '5205', 'Yes', '', 'FIXED'],
+    ['CAT-041', 'Raw Material', 'Yarn', 'Cotton Carded', 'RM-YARN', '5205', 'Yes', '', 'FIXED'],
+    ['CAT-042', 'Raw Material', 'Yarn', 'Polyester', 'RM-YARN', '5402', 'Yes', '', 'FIXED'],
+    ['CAT-043', 'Raw Material', 'Yarn', 'PC Blend', 'RM-YARN', '5205', 'Yes', '', 'FIXED'],
+    ['CAT-044', 'Raw Material', 'Yarn', 'Viscose', 'RM-YARN', '5510', 'Yes', '', 'FIXED'],
+    ['CAT-045', 'Raw Material', 'Yarn', 'Melange', 'RM-YARN', '5205', 'Yes', '', 'FIXED'],
+    // ── RM-WOVEN — FIXED L1 ──
+    ['CAT-050', 'Raw Material', 'Woven / Interlining', 'Fusible Interlining', 'RM-WOVEN', '5903', 'Yes', '', 'FIXED'],
+    ['CAT-051', 'Raw Material', 'Woven / Interlining', 'Non-Fusible Interlining', 'RM-WOVEN', '5903', 'Yes', '', 'FIXED'],
+    ['CAT-052', 'Raw Material', 'Woven / Interlining', 'Woven Fabric', 'RM-WOVEN', '5208', 'Yes', '', 'FIXED'],
+    // ── TRIM — FIXED L1 ──
+    ['CAT-060', 'Trim', 'Thread', 'Sewing Thread', 'TRIM', '5204', 'Yes', '', 'FIXED'],
+    ['CAT-061', 'Trim', 'Thread', 'Overlock Thread', 'TRIM', '5204', 'Yes', '', 'FIXED'],
+    ['CAT-062', 'Trim', 'Thread', 'Embroidery Thread', 'TRIM', '5204', 'Yes', '', 'FIXED'],
+    ['CAT-063', 'Trim', 'Thread', 'Tacking Thread', 'TRIM', '5204', 'Yes', '', 'FIXED'],
+    ['CAT-064', 'Trim', 'Label', 'Main Label', 'TRIM', '5807', 'Yes', '', 'FIXED'],
+    ['CAT-065', 'Trim', 'Label', 'Care Label', 'TRIM', '5807', 'Yes', '', 'FIXED'],
+    ['CAT-066', 'Trim', 'Label', 'Size Label', 'TRIM', '5807', 'Yes', '', 'FIXED'],
+    ['CAT-067', 'Trim', 'Label', 'Hang Tag', 'TRIM', '5807', 'Yes', '', 'FIXED'],
+    ['CAT-068', 'Trim', 'Label', 'Badge', 'TRIM', '5807', 'Yes', 'Sub-category under LBL', 'FIXED'],
+    ['CAT-069', 'Trim', 'Elastic', 'Crochet Elastic', 'TRIM', '5604', 'Yes', '', 'FIXED'],
+    ['CAT-070', 'Trim', 'Elastic', 'Knitted Elastic', 'TRIM', '5604', 'Yes', '', 'FIXED'],
+    ['CAT-071', 'Trim', 'Elastic', 'Flat Elastic', 'TRIM', '5604', 'Yes', '', 'FIXED'],
+    ['CAT-072', 'Trim', 'Zipper', 'Dress Zipper', 'TRIM', '9607', 'Yes', '', 'FIXED'],
+    ['CAT-073', 'Trim', 'Zipper', 'Open-End Zipper', 'TRIM', '9607', 'Yes', '', 'FIXED'],
+    ['CAT-074', 'Trim', 'Zipper', 'Invisible Zipper', 'TRIM', '9607', 'Yes', '', 'FIXED'],
+    ['CAT-075', 'Trim', 'Button', 'Flat Button', 'TRIM', '9606', 'Yes', '', 'FIXED'],
+    ['CAT-076', 'Trim', 'Button', 'Snap Button', 'TRIM', '9606', 'Yes', '', 'FIXED'],
+    ['CAT-077', 'Trim', 'Button', 'Shank Button', 'TRIM', '9606', 'Yes', '', 'FIXED'],
+    ['CAT-078', 'Trim', 'Tape', 'Twill Tape', 'TRIM', '5806', 'Yes', '', 'FIXED'],
+    ['CAT-079', 'Trim', 'Tape', 'Herringbone Tape', 'TRIM', '5806', 'Yes', '', 'FIXED'],
+    ['CAT-080', 'Trim', 'Drawcord', 'Flat Drawcord', 'TRIM', '5604', 'Yes', '', 'FIXED'],
+    ['CAT-081', 'Trim', 'Drawcord', 'Round Drawcord', 'TRIM', '5604', 'Yes', '', 'FIXED'],
+    ['CAT-082', 'Trim', 'Velcro', 'Sew-On Velcro', 'TRIM', '5806', 'Yes', '', 'FIXED'],
+    ['CAT-083', 'Trim', 'Rivet / Eyelet', 'Metal Rivet', 'TRIM', '8308', 'Yes', '', 'FIXED'],
+    ['CAT-084', 'Trim', 'Rivet / Eyelet', 'Brass Eyelet', 'TRIM', '8308', 'Yes', '', 'FIXED'],
+    ['CAT-085', 'Trim', 'Neck / Shoulder Tape', 'Neck Tape', 'TRIM', '5806', 'Yes', '', 'FIXED'],
+    ['CAT-086', 'Trim', 'Other', 'Other Trim', 'TRIM', '6307', 'Yes', '', 'FIXED'],
+    // ── CONSUMABLE — FIXED L1 ──
+    ['CAT-090', 'Consumable', 'Dye', 'Reactive Dye', 'CONSUMABLE', '3204', 'Yes', '', 'FIXED'],
+    ['CAT-091', 'Consumable', 'Dye', 'Disperse Dye', 'CONSUMABLE', '3204', 'Yes', '', 'FIXED'],
+    ['CAT-092', 'Consumable', 'Dye', 'Pigment Dye', 'CONSUMABLE', '3204', 'Yes', '', 'FIXED'],
+    ['CAT-093', 'Consumable', 'Chemical', 'Softener', 'CONSUMABLE', '3402', 'Yes', '', 'FIXED'],
+    ['CAT-094', 'Consumable', 'Chemical', 'Fixing Agent', 'CONSUMABLE', '3402', 'Yes', '', 'FIXED'],
+    ['CAT-095', 'Consumable', 'Chemical', 'Levelling Agent', 'CONSUMABLE', '3402', 'Yes', '', 'FIXED'],
+    ['CAT-096', 'Consumable', 'Needle', 'Knitting Needle', 'CONSUMABLE', '7319', 'Yes', '', 'FIXED'],
+    ['CAT-097', 'Consumable', 'Needle', 'Sewing Needle', 'CONSUMABLE', '7319', 'Yes', '', 'FIXED'],
+    ['CAT-098', 'Consumable', 'Oil', 'Machine Oil', 'CONSUMABLE', '2710', 'Yes', '', 'FIXED'],
+    ['CAT-099', 'Consumable', 'Other', 'Other Consumable', 'CONSUMABLE', '6307', 'Yes', '', 'FIXED'],
+    // ── PACKAGING — FIXED L1 ──
+    ['CAT-100', 'Packaging', 'Polybag', 'LDPE Polybag', 'PACKAGING', '3923', 'Yes', '', 'FIXED'],
+    ['CAT-101', 'Packaging', 'Polybag', 'HM Polybag', 'PACKAGING', '3923', 'Yes', '', 'FIXED'],
+    ['CAT-102', 'Packaging', 'Carton', 'Single Wall Carton', 'PACKAGING', '4819', 'Yes', '', 'FIXED'],
+    ['CAT-103', 'Packaging', 'Carton', 'Double Wall Carton', 'PACKAGING', '4819', 'Yes', '', 'FIXED'],
+    ['CAT-104', 'Packaging', 'Hanger', 'Plastic Hanger', 'PACKAGING', '3926', 'Yes', '', 'FIXED'],
+    ['CAT-105', 'Packaging', 'Ticket / Tag', 'Price Ticket', 'PACKAGING', '4821', 'Yes', '', 'FIXED'],
+    ['CAT-106', 'Packaging', 'Ticket / Tag', 'Barcode Label', 'PACKAGING', '4821', 'Yes', '', 'FIXED'],
+    ['CAT-107', 'Packaging', 'Other', 'Tissue Paper', 'PACKAGING', '4818', 'Yes', '', 'FIXED'],
+  ];
+}
+
+/**
+ * Standalone function to re-seed ITEM_CATEGORIES sheet.
+ * Run this from Apps Script menu: CC ERP > Seed Item Categories
+ * Clears existing data (rows 4+) and writes fresh seed data.
+ */
+function seedItemCategories() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
+  if (!sheet) {
+    SpreadsheetApp.getUi().alert('ITEM_CATEGORIES sheet not found. Run full setup first.');
+    return;
+  }
+  // Clear old data (keep rows 1-3: banner, headers, descriptions)
+  var lastRow = sheet.getLastRow();
+  if (lastRow >= 4) {
+    sheet.getRange(4, 1, lastRow - 3, sheet.getLastColumn()).clearContent();
+  }
+  var catData = getItemCategorySeedData_();
+  sheet.getRange(4, 1, catData.length, catData[0].length).setValues(catData);
+  SpreadsheetApp.getUi().alert('Seeded ' + catData.length + ' item categories (CAT-001 to CAT-107).');
 }
 
 /* ── 15. UOM_MASTER ── */
