@@ -305,7 +305,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
       </div>
 
       {/* ── Active View Banner ── */}
-      {currentView && (mainTab === "entry" || mainTab === "bulk") && (
+      {currentView && mainTab === "entry" && (
         <div style={{ padding: "5px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${M.divider}`, background: `${currentView.color}09`, flexShrink: 0 }}>
           <div style={{ width: 3, height: 14, background: currentView.color, borderRadius: 2, flexShrink: 0 }} />
           <span style={{ fontSize: 10, fontWeight: 900, color: currentView.color, fontFamily: uff }}>VIEW:</span>
@@ -319,8 +319,8 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         </div>
       )}
 
-      {/* ── Views Bar (Data Entry / Bulk Entry tab) ── */}
-      {(mainTab === "entry" || mainTab === "bulk") && (
+      {/* ── Views Bar (Data Entry tab only — Bulk tab has its own views) ── */}
+      {mainTab === "entry" && (
         <ViewsBar
           views={currentViews}
           activeViewId={activeViewId}
@@ -351,7 +351,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         {mainTab === "bulk" && (
           <BulkEntryTab
             enriched={enriched}
-            visibleKeys={visibleKeys}
+            sheet={sheet}
             onSaveBulk={handleBulkSave}
             saving={saving}
             M={M} A={A} uff={uff} dff={dff}
