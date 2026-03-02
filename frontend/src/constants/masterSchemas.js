@@ -18,7 +18,7 @@
 // ─── FILE 1A — Items ─────────────────────────────────────────────────────────
 
 export const SCHEMA_ARTICLE_MASTER = [
-  { key:"code",       header:"🔑 Article Code",         label:"Article Code",  w:"130px", mono:true, auto:true },
+  { key:"code",       header:"🔑 Article Code",         label:"Article Code",  w:"130px", mono:true, required:true },
   { key:"desc",       header:"Article Description",     label:"Description",   w:"1fr",   required:true },
   { key:"shortName",  header:"Short Name",              label:"Short Name",    w:"110px" },
   { key:"imageLink",  header:"IMAGE LINK",              label:"Image Link",    w:"0",     hidden:true },
@@ -26,6 +26,7 @@ export const SCHEMA_ARTICLE_MASTER = [
   { key:"buyerStyle", header:"Buyer Style No",          label:"Buyer Style",   w:"110px" },
   { key:"l1Division", header:"L1 Division",             label:"Division",      w:"100px" },
   { key:"l2Category", header:"L2 Product Category",     label:"Category",      w:"120px" },
+  { key:"l3Style",    header:"L3 Style",                label:"Style",         w:"110px" },
   { key:"season",     header:"Season",                  label:"Season",        w:"80px" },
   { key:"gender",     header:"Gender",                  label:"Gender",        w:"70px",  type:"select", options:["Men","Women","Unisex","Kids"] },
   { key:"fitType",    header:"Fit Type",                label:"Fit",           w:"80px" },

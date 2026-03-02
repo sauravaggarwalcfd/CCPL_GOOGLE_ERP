@@ -508,9 +508,9 @@ function handleCodeGeneration(e) {
         return;
       }
 
-      // Check for duplicate article codes
+      // Check for duplicate article codes (exclude current row to avoid self-match)
       var normalizedCode = enteredCode.toString().trim();
-      if (codeExistsInSheet_(sheet, normalizedCode)) {
+      if (codeExistsInSheet_(sheet, normalizedCode, editedRow)) {
         SpreadsheetApp.getUi().alert(
           'Duplicate Article Code\n\n' +
           'Code "' + normalizedCode + '" already exists in ARTICLE_MASTER.\n' +
@@ -708,12 +708,13 @@ function getDigitCount_(sheetName) {
  * Checks if a specific code already exists in column A of the sheet.
  * Used for duplicate detection on both auto-generated and manual codes.
  *
- * @param {Sheet}  sheet - The Google Sheet object.
- * @param {string} code  - The code to search for.
- * @return {boolean}     - True if the code already exists.
+ * @param {Sheet}  sheet      - The Google Sheet object.
+ * @param {string} code       - The code to search for.
+ * @param {number} excludeRow - Optional row number to skip (the row being edited).
+ * @return {boolean}          - True if the code already exists in another row.
  * @private
  */
-function codeExistsInSheet_(sheet, code) {
+function codeExistsInSheet_(sheet, code, excludeRow) {
   var lastRow = sheet.getLastRow();
   if (lastRow < DATA_START_ROW) {
     return false;
@@ -724,6 +725,11 @@ function codeExistsInSheet_(sheet, code) {
   var normalizedCode = code.toString().trim().toUpperCase();
 
   for (var i = 0; i < codeValues.length; i++) {
+    var rowNum = DATA_START_ROW + i;
+    // Skip the row currently being edited to avoid self-match
+    if (excludeRow && rowNum === excludeRow) {
+      continue;
+    }
     var cellValue = codeValues[i][0];
     if (cellValue !== '' && cellValue !== null && cellValue !== undefined) {
       if (cellValue.toString().trim().toUpperCase() === normalizedCode) {

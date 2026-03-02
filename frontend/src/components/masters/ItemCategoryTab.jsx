@@ -26,7 +26,7 @@ function toM(M) {
 }
 
 // ─── L1 HIERARCHY DEFINITION (single source of truth) ───
-const CATEGORY_HIERARCHY = {
+export const CATEGORY_HIERARCHY = {
   "ARTICLE": {
     l1Behavior: "SELECTABLE",
     l1Options: ["Men's Apparel", "Women's Apparel", "Kids Apparel", "Unisex Apparel"],
@@ -115,10 +115,9 @@ const CATEGORY_HIERARCHY = {
   },
 };
 
-const MASTER_OPTIONS = Object.keys(CATEGORY_HIERARCHY).map(k => ({ v: k, l: `${CATEGORY_HIERARCHY[k].icon} ${k}` }));
-
 // ─── Full seed data from ITEM_CATEGORIES sheet (xlsx) ───
-const SEED_DATA = [
+// Exported so other components (e.g. ArticleMasterTab) can derive dropdowns from it
+export const SEED_DATA = [
   { code:"CAT-001", l1:"Men's Apparel", l2:"Tops - Polo", l3:"Pique Polo", master:"ARTICLE", hsn:"6105", active:"Yes", remarks:"Classic polo", behavior:"SELECTABLE" },
   { code:"CAT-002", l1:"Men's Apparel", l2:"Tops - Polo", l3:"Autostriper Polo", master:"ARTICLE", hsn:"6105", active:"Yes", remarks:"", behavior:"SELECTABLE" },
   { code:"CAT-003", l1:"Men's Apparel", l2:"Tops - Polo", l3:"Jacquard Polo", master:"ARTICLE", hsn:"6105", active:"Yes", remarks:"", behavior:"SELECTABLE" },
@@ -203,6 +202,47 @@ const SEED_DATA = [
   { code:"CAT-106", l1:"Packaging", l2:"Ticket / Tag", l3:"Barcode Label", master:"PACKAGING", hsn:"4821", active:"Yes", remarks:"", behavior:"FIXED" },
   { code:"CAT-107", l1:"Packaging", l2:"Other", l3:"Tissue Paper", master:"PACKAGING", hsn:"4818", active:"Yes", remarks:"", behavior:"FIXED" },
 ];
+
+// ─── Build CATEGORY_HIERARCHY options from SEED_DATA (ITEM_CATEGORIES sheet) ───
+// This ensures dropdowns always match the sheet data instead of being hardcoded separately.
+(function _syncHierarchyFromSeed() {
+  for (const masterKey of Object.keys(CATEGORY_HIERARCHY)) {
+    const h = CATEGORY_HIERARCHY[masterKey];
+    const cats = SEED_DATA.filter(c => c.master === masterKey && c.active === "Yes");
+    if (!cats.length) continue;
+
+    // Rebuild l1Options from seed (only for SELECTABLE masters)
+    if (h.l1Behavior === "SELECTABLE") {
+      h.l1Options = [...new Set(cats.map(c => c.l1))];
+    }
+
+    // Rebuild l2Options from seed
+    const l2Map = {};
+    for (const c of cats) {
+      const l1Key = h.l1Behavior === "FIXED" ? h.l1Fixed : c.l1;
+      if (!l2Map[l1Key]) l2Map[l1Key] = [];
+      if (!l2Map[l1Key].includes(c.l2)) l2Map[l1Key].push(c.l2);
+    }
+    h.l2Options = l2Map;
+
+    // Rebuild l3Options from seed
+    const l3Map = {};
+    for (const c of cats) {
+      if (!l3Map[c.l2]) l3Map[c.l2] = [];
+      if (!l3Map[c.l2].includes(c.l3)) l3Map[c.l2].push(c.l3);
+    }
+    h.l3Options = l3Map;
+
+    // Rebuild defaultHSN from seed (first HSN per L2)
+    const hsnMap = {};
+    for (const c of cats) {
+      if (c.hsn && !hsnMap[c.l2]) hsnMap[c.l2] = c.hsn;
+    }
+    h.defaultHSN = hsnMap;
+  }
+})();
+
+const MASTER_OPTIONS = Object.keys(CATEGORY_HIERARCHY).map(k => ({ v: k, l: `${CATEGORY_HIERARCHY[k].icon} ${k}` }));
 
 // ─── CC_RED + Toast colours ───
 const CC_RED = '#CC0000';

@@ -7,7 +7,10 @@
       "Bash(npx vite build --mode development)",
       "Bash(npm run build)",
       "Bash(ls \"e:\\\\Lenovo\\\\Documents\\\\GitHub\\\\CCPL_GOOGLE_ERP\\\\frontend\\\\src\\\\components\\\\masters\"\" 2>/dev/null || ls \"e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/components/masters/ \")",
-      "Bash(node_modules/.bin/vite build)"
+      "Bash(node_modules/.bin/vite build)",
+      "Bash(find /workspaces/CCPL_GOOGLE_ERP/gas/File1A -name \"*.gs\" -type f -exec wc -l {} ;)",
+      "Bash(wc:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }

@@ -28,19 +28,19 @@ const DIVISION_META = {
   "Unisex Apparel":  { color: "#0078D4", icon: "👕" },
 };
 
-const DIVISIONS = ["Men's Apparel", "Women's Apparel", "Kids Apparel", "Unisex Apparel"];
+// ─── Derive DIVISIONS, L2_BY_DIV, L2_HSN from ITEM_CATEGORIES seed data ───
+import { SEED_DATA as CAT_SEED } from './ItemCategoryTab';
 
-const L2_BY_DIV = {
-  "Men's Apparel":   ["Tops - Polo", "Tops - Tee", "Sweatshirt", "Tracksuit", "Bottoms"],
-  "Women's Apparel": ["Tops - Tee", "Sweatshirt", "Bottoms"],
-  "Kids Apparel":    ["Tops - Tee", "Sweatshirt"],
-  "Unisex Apparel":  ["Tops - Tee", "Sweatshirt"],
-};
-
-const L2_HSN = {
-  "Tops - Polo": "6105", "Tops - Tee": "6109",
-  "Sweatshirt":  "6110", "Tracksuit":  "6112", "Bottoms": "6103",
-};
+// Build from ARTICLE categories in SEED_DATA (single source of truth = ITEM_CATEGORIES sheet)
+const _articleCats = CAT_SEED.filter(c => c.master === "ARTICLE" && c.active === "Yes");
+const DIVISIONS = [...new Set(_articleCats.map(c => c.l1))];
+const L2_BY_DIV = {};
+const L2_HSN = {};
+for (const c of _articleCats) {
+  if (!L2_BY_DIV[c.l1]) L2_BY_DIV[c.l1] = [];
+  if (!L2_BY_DIV[c.l1].includes(c.l2)) L2_BY_DIV[c.l1].push(c.l2);
+  if (c.hsn && !L2_HSN[c.l2]) L2_HSN[c.l2] = c.hsn;
+}
 
 const FIT_OPTS     = ["Regular", "Slim", "Relaxed", "Oversized", "Crop"];
 const NECK_OPTS    = ["Round Neck", "V-Neck", "Polo", "Henley", "Hood", "Crew Neck", "Quarter Zip"];
@@ -442,7 +442,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   }, []);
 
   // ─── CREATE FORM STATE ───
-  const emptyForm = { desc: "", shortName: "", l1Division: "", l2Category: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", wsp: "", mrp: "", hsnCode: "", buyerStyle: "", status: "Active", tags: "" };
+  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", wsp: "", mrp: "", hsnCode: "", buyerStyle: "", status: "Active", tags: "" };
   const [form, setForm]           = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
 
@@ -457,16 +457,22 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
 
   const l2Opts = form.l1Division ? (L2_BY_DIV[form.l1Division] || []) : [];
 
-  // ─── Next code ───
-  const nextCode = useMemo(() => {
-    const nums = data.map(d => parseInt(d.code.replace("ART-", ""), 10)).filter(n => !isNaN(n));
-    const max  = nums.length ? Math.max(...nums) : 0;
-    return `ART-${String(max + 1).padStart(3, "0")}`;
-  }, [data]);
+  // ─── Article code validation (4-5 digits + 2 CAPS, e.g. 5249HP) ───
+  const ARTICLE_CODE_REGEX = /^[0-9]{4,5}[A-Z]{2}$/;
+  const validateArticleCode = (code) => {
+    if (!code || !code.trim()) return "Article Code is required";
+    if (!ARTICLE_CODE_REGEX.test(code.trim())) return "Must be 4-5 digits + 2 CAPS (e.g. 5249HP)";
+    if (data.some(d => d.code === code.trim() && (!editItem || d.code !== editItem.code))) return "Code already exists";
+    return null;
+  };
 
   // ─── Save handler ───
   const handleSave = async () => {
     const errs = {};
+    if (!editItem) {
+      const codeErr = validateArticleCode(form.code);
+      if (codeErr) errs.code = codeErr;
+    }
     if (!form.desc.trim())   errs.desc       = "Required";
     if (!form.l1Division)    errs.l1Division = "Required";
     if (!form.l2Category)    errs.l2Category = "Required";
@@ -481,11 +487,12 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       try { await api.updateMasterRecord('article_master', editItem.code, { ...form }); } catch {}
       setEditItem(null);
     } else {
-      const newItem = { code: nextCode, ...form };
+      const code = form.code.trim();
+      const newItem = { ...form, code };
       setData(prev => [...prev, newItem]);
-      showToast(`✓ Created ${nextCode}`, 'success');
-      addLog('ADD', `Added ${nextCode} — ${form.desc} in ${form.l1Division} › ${form.l2Category}`, null);
-      try { await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: nextCode }, false); } catch {}
+      showToast(`✓ Created ${code}`, 'success');
+      addLog('ADD', `Added ${code} — ${form.desc} in ${form.l1Division} › ${form.l2Category}`, null);
+      try { await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code }, false); } catch {}
     }
     setForm(emptyForm);
     setFormErrors({});
@@ -495,6 +502,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     if (!canEdit) return; // guard — blocked if user has no edit rights
     setEditItem(item);
     setForm({
+      code: item.code || "",
       desc: item.desc || "", shortName: item.shortName || "",
       l1Division: item.l1Division || "", l2Category: item.l2Category || "",
       gender: item.gender || "", fitType: item.fitType || "",
@@ -570,6 +578,18 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
             <div style={{ fontSize: 13, fontWeight: 900, color: M.tA, fontFamily: uff, marginBottom: 20 }}>
               {editItem ? `✏️ Editing ${editItem.code}` : "➕ New Article"}
             </div>
+
+            {/* Row 0: Article Code (manual) */}
+            {!editItem && (
+              <div style={{ marginBottom: 14, maxWidth: 220 }}>
+                <label style={lbl}>🔑 Article Code *</label>
+                <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                  style={{ ...inp, fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1.5, borderColor: formErrors.code ? '#ef4444' : M.inBd }}
+                  placeholder="e.g. 5249HP" maxLength={7} />
+                {formErrors.code && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.code}</div>}
+                <div style={{ fontSize: 8, color: M.tD, marginTop: 2 }}>4-5 digits + 2 uppercase letters</div>
+              </div>
+            )}
 
             {/* Row 1: Description + Short Name */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, marginBottom: 14 }}>
@@ -691,7 +711,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
               <div style={{ padding: 14, borderRadius: 8, border: `1px dashed ${A.a}`, background: A.al, marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", color: A.a, letterSpacing: 0.5, marginBottom: 6 }}>Preview</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: divColor(form.l1Division) }}>{editItem ? editItem.code : nextCode}</span>
+                  <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: divColor(form.l1Division) }}>{editItem ? editItem.code : (form.code || '—')}</span>
                   <span style={{ color: M.div }}>│</span>
                   <span style={{ fontWeight: 700, color: M.tA }}>{form.l1Division}</span>
                   <span style={{ color: M.tD }}>›</span>

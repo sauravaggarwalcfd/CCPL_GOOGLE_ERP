@@ -18,7 +18,7 @@ export const FIELD_META = {
   article_master: {
     sections: [
       { id: "identity", icon: "📋", title: "Article Identity",  keys: ["code", "desc", "shortName", "imageLink", "sketchLink", "buyerStyle"] },
-      { id: "details",  icon: "👕", title: "Item Details",      keys: ["l1Division", "l2Category", "season", "gender", "fitType", "neckline", "sleeveType"] },
+      { id: "details",  icon: "👕", title: "Item Details",      keys: ["l1Division", "l2Category", "l3Style", "season", "gender", "fitType", "neckline", "sleeveType"] },
       { id: "fabric",   icon: "🧵", title: "Fabric & Colors",   keys: ["mainFabric", "fabricName", "colorCodes", "sizeRange"] },
       { id: "pricing",  icon: "₹",  title: "Pricing & Tax",     keys: ["wsp", "mrp", "markupPct", "markdownPct", "hsnCode", "gstPct"] },
       { id: "status",   icon: "🏷️", title: "Status & Tags",     keys: ["status", "remarks", "tags"] },
@@ -30,8 +30,9 @@ export const FIELD_META = {
       imageLink:   { ico: "—",  hint: "Google Drive public image URL.", fieldType: "url" },
       sketchLink:  { ico: "⟷",  hint: "Pipe-separated Drive links." },
       buyerStyle:  { ico: "—",  hint: "Optional buyer reference number." },
-      l1Division:  { ico: "←",  hint: "← Auto-filled: 'Apparel'. GAS reads ITEM_CATEGORIES.", fieldType: "auto" },
+      l1Division:  { ico: "⚠",  fk: "item_categories", hint: "SELECTABLE for Article: Men's/Women's/Kids/Unisex Apparel.", fieldType: "fk" },
       l2Category:  { ico: "⚠",  fk: "item_categories", hint: "Controls L3 sub-categories. Mandatory.", fieldType: "fk" },
+      l3Style:     { ico: "—",  fk: "item_categories", hint: "Cascading from L2 — Pique, Hoodie, etc.", fieldType: "fk" },
       season:      { ico: "—",  hint: "e.g. SS25, AW26, Year Round." },
       gender:      { ico: "⚠",  hint: "Men / Women / Kids / Unisex.", fieldType: "dropdown", opts: "gender" },
       fitType:     { ico: "—",  hint: "Regular / Slim / Relaxed / Oversized.", fieldType: "dropdown", opts: "fit" },
