@@ -143,6 +143,70 @@ function fmtAgg(rawVal, field, fn) {
   return rawVal;
 }
 
+// ═══════════════════════════════════════════════════════════
+// ADVANCED FILTER / SORT — operator-based multi-condition panel
+// ═══════════════════════════════════════════════════════════
+const REC_FILTER_OPS = {
+  cat: ['is', 'is not'],
+  txt: ['contains', 'not contains', 'starts with'],
+  num: ['=', '≠', '>', '<', '≥', '≤'],
+};
+const REC_SORT_MODES = [
+  { value: 'a_z',       label: 'A → Z'               },
+  { value: 'z_a',       label: 'Z → A'               },
+  { value: 'nil_first', label: 'Nil / Empty First'    },
+  { value: 'nil_last',  label: 'Nil / Empty Last'     },
+  { value: 'freq_hi',   label: 'Most Frequent First'  },
+  { value: 'freq_lo',   label: 'Least Frequent First' },
+  { value: 'num_lo',    label: 'Lowest → Highest'     },
+  { value: 'num_hi',    label: 'Highest → Lowest'     },
+  { value: 'val_first', label: 'Value is… First'      },
+  { value: 'val_last',  label: 'Value is… Last'       },
+];
+function recAdvFieldType(f) {
+  if (!f) return 'txt';
+  if (f.type === 'number' || f.type === 'currency') return 'num';
+  if (f.type === 'select' || f.options?.length) return 'cat';
+  return 'txt';
+}
+function evalRecAdvFilter(row, { field, op, value }, schema) {
+  const f = schema?.find(x => x.key === field);
+  const fType = recAdvFieldType(f);
+  const rv = row[field];
+  if (fType === 'num') {
+    const n = parseFloat(rv), v = parseFloat(value);
+    if (isNaN(n) || isNaN(v)) return true;
+    return op==='='?n===v:op==='≠'?n!==v:op==='>'?n>v:op==='<'?n<v:op==='≥'?n>=v:n<=v;
+  }
+  if (fType === 'txt') {
+    const s = String(rv||'').toLowerCase(), v = String(value||'').toLowerCase();
+    return op==='contains'?s.includes(v):op==='not contains'?!s.includes(v):s.startsWith(v);
+  }
+  return op === 'is' ? rv === value : rv !== value;
+}
+function applyRecAdvSort(arr, advSorts, freqMaps) {
+  if (!advSorts.length) return arr;
+  return [...arr].sort((a, b) => {
+    for (const s of advSorts) {
+      const av = a[s.field]??'', bv = b[s.field]??'';
+      const ae = av===''||av==null, be = bv===''||bv==null;
+      let cmp = 0;
+      if      (s.mode==='nil_first') { if(ae!==be)cmp=ae?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='nil_last')  { if(ae!==be)cmp=ae?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='freq_hi')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fb-fa; }
+      else if (s.mode==='freq_lo')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fa-fb; }
+      else if (s.mode==='num_lo')    cmp=parseFloat(av||0)-parseFloat(bv||0);
+      else if (s.mode==='num_hi')    cmp=parseFloat(bv||0)-parseFloat(av||0);
+      else if (s.mode==='val_first') { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm)cmp=am?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='val_last')  { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm)cmp=am?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='z_a')       cmp=String(bv).localeCompare(String(av),undefined,{sensitivity:'base'});
+      else                           cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'});
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+}
+
 // ── Type-aware null-safe multi-sort (§E) ──
 function applySort(rows, sorts, schema) {
   if (!sorts.length) return rows;
@@ -264,6 +328,12 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   const [showInlineSave, setShowInlineSave] = useState(false);
   const [inlineSaveName, setInlineSaveName] = useState('');
 
+  // === ADVANCED FILTER / SORT (Layout View style) ===
+  const [advFilters,     setAdvFilters]    = useState([]);
+  const [advSorts,       setAdvSorts]      = useState([]);
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  const [showAdvSorts,   setShowAdvSorts]   = useState(false);
+
   const schema     = SCHEMA_MAP[sheet.key] || FALLBACK_SCHEMA;
   const codeKey    = schema[0]?.key || 'code';
   const allFields  = schema.filter(c => !c.hidden && c.w !== '0');
@@ -323,12 +393,45 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         result = result.filter(r => String(r[col] ?? '').toLowerCase().includes(q));
       }
     }
+    // Advanced operator-based filters
+    advFilters.forEach(fil => {
+      if (fil.value !== '' || recAdvFieldType(schema.find(x => x.key === fil.field)) === 'num')
+        result = result.filter(r => evalRecAdvFilter(r, fil, schema));
+    });
     return result;
-  }, [rows, search, filters]);
+  }, [rows, search, filters, advFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sorted = useMemo(() => applySort(filtered, sorts, schema), [filtered, sorts]); // eslint-disable-line react-hooks/exhaustive-deps
+  const sorted = useMemo(() => {
+    const base = applySort(filtered, sorts, schema);
+    if (!advSorts.length) return base;
+    const fMaps = {};
+    allFields.forEach(f => {
+      const counts = {};
+      rows.forEach(r => { const v = String(r[f.key]??''); counts[v] = (counts[v]||0) + 1; });
+      fMaps[f.key] = counts;
+    });
+    return applyRecAdvSort(base, advSorts, fMaps);
+  }, [filtered, sorts, advSorts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const renderList = useMemo(() => buildRenderList(sorted, groupBy, subGroupBy), [sorted, groupBy, subGroupBy]);
+
+  // ── Advanced filter / sort helpers ──
+  const addAdvFilter    = () => setAdvFilters(p => [...p, { id: Date.now(), field: allFields[0]?.key || '', op: 'is', value: '' }]);
+  const removeAdvFilter = (id) => setAdvFilters(p => p.filter(f => f.id !== id));
+  const updateAdvFilter = (id, patch) => setAdvFilters(p => p.map(f => {
+    if (f.id !== id) return f;
+    const merged = { ...f, ...patch };
+    if (patch.field && patch.field !== f.field) {
+      const ft = recAdvFieldType(schema.find(x => x.key === patch.field));
+      merged.op = REC_FILTER_OPS[ft]?.[0] || 'is'; merged.value = '';
+    }
+    return merged;
+  }));
+  const addAdvSort    = () => setAdvSorts(p => [...p, { id: Date.now(), field: allFields[0]?.key || '', mode: 'a_z', value: '' }]);
+  const removeAdvSort = (id) => setAdvSorts(p => p.length > 1 ? p.filter(s => s.id !== id) : p);
+  const updateAdvSort = (id, patch) => setAdvSorts(p => p.map(s => s.id === id ? { ...s, ...patch } : s));
+  const activeAdvFilterCount = advFilters.filter(f => f.value !== '').length;
+  const isAdvSortActive = advSorts.length > 0;
 
   // ── Toast helper — colorKey: 'success'|'delete'|'view'|'info' ──
   const showToast = (msg, colorKey = 'info', delay = 2500) => {
@@ -602,11 +705,29 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* ── Toolbar ── */}
-      <div style={{ background: M.surfMid, borderBottom: `1px solid ${M.divider}`, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 7, height: 44, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto' }}>
+      <div style={{ background: M.surfMid, borderBottom: `1px solid ${M.divider}`, padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 7, minHeight: 44, flexShrink: 0, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 9, fontWeight: 900, color: M.textD, letterSpacing: 0.5, fontFamily: uff, flexShrink: 0 }}>📊 RECORDS</span>
         <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 12, background: M.surfHigh, color: M.textC, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>
           {sheetCounts?.[sheet.key] ?? rows.length}
         </span>
+
+        {/* ── Advanced Filter + Sort buttons — LEFT, always visible ── */}
+        <div style={{ width: 1, height: 16, background: M.divider, flexShrink: 0 }} />
+        <button onClick={() => { const op = !showAdvFilters; setShowAdvFilters(op); setShowAdvSorts(false); if (op && advFilters.length === 0) addAdvFilter(); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', border: `1px solid ${showAdvFilters || activeAdvFilterCount > 0 ? A.a : M.inputBd}`, borderRadius: 6, background: showAdvFilters || activeAdvFilterCount > 0 ? A.al : M.inputBg, color: showAdvFilters || activeAdvFilterCount > 0 ? A.a : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          ＋ Filter
+          {activeAdvFilterCount > 0 && <span style={{ background: A.a, color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 8.5, fontWeight: 900, lineHeight: 1 }}>{activeAdvFilterCount}</span>}
+        </button>
+        <button onClick={() => { const op = !showAdvSorts; setShowAdvSorts(op); setShowAdvFilters(false); if (op && advSorts.length === 0) addAdvSort(); }}
+          style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', border: `1px solid ${showAdvSorts || isAdvSortActive ? '#7C3AED' : M.inputBd}`, borderRadius: 6, background: showAdvSorts || isAdvSortActive ? 'rgba(124,58,237,.1)' : M.inputBg, color: showAdvSorts || isAdvSortActive ? '#7C3AED' : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap', flexShrink: 0 }}>
+          ↑ Sort
+          {isAdvSortActive && <span style={{ background: '#7C3AED', color: '#fff', borderRadius: 10, padding: '1px 6px', fontSize: 8.5, fontWeight: 900, lineHeight: 1 }}>{advSorts.length}</span>}
+        </button>
+        {(activeAdvFilterCount > 0 || isAdvSortActive) && (
+          <button onClick={() => { setAdvFilters([]); setAdvSorts([]); setShowAdvFilters(false); setShowAdvSorts(false); }}
+            style={{ padding: '5px 9px', border: '1px solid #fecaca', borderRadius: 6, background: '#fef2f2', color: '#dc2626', fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap', flexShrink: 0 }}>✕ Reset</button>
+        )}
+
         <div style={{ flex: 1, minWidth: 8 }} />
 
         {/* Search */}
@@ -869,6 +990,97 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         </div>
       )}
 
+      {/* ── ADVANCED FILTER PANEL (operator-based, Layout View style) ── */}
+      {showAdvFilters && (
+        <div style={{ padding: '10px 14px 12px', borderBottom: `1px solid ${M.divider}`, background: M.surfHigh, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {advFilters.map((fil, fi) => {
+              const f       = schema.find(x => x.key === fil.field);
+              const fType   = recAdvFieldType(f);
+              const ops     = REC_FILTER_OPS[fType] || REC_FILTER_OPS.txt;
+              const catOpts = fType === 'cat' && f?.options ? f.options : null;
+              const isAct   = fil.value !== '';
+              const ctrlSel = { fontSize: 10, border: `1px solid ${M.divider}`, borderRadius: 5, padding: '3px 7px', background: M.inputBg, color: M.textA, cursor: 'pointer', outline: 'none', fontFamily: uff };
+              return (
+                <div key={fil.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 9, color: M.textD, minWidth: 34, textAlign: 'right', fontWeight: 600, fontFamily: uff }}>{fi === 0 ? 'Where' : 'And'}</span>
+                  <select value={fil.field} onChange={e => updateAdvFilter(fil.id, { field: e.target.value })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: '#0e7490', borderColor: '#0891B270', background: '#f0fdfa' }}>
+                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                  </select>
+                  <select value={fil.op} onChange={e => updateAdvFilter(fil.id, { op: e.target.value })} style={ctrlSel}>
+                    {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                  {fType === 'cat' && catOpts ? (
+                    <select value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? '#0891B270' : M.divider, color: isAct ? '#0e7490' : M.textA }}>
+                      <option value="">Select value…</option>
+                      {catOpts.map(v => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
+                    </select>
+                  ) : (
+                    <input value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      placeholder={fType === 'num' ? 'Enter number…' : 'Enter text…'}
+                      type={fType === 'num' ? 'number' : 'text'}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? '#0891B270' : M.divider, color: isAct ? '#0e7490' : M.textA }} />
+                  )}
+                  <button onClick={() => removeAdvFilter(fil.id)}
+                    style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
+                </div>
+              );
+            })}
+            <button onClick={addAdvFilter}
+              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: '#0e7490', fontSize: 9, fontWeight: 700, cursor: 'pointer', padding: 0, fontFamily: uff }}>
+              ＋ Add another filter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADVANCED SORT PANEL (multi-mode, Layout View style) ── */}
+      {showAdvSorts && (
+        <div style={{ padding: '10px 14px 12px', borderBottom: `1px solid ${M.divider}`, background: M.surfHigh, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {advSorts.map((srt, si) => {
+              const f       = schema.find(x => x.key === srt.field);
+              const fType   = recAdvFieldType(f);
+              const needVal = srt.mode === 'val_first' || srt.mode === 'val_last';
+              const catOpts = needVal && fType === 'cat' && f?.options ? f.options : null;
+              const ctrlSel = { fontSize: 10, border: `1px solid ${M.divider}`, borderRadius: 5, padding: '3px 7px', background: M.inputBg, color: M.textA, cursor: 'pointer', outline: 'none', fontFamily: uff };
+              return (
+                <div key={srt.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 9, color: M.textD, minWidth: 34, textAlign: 'right', fontWeight: 600, fontFamily: uff }}>{si === 0 ? 'Sort' : 'Then'}</span>
+                  <select value={srt.field} onChange={e => updateAdvSort(srt.id, { field: e.target.value, value: '' })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: '#6d28d9', borderColor: '#7c3aed70', background: '#7c3aed10' }}>
+                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                  </select>
+                  <select value={srt.mode} onChange={e => updateAdvSort(srt.id, { mode: e.target.value, value: '' })} style={ctrlSel}>
+                    {REC_SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  {needVal && (catOpts ? (
+                    <select value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }}>
+                      <option value="">Pick value…</option>
+                      {catOpts.map(v => <option key={String(v)} value={String(v)}>{String(v)}</option>)}
+                    </select>
+                  ) : (
+                    <input value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      placeholder="Enter value…" style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }} />
+                  ))}
+                  {advSorts.length > 1 && (
+                    <button onClick={() => removeAdvSort(srt.id)}
+                      style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
+                  )}
+                </div>
+              );
+            })}
+            <button onClick={addAdvSort}
+              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: '#6d28d9', fontSize: 9, fontWeight: 700, cursor: 'pointer', padding: 0, fontFamily: uff }}>
+              ＋ Add another sort
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Inline Column Pills (showCM) ── */}
       {showCM && (
         <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -886,6 +1098,64 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           <button onClick={() => setHiddenC([])} style={{ fontSize: 8.5, color: M.textD, background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: uff }}>Show all</button>
         </div>
       )}
+
+      {/* ── Filter + Sort Summary Strip — single combined row ── */}
+      {(() => {
+        const colEntries = Object.entries(filters).filter(([, v]) => v);
+        const anyFilter = colEntries.length > 0 || activeAdvFilterCount > 0;
+        if (!anyFilter && !isAdvSortActive) return null;
+        const chipF = { display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(8,145,178,.08)', border: '1px solid rgba(8,145,178,.3)', borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 700, color: '#0e7490', fontFamily: uff, flexShrink: 0 };
+        const chipS = { display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(124,58,237,.08)', border: '1px solid rgba(124,58,237,.3)', borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 700, color: '#7C3AED', fontFamily: uff, flexShrink: 0 };
+        return (
+          <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: '4px 16px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
+            {anyFilter && (
+              <>
+                <span style={{ fontSize: 9, fontWeight: 900, color: '#0891B2', fontFamily: uff, flexShrink: 0 }}>FILTERED:</span>
+                {/* Per-column filter chips */}
+                {colEntries.map(([key, val]) => {
+                  const fd = allFields.find(x => x.key === key);
+                  return (
+                    <span key={'col_' + key} style={chipF}>
+                      {fd?.label || key} <span style={{ fontWeight: 400, color: '#0891B2' }}>contains</span> <strong>{val}</strong>
+                      <span onClick={() => setFilters(p => { const n = { ...p }; delete n[key]; return n; })} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
+                    </span>
+                  );
+                })}
+                {/* Advanced filter chips */}
+                {advFilters.filter(f => f.value !== '').map(fil => {
+                  const fd = allFields.find(x => x.key === fil.field);
+                  return (
+                    <span key={fil.id} style={chipF}>
+                      {fd?.label || fil.field} <span style={{ fontWeight: 400, color: '#0891B2' }}>{fil.op}</span> <strong>{fil.value}</strong>
+                      <span onClick={() => removeAdvFilter(fil.id)} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
+                    </span>
+                  );
+                })}
+              </>
+            )}
+            {anyFilter && isAdvSortActive && (
+              <div style={{ width: 1, height: 14, background: M.divider, flexShrink: 0 }} />
+            )}
+            {isAdvSortActive && (
+              <>
+                <span style={{ fontSize: 9, fontWeight: 900, color: '#7C3AED', fontFamily: uff, flexShrink: 0 }}>SORT:</span>
+                {advSorts.map(srt => {
+                  const fd = allFields.find(x => x.key === srt.field);
+                  const mLabel = REC_SORT_MODES.find(m => m.value === srt.mode)?.label || srt.mode;
+                  return (
+                    <span key={srt.id} style={chipS}>
+                      {fd?.label || srt.field} <span style={{ fontWeight: 400, color: '#9333ea' }}>{mLabel}</span>{srt.value ? <> <strong>{srt.value}</strong></> : null}
+                      {advSorts.length > 1 && <span onClick={() => removeAdvSort(srt.id)} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>}
+                    </span>
+                  );
+                })}
+              </>
+            )}
+            <div style={{ flex: 1 }} />
+            <button onClick={() => { setFilters({}); setAdvFilters([]); setAdvSorts([]); }} style={{ fontSize: 9, color: '#dc2626', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: uff, flexShrink: 0 }}>✕ Clear all</button>
+          </div>
+        );
+      })()}
 
       {/* ── Table area ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

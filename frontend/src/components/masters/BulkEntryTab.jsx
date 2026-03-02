@@ -667,6 +667,71 @@ const EMPTY_ROW = (master, id) => {
 };
 
 // ═══════════════════════════════════════════════════════════════
+// ADVANCED FILTER / SORT — operator-based multi-condition panel
+// Same pattern as Layout View; reused here for Records & BulkEntry
+// ═══════════════════════════════════════════════════════════════
+const BULK_FILTER_OPS = {
+  cat: ['is', 'is not'],
+  txt: ['contains', 'not contains', 'starts with'],
+  num: ['=', '≠', '>', '<', '≥', '≤'],
+};
+const BULK_SORT_MODES = [
+  { value: 'a_z',       label: 'A → Z'               },
+  { value: 'z_a',       label: 'Z → A'               },
+  { value: 'nil_first', label: 'Nil / Empty First'    },
+  { value: 'nil_last',  label: 'Nil / Empty Last'     },
+  { value: 'freq_hi',   label: 'Most Frequent First'  },
+  { value: 'freq_lo',   label: 'Least Frequent First' },
+  { value: 'num_lo',    label: 'Lowest → Highest'     },
+  { value: 'num_hi',    label: 'Highest → Lowest'     },
+  { value: 'val_first', label: 'Value is… First'      },
+  { value: 'val_last',  label: 'Value is… Last'       },
+];
+function bulkAdvFieldType(f) {
+  if (!f) return 'txt';
+  if (['currency', 'number', 'calc'].includes(f.type)) return 'num';
+  if (f.opts?.length || ['fk', 'multifk', 'dropdown'].includes(f.type)) return 'cat';
+  return 'txt';
+}
+function evalBulkAdvFilter(row, { field, op, value }, allFields) {
+  const f = allFields.find(x => x.col === field);
+  const fType = bulkAdvFieldType(f);
+  const rv = row[field];
+  if (fType === 'num') {
+    const n = parseFloat(rv), v = parseFloat(value);
+    if (isNaN(n) || isNaN(v)) return true;
+    return op==='='?n===v:op==='≠'?n!==v:op==='>'?n>v:op==='<'?n<v:op==='≥'?n>=v:n<=v;
+  }
+  if (fType === 'txt') {
+    const s = String(rv||'').toLowerCase(), v = String(value||'').toLowerCase();
+    return op==='contains'?s.includes(v):op==='not contains'?!s.includes(v):s.startsWith(v);
+  }
+  return op === 'is' ? rv === value : rv !== value;
+}
+function applyBulkAdvSort(arr, advSorts, freqMaps) {
+  if (!advSorts.length) return arr;
+  return [...arr].sort((a, b) => {
+    for (const s of advSorts) {
+      const av = a[s.field]??'', bv = b[s.field]??'';
+      const ae = av===''||av==null, be = bv===''||bv==null;
+      let cmp = 0;
+      if      (s.mode==='nil_first') { if(ae!==be){cmp=ae?-1:1;} else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='nil_last')  { if(ae!==be){cmp=ae?1:-1;} else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='freq_hi')  { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fb-fa; }
+      else if (s.mode==='freq_lo')  { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fa-fb; }
+      else if (s.mode==='num_lo')   cmp=parseFloat(av||0)-parseFloat(bv||0);
+      else if (s.mode==='num_hi')   cmp=parseFloat(bv||0)-parseFloat(av||0);
+      else if (s.mode==='val_first'){ const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm)cmp=am?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='val_last') { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm)cmp=am?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='z_a')      cmp=String(bv).localeCompare(String(av),undefined,{sensitivity:'base'});
+      else                          cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'});
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
 //  BulkEntryTab — Main export, replaces old simple BulkEntryTab
 // ═══════════════════════════════════════════════════════════════
 export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: rawM, A, uff, dff }) {
@@ -726,6 +791,41 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
   const [editingTpl, setEditingTpl] = useState(null);
   const [viewSwitchGuard, setViewSwitchGuard] = useState(null);
 
+  // ── Advanced filter / sort (Layout View style) ──
+  const [advFilters,     setAdvFilters]    = useState([]);
+  const [advSorts,       setAdvSorts]      = useState([]);
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  const [showAdvSorts,   setShowAdvSorts]   = useState(false);
+
+  // Derived field defs for adv filter/sort (exclude auto-computed fields)
+  const advFieldDefs = allFields.filter(f => !f.auto && !['calc','autocode'].includes(f.type)).map(f => ({
+    key: f.col, label: f.h || f.col, type: bulkAdvFieldType(f), opts: f.opts || null,
+  }));
+  const activeAdvFilterCount = advFilters.filter(f => f.value !== '').length;
+  const isAdvSortActive = advSorts.length > 0;
+
+  const addAdvFilter = () => {
+    const first = advFieldDefs[0];
+    const ft = first ? bulkAdvFieldType(allFields.find(x => x.col === first.key)) : 'txt';
+    setAdvFilters(p => [...p, { id: Date.now(), field: first?.key || '', op: BULK_FILTER_OPS[ft]?.[0] || 'is', value: '' }]);
+  };
+  const removeAdvFilter = (id) => setAdvFilters(p => p.filter(f => f.id !== id));
+  const updateAdvFilter = (id, patch) => setAdvFilters(p => p.map(f => {
+    if (f.id !== id) return f;
+    const merged = { ...f, ...patch };
+    if (patch.field && patch.field !== f.field) {
+      const ft = bulkAdvFieldType(allFields.find(x => x.col === patch.field));
+      merged.op = BULK_FILTER_OPS[ft]?.[0] || 'is'; merged.value = '';
+    }
+    return merged;
+  }));
+  const addAdvSort = () => {
+    const first = advFieldDefs[0];
+    setAdvSorts(p => [...p, { id: Date.now(), field: first?.key || '', mode: 'a_z', value: '' }]);
+  };
+  const removeAdvSort = (id) => setAdvSorts(p => p.length > 1 ? p.filter(s => s.id !== id) : p);
+  const updateAdvSort = (id, patch) => setAdvSorts(p => p.map(s => s.id === id ? { ...s, ...patch } : s));
+
   // Reset when enriched changes
   useEffect(() => {
     setSelRows(new Set()); setEditCell(null); setRowErrors({});
@@ -746,10 +846,17 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
 
   const visRows = (() => {
     let rs = [...rows];
+    // ── Existing per-column text filters (kept) ──
     Object.entries(filters).forEach(([col, val]) => {
       if (!val.trim()) return;
       rs = rs.filter(r => String(r[col] || "").toLowerCase().includes(val.trim().toLowerCase()));
     });
+    // ── Advanced operator-based filters (new) ──
+    advFilters.forEach(fil => {
+      if (fil.value !== '' || bulkAdvFieldType(allFields.find(x => x.col === fil.field)) === 'num')
+        rs = rs.filter(r => evalBulkAdvFilter(r, fil, allFields));
+    });
+    // ── Existing column-click sorts (kept) ──
     if (sorts.length > 0) {
       rs.sort((a, b) => {
         for (const { col, dir, type, nulls } of sorts) {
@@ -768,6 +875,16 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
         }
         return 0;
       });
+    }
+    // ── Advanced multi-mode sorts (new, applied after column sorts) ──
+    if (advSorts.length > 0) {
+      const fMaps = {};
+      advFieldDefs.forEach(f => {
+        const counts = {};
+        rows.forEach(r => { const v = String(r[f.key]??''); counts[v] = (counts[v]||0) + 1; });
+        fMaps[f.key] = counts;
+      });
+      rs = applyBulkAdvSort(rs, advSorts, fMaps);
     }
     return rs;
   })();
@@ -986,11 +1103,17 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
           </button>
         )}
         <div style={{ width: 1, height: 22, background: M.div, margin: "0 4px" }} />
-        <button onClick={() => { setShowFP(p => !p); setShowCM(false); }} style={{ padding: "5px 10px", borderRadius: 5, border: "1.5px solid " + (showFP || activeFilters > 0 ? A.a : M.inBd), background: showFP || activeFilters > 0 ? A.al : M.inBg, color: showFP || activeFilters > 0 ? A.a : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-          Filter {activeFilters > 0 && <span style={{ background: A.a, color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{activeFilters}</span>}
+        <button onClick={() => { setShowFP(p => !p); setShowCM(false); setShowAdvFilters(false); }} style={{ padding: "5px 10px", borderRadius: 5, border: "1.5px solid " + (showFP || activeFilters > 0 ? A.a : M.inBd), background: showFP || activeFilters > 0 ? A.al : M.inBg, color: showFP || activeFilters > 0 ? A.a : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          Col Filter {activeFilters > 0 && <span style={{ background: A.a, color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{activeFilters}</span>}
+        </button>
+        <button onClick={() => { setShowAdvFilters(p => !p); setShowFP(false); setShowCM(false); setShowAdvSorts(false); }} style={{ padding: "5px 10px", borderRadius: 5, border: "1.5px solid " + (showAdvFilters || activeAdvFilterCount > 0 ? "#0891B2" : M.inBd), background: showAdvFilters || activeAdvFilterCount > 0 ? "#f0fdfa" : M.inBg, color: showAdvFilters || activeAdvFilterCount > 0 ? "#0e7490" : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          ＋ Filter {activeAdvFilterCount > 0 && <span style={{ background: "#0891B2", color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{activeAdvFilterCount}</span>}
         </button>
         <button onClick={() => { setShowSortPanel(true); setShowFP(false); setShowCM(false); }} style={{ padding: "5px 10px", borderRadius: 5, border: "1.5px solid " + (showSortPanel || sorts.length > 0 ? "#7C3AED" : M.inBd), background: showSortPanel || sorts.length > 0 ? "#ede9fe" : M.inBg, color: showSortPanel || sorts.length > 0 ? "#6d28d9" : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
-          Sort {sorts.length > 0 && <span style={{ background: "#7C3AED", color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{sorts.length}</span>}
+          Col Sort {sorts.length > 0 && <span style={{ background: "#7C3AED", color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{sorts.length}</span>}
+        </button>
+        <button onClick={() => { setShowAdvSorts(p => !p); setShowSortPanel(false); setShowFP(false); setShowAdvFilters(false); }} style={{ padding: "5px 10px", borderRadius: 5, border: "1.5px solid " + (showAdvSorts || isAdvSortActive ? "#7C3AED" : M.inBd), background: showAdvSorts || isAdvSortActive ? "#ede9fe" : M.inBg, color: showAdvSorts || isAdvSortActive ? "#6d28d9" : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+          ↑ Sort {isAdvSortActive && <span style={{ background: "#7C3AED", color: "#fff", borderRadius: 10, padding: "0 5px", fontSize: 8 }}>{advSorts.length}</span>}
         </button>
         <select value={groupBy || ""} onChange={e => { setGroupBy(e.target.value || null); if (!e.target.value) setSubGroupBy(null); }} style={{ padding: "5px 8px", border: "1.5px solid " + (groupBy ? "#059669" : M.inBd), borderRadius: 5, background: groupBy ? "#f0fdf4" : M.inBg, color: groupBy ? "#15803d" : M.tB, fontSize: 10, fontWeight: 900, cursor: "pointer", outline: "none" }}>
           <option value="">Group by…</option>
@@ -1011,8 +1134,8 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
         </button>
         <div style={{ flex: 1 }} />
         <span style={{ fontSize: 9, color: M.tC, fontWeight: 700 }}>{visRows.length} rows · {visCols.length} cols</span>
-        {(sorts.length > 0 || activeFilters > 0 || groupBy) && (
-          <button onClick={() => { setSorts([]); setFilters({}); setGroupBy(null); setSubGroupBy(null); }} style={{ padding: "4px 9px", border: "1px solid #fecaca", borderRadius: 4, background: "#fef2f2", color: "#dc2626", fontSize: 9, fontWeight: 800, cursor: "pointer" }}>Clear All</button>
+        {(sorts.length > 0 || activeFilters > 0 || activeAdvFilterCount > 0 || isAdvSortActive || groupBy) && (
+          <button onClick={() => { setSorts([]); setFilters({}); setAdvFilters([]); setAdvSorts([]); setGroupBy(null); setSubGroupBy(null); setShowAdvFilters(false); setShowAdvSorts(false); }} style={{ padding: "4px 9px", border: "1px solid #fecaca", borderRadius: 4, background: "#fef2f2", color: "#dc2626", fontSize: 9, fontWeight: 800, cursor: "pointer" }}>Clear All</button>
         )}
       </div>
 
@@ -1125,6 +1248,97 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
       {/* ── SORT PANEL ── */}
       {showSortPanel && <SortPanel sorts={sorts} setSorts={setSorts} allFields={allFields} M={M} A={A} onClose={() => setShowSortPanel(false)} />}
 
+      {/* ── ADVANCED FILTER PANEL (operator-based, Layout View style) ── */}
+      {showAdvFilters && (
+        <div style={{ padding: "10px 12px 12px", borderBottom: "1px solid " + M.div, background: M.hi, flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {advFilters.map((fil, fi) => {
+              const f      = allFields.find(x => x.col === fil.field);
+              const fType  = bulkAdvFieldType(f);
+              const ops    = BULK_FILTER_OPS[fType] || BULK_FILTER_OPS.txt;
+              const catOpts = fType === 'cat' && f?.opts ? f.opts.map(o => typeof o === 'string' ? o : o.v) : null;
+              const isAct  = fil.value !== '';
+              const ctrlSel = { fontSize: 10, border: "1px solid " + M.div, borderRadius: 5, padding: "3px 7px", background: M.inBg, color: M.tA, cursor: "pointer", outline: "none" };
+              return (
+                <div key={fil.id} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 9, color: M.tD, minWidth: 34, textAlign: "right", fontWeight: 600 }}>{fi === 0 ? "Where" : "And"}</span>
+                  <select value={fil.field} onChange={e => updateAdvFilter(fil.id, { field: e.target.value })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: "#0e7490", borderColor: "#0891B270", background: "#f0fdfa" }}>
+                    {advFieldDefs.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                  </select>
+                  <select value={fil.op} onChange={e => updateAdvFilter(fil.id, { op: e.target.value })} style={ctrlSel}>
+                    {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                  {fType === 'cat' && catOpts ? (
+                    <select value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? "#0891B270" : M.div, color: isAct ? "#0e7490" : M.tA }}>
+                      <option value="">Select value…</option>
+                      {catOpts.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  ) : (
+                    <input value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      placeholder={fType === 'num' ? 'Enter number…' : 'Enter text…'}
+                      type={fType === 'num' ? 'number' : 'text'}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? "#0891B270" : M.div, color: isAct ? "#0e7490" : M.tA }} />
+                  )}
+                  <button onClick={() => removeAdvFilter(fil.id)}
+                    style={{ border: "none", background: "transparent", color: "#dc2626", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 3px", fontWeight: 900 }}>×</button>
+                </div>
+              );
+            })}
+            <button onClick={addAdvFilter}
+              style={{ alignSelf: "flex-start", marginLeft: 40, border: "none", background: "transparent", color: "#0e7490", fontSize: 9, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+              ＋ Add another filter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ADVANCED SORT PANEL (multi-mode, Layout View style) ── */}
+      {showAdvSorts && (
+        <div style={{ padding: "10px 12px 12px", borderBottom: "1px solid " + M.div, background: M.hi, flexShrink: 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {advSorts.map((srt, si) => {
+              const f       = allFields.find(x => x.col === srt.field);
+              const fType   = bulkAdvFieldType(f);
+              const needVal = srt.mode === 'val_first' || srt.mode === 'val_last';
+              const catOpts = needVal && fType === 'cat' && f?.opts ? f.opts.map(o => typeof o === 'string' ? o : o.v) : null;
+              const ctrlSel = { fontSize: 10, border: "1px solid " + M.div, borderRadius: 5, padding: "3px 7px", background: M.inBg, color: M.tA, cursor: "pointer", outline: "none" };
+              return (
+                <div key={srt.id} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 9, color: M.tD, minWidth: 34, textAlign: "right", fontWeight: 600 }}>{si === 0 ? "Sort" : "Then"}</span>
+                  <select value={srt.field} onChange={e => updateAdvSort(srt.id, { field: e.target.value, value: "" })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: "#6d28d9", borderColor: "#7c3aed70", background: "#7c3aed10" }}>
+                    {advFieldDefs.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                  </select>
+                  <select value={srt.mode} onChange={e => updateAdvSort(srt.id, { mode: e.target.value, value: "" })} style={ctrlSel}>
+                    {BULK_SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  {needVal && (catOpts ? (
+                    <select value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }}>
+                      <option value="">Pick value…</option>
+                      {catOpts.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  ) : (
+                    <input value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      placeholder="Enter value…" style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }} />
+                  ))}
+                  {advSorts.length > 1 && (
+                    <button onClick={() => removeAdvSort(srt.id)}
+                      style={{ border: "none", background: "transparent", color: "#dc2626", cursor: "pointer", fontSize: 15, lineHeight: 1, padding: "0 3px", fontWeight: 900 }}>×</button>
+                  )}
+                </div>
+              );
+            })}
+            <button onClick={addAdvSort}
+              style={{ alignSelf: "flex-start", marginLeft: 40, border: "none", background: "transparent", color: "#6d28d9", fontSize: 9, fontWeight: 700, cursor: "pointer", padding: 0 }}>
+              ＋ Add another sort
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── COLUMN MANAGER ── */}
       {showCM && (
         <div style={{ padding: "10px 12px", borderBottom: "1px solid " + M.div, background: M.hi, flexShrink: 0, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
@@ -1151,6 +1365,64 @@ export default function BulkEntryTab({ enriched, sheet, onSaveBulk, saving, M: r
           <button onClick={() => setShowSave(false)} style={{ padding: "5px 10px", border: "1px solid " + M.inBd, borderRadius: 5, background: M.inBg, color: M.tB, fontSize: 10, fontWeight: 800, cursor: "pointer" }}>Cancel</button>
         </div>
       )}
+
+      {/* ── Filter + Sort Summary Strip — single combined row ── */}
+      {(() => {
+        const colEntries = Object.entries(filters).filter(([, v]) => v);
+        const anyFilter = colEntries.length > 0 || activeAdvFilterCount > 0;
+        if (!anyFilter && !isAdvSortActive) return null;
+        const chipF = { display: "inline-flex", alignItems: "center", gap: 3, background: "rgba(8,145,178,.08)", border: "1px solid rgba(8,145,178,.3)", borderRadius: 20, padding: "2px 8px", fontSize: 9, fontWeight: 700, color: "#0e7490", flexShrink: 0 };
+        const chipS = { display: "inline-flex", alignItems: "center", gap: 3, background: "rgba(124,58,237,.08)", border: "1px solid rgba(124,58,237,.3)", borderRadius: 20, padding: "2px 8px", fontSize: 9, fontWeight: 700, color: "#7C3AED", flexShrink: 0 };
+        return (
+          <div style={{ background: M.hi, borderBottom: "1px solid " + M.div, padding: "4px 12px", display: "flex", alignItems: "center", gap: 6, flexShrink: 0, flexWrap: "wrap" }}>
+            {anyFilter && (
+              <>
+                <span style={{ fontSize: 9, fontWeight: 900, color: "#0891B2", flexShrink: 0 }}>FILTERED:</span>
+                {/* Per-column filter chips */}
+                {colEntries.map(([key, val]) => {
+                  const fd = advFieldDefs.find(x => x.key === key);
+                  return (
+                    <span key={"col_" + key} style={chipF}>
+                      {fd?.label || key} <span style={{ fontWeight: 400, color: "#0891B2" }}>contains</span> <strong>{val}</strong>
+                      <span onClick={() => setFilters(p => { const n = { ...p }; delete n[key]; return n; })} style={{ cursor: "pointer", color: M.tD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
+                    </span>
+                  );
+                })}
+                {/* Advanced filter chips */}
+                {advFilters.filter(f => f.value !== '').map(fil => {
+                  const fd = advFieldDefs.find(x => x.key === fil.field);
+                  return (
+                    <span key={fil.id} style={chipF}>
+                      {fd?.label || fil.field} <span style={{ fontWeight: 400, color: "#0891B2" }}>{fil.op}</span> <strong>{fil.value}</strong>
+                      <span onClick={() => removeAdvFilter(fil.id)} style={{ cursor: "pointer", color: M.tD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
+                    </span>
+                  );
+                })}
+              </>
+            )}
+            {anyFilter && isAdvSortActive && (
+              <div style={{ width: 1, height: 14, background: M.div, flexShrink: 0 }} />
+            )}
+            {isAdvSortActive && (
+              <>
+                <span style={{ fontSize: 9, fontWeight: 900, color: "#7C3AED", flexShrink: 0 }}>SORT:</span>
+                {advSorts.map(srt => {
+                  const fd = advFieldDefs.find(x => x.key === srt.field);
+                  const mLabel = BULK_SORT_MODES.find(m => m.value === srt.mode)?.label || srt.mode;
+                  return (
+                    <span key={srt.id} style={chipS}>
+                      {fd?.label || srt.field} <span style={{ fontWeight: 400, color: "#9333ea" }}>{mLabel}</span>{srt.value ? <> <strong>{srt.value}</strong></> : null}
+                      {advSorts.length > 1 && <span onClick={() => removeAdvSort(srt.id)} style={{ cursor: "pointer", color: M.tD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>}
+                    </span>
+                  );
+                })}
+              </>
+            )}
+            <div style={{ flex: 1 }} />
+            <button onClick={() => { setFilters({}); setAdvFilters([]); setAdvSorts([]); }} style={{ fontSize: 9, color: "#dc2626", background: "transparent", border: "none", cursor: "pointer", flexShrink: 0 }}>✕ Clear all</button>
+          </div>
+        );
+      })()}
 
       {/* ── TABLE ── */}
       <div style={{ flex: 1, overflowX: "auto", overflowY: "auto" }}>

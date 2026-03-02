@@ -4,7 +4,9 @@
       "Bash(npm run preview)",
       "Bash(python3 -c \":*)",
       "Bash(node -e \":*)",
-      "Bash(npx vite build --mode development)"
+      "Bash(npx vite build --mode development)",
+      "Bash(npm run build)",
+      "Bash(ls \"e:\\\\Lenovo\\\\Documents\\\\GitHub\\\\CCPL_GOOGLE_ERP\\\\frontend\\\\src\\\\components\\\\masters\"\" 2>/dev/null || ls \"e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/components/masters/ \")"
     ]
   }
 }

@@ -765,6 +765,47 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
   const [filterDiv, setFilterDiv] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
 
+  // ── Advanced filter / sort (Layout View style) ──
+  const [advFilters,     setAdvFilters]    = useState([]);
+  const [advSorts,       setAdvSorts]      = useState([]);
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  const [showAdvSorts,   setShowAdvSorts]   = useState(false);
+
+  const fieldVals = useMemo(() => {
+    const m = {};
+    CARD_FIELDS.filter(f => f.type === 'cat').forEach(f => {
+      m[f.key] = [...new Set(data.map(d => d[f.key]).filter(Boolean))].sort();
+    });
+    return m;
+  }, [data]);
+
+  const freqMaps = useMemo(() => {
+    const m = {};
+    CARD_FIELDS.forEach(f => {
+      const counts = {};
+      data.forEach(d => { const v = String(d[f.key] ?? ''); counts[v] = (counts[v] || 0) + 1; });
+      m[f.key] = counts;
+    });
+    return m;
+  }, [data]);
+
+  const addAdvFilter    = () => setAdvFilters(p => [...p, { id: Date.now(), field: 'l1Division', op: 'is', value: '' }]);
+  const removeAdvFilter = (id) => setAdvFilters(p => p.filter(f => f.id !== id));
+  const updateAdvFilter = (id, patch) => setAdvFilters(p => p.map(f => {
+    if (f.id !== id) return f;
+    const merged = { ...f, ...patch };
+    if (patch.field && patch.field !== f.field) {
+      const newType = CARD_FIELDS.find(x => x.key === patch.field)?.type || 'cat';
+      merged.op = FILTER_OPS[newType][0]; merged.value = '';
+    }
+    return merged;
+  }));
+  const addAdvSort    = () => setAdvSorts(p => [...p, { id: Date.now(), field: 'code', mode: 'a_z', value: '' }]);
+  const removeAdvSort = (id) => setAdvSorts(p => p.length > 1 ? p.filter(s => s.id !== id) : p);
+  const updateAdvSort = (id, patch) => setAdvSorts(p => p.map(s => s.id === id ? { ...s, ...patch } : s));
+  const activeAdvFilterCount = advFilters.filter(f => f.value !== '').length;
+  const isAdvSortActive = advSorts.length > 0;
+
   const filtered = useMemo(() => {
     let r = data;
     if (filterDiv !== 'ALL') r = r.filter(d => d.l1Division === filterDiv);
@@ -773,21 +814,29 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
       const q = search.toLowerCase();
       r = r.filter(d => [d.code, d.desc, d.l1Division, d.l2Category, d.gender, d.season, d.hsnCode].some(v => String(v || '').toLowerCase().includes(q)));
     }
+    advFilters.forEach(fil => {
+      if (fil.value !== '' || CARD_FIELDS.find(x => x.key === fil.field)?.type === 'num')
+        r = r.filter(art => evalFilter(art, fil));
+    });
     return r;
-  }, [data, search, filterDiv, filterStatus]);
+  }, [data, search, filterDiv, filterStatus, advFilters]);
 
   const sorted = useMemo(() => {
+    if (advSorts.length > 0) return applyMultiSort(filtered, advSorts, freqMaps);
     return [...filtered].sort((a, b) => {
       const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
       const d  = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' });
       return sortDir === 'asc' ? d : -d;
     });
-  }, [filtered, sortCol, sortDir]);
+  }, [filtered, sortCol, sortDir, advSorts, freqMaps]);
 
   const handleHeaderClick = (key) => {
     if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortCol(key); setSortDir('asc'); }
   };
+
+  const ctrlSel = { fontSize: 10, border: `1px solid ${M.div}`, borderRadius: 5, padding: '3px 7px', background: M.inBg, color: M.tA, fontFamily: uff, cursor: 'pointer', outline: 'none' };
+  const ctrlBtn = (on) => ({ padding: '3px 10px', border: `1px solid ${on ? A.a : M.div}`, borderRadius: 5, background: on ? A.al : 'transparent', color: on ? A.a : M.tB, fontSize: 10, fontWeight: on ? 800 : 600, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap' });
 
   const thStyle = (key) => ({
     padding: '8px 12px', textAlign: 'left', fontSize: fz - 3, fontWeight: 900,
@@ -800,39 +849,136 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Toolbar */}
-      <div style={{ background: M.mid, borderBottom: `1px solid ${M.div}`, padding: '0 14px', display: 'flex', alignItems: 'center', gap: 8, height: 44, flexShrink: 0, flexWrap: 'nowrap', overflowX: 'auto' }}>
+      {/* ── Toolbar Row 1: label + filter/sort controls on left, search/dropdowns on right ── */}
+      <div style={{ background: M.mid, borderBottom: `1px solid ${M.div}`, padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, flexWrap: 'wrap' }}>
+
+        {/* Left: label + count + Filter + Sort + Reset */}
         <span style={{ fontSize: 9, fontWeight: 900, color: M.tD, letterSpacing: 0.5, fontFamily: uff, flexShrink: 0 }}>📊 ARTICLES</span>
         <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 12, background: M.hi, color: M.tC, fontFamily: "'IBM Plex Mono',monospace", flexShrink: 0 }}>{sorted.length}</span>
+        <div style={{ width: 1, height: 16, background: M.div, flexShrink: 0 }} />
+        <button onClick={() => { setShowAdvFilters(v => !v); setShowAdvSorts(false); }}
+          style={{ ...ctrlBtn(showAdvFilters || activeAdvFilterCount > 0), flexShrink: 0 }}>
+          ＋ Filter{activeAdvFilterCount > 0 ? ` (${activeAdvFilterCount})` : ''}
+        </button>
+        <button onClick={() => { setShowAdvSorts(v => !v); setShowAdvFilters(false); }}
+          style={{ ...ctrlBtn(showAdvSorts || isAdvSortActive), flexShrink: 0 }}>
+          ↑ Sort{isAdvSortActive ? ` (${advSorts.length})` : ''}
+        </button>
+        {(activeAdvFilterCount > 0 || isAdvSortActive) && (
+          <button onClick={() => { setAdvFilters([]); setAdvSorts([]); setShowAdvFilters(false); setShowAdvSorts(false); }}
+            style={{ ...ctrlBtn(false), color: '#dc2626', borderColor: '#dc262640', fontSize: 9, flexShrink: 0 }}>✕ Reset</button>
+        )}
+
         <div style={{ flex: 1 }} />
 
-        {/* Search */}
+        {/* Right: Search + Division + Status + Add New */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 10, color: M.tD }}>🔍</span>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
             style={{ padding: '5px 8px 5px 26px', border: `1px solid ${M.div}`, borderRadius: 6, fontSize: fz - 2, fontFamily: uff, width: 130, outline: 'none', color: M.tA, background: M.inBg }} />
         </div>
-
-        {/* Division filter */}
         <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)}
           style={{ padding: '4px 7px', border: `1px solid ${filterDiv !== 'ALL' ? A.a : M.inBd}`, borderRadius: 6, background: M.inBg, color: filterDiv !== 'ALL' ? A.a : M.tB, fontSize: fz - 3, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
           <option value="ALL">All Divisions</option>
           {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
-
-        {/* Status filter */}
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ padding: '4px 7px', border: `1px solid ${filterStatus !== 'ALL' ? A.a : M.inBd}`, borderRadius: 6, background: M.inBg, color: filterStatus !== 'ALL' ? A.a : M.tB, fontSize: fz - 3, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
           <option value="ALL">All Status</option>
           {STATUS_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
-
-        {/* Add New */}
         <button onClick={() => showToast('Use "➕ Create Article" tab to add a new article', 'info')}
           style={{ padding: '5px 13px', background: CC_RED, border: 'none', borderRadius: 6, fontSize: fz - 2, fontWeight: 900, color: '#fff', cursor: 'pointer', fontFamily: uff, flexShrink: 0 }}>
           + Add New
         </button>
       </div>
+
+      {/* ── Advanced Filter Panel ── */}
+      {showAdvFilters && (
+        <div style={{ padding: '8px 14px 10px', borderBottom: `1px solid ${M.div}`, background: M.hi, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {advFilters.map((fil, fi) => {
+              const fMeta = CARD_FIELDS.find(f => f.key === fil.field);
+              const ops   = FILTER_OPS[fMeta?.type || 'cat'];
+              const vals  = fieldVals[fil.field];
+              const isAct = fil.value !== '';
+              return (
+                <div key={fil.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 9, color: M.tD, fontFamily: uff, minWidth: 34, textAlign: 'right', fontWeight: 600 }}>{fi === 0 ? 'Where' : 'And'}</span>
+                  <select value={fil.field} onChange={e => updateAdvFilter(fil.id, { field: e.target.value })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: A.a, borderColor: `${A.a}70`, background: A.al }}>
+                    {CARD_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                  <select value={fil.op} onChange={e => updateAdvFilter(fil.id, { op: e.target.value })} style={ctrlSel}>
+                    {ops.map(op => <option key={op} value={op}>{op}</option>)}
+                  </select>
+                  {fMeta?.type === 'cat' && vals ? (
+                    <select value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? `${A.a}70` : M.div, color: isAct ? A.a : M.tA }}>
+                      <option value="">Select value…</option>
+                      {vals.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  ) : (
+                    <input value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
+                      placeholder={fMeta?.type === 'num' ? 'Enter number…' : 'Enter text…'}
+                      type={fMeta?.type === 'num' ? 'number' : 'text'}
+                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? `${A.a}70` : M.div, color: isAct ? A.a : M.tA }} />
+                  )}
+                  <button onClick={() => removeAdvFilter(fil.id)}
+                    style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
+                </div>
+              );
+            })}
+            <button onClick={addAdvFilter}
+              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: A.a, fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: uff, padding: 0 }}>
+              ＋ Add another filter
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Advanced Sort Panel ── */}
+      {showAdvSorts && (
+        <div style={{ padding: '8px 14px 10px', borderBottom: `1px solid ${M.div}`, background: M.hi, flexShrink: 0 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {advSorts.map((srt, si) => {
+              const fMeta   = CARD_FIELDS.find(f => f.key === srt.field);
+              const needVal = srt.mode === 'val_first' || srt.mode === 'val_last';
+              const catVals = needVal && fMeta?.type === 'cat' ? fieldVals[srt.field] : null;
+              return (
+                <div key={srt.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 9, color: M.tD, fontFamily: uff, minWidth: 34, textAlign: 'right', fontWeight: 600 }}>{si === 0 ? 'Sort' : 'Then'}</span>
+                  <select value={srt.field} onChange={e => updateAdvSort(srt.id, { field: e.target.value, value: '' })}
+                    style={{ ...ctrlSel, fontWeight: 700, color: '#7c3aed', borderColor: '#7c3aed70', background: '#7c3aed10' }}>
+                    {CARD_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                  <select value={srt.mode} onChange={e => updateAdvSort(srt.id, { mode: e.target.value, value: '' })} style={ctrlSel}>
+                    {SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                  </select>
+                  {needVal && (catVals ? (
+                    <select value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }}>
+                      <option value="">Pick value…</option>
+                      {catVals.map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  ) : (
+                    <input value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
+                      placeholder="Enter value…" style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }} />
+                  ))}
+                  {advSorts.length > 1 && (
+                    <button onClick={() => removeAdvSort(srt.id)}
+                      style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
+                  )}
+                </div>
+              );
+            })}
+            <button onClick={addAdvSort}
+              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: '#7c3aed', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: uff, padding: 0 }}>
+              ＋ Add another sort
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
@@ -1244,7 +1390,7 @@ const CARD_FIELDS = [
   { key: 'desc',       label: 'Description', type: 'txt' },
 ];
 const FILTER_OPS = {
-  cat: ['is', 'is not'],
+  cat: ['is', 'is not', 'contains', 'starts with'],
   txt: ['contains', 'not contains', 'starts with'],
   num: ['=', '≠', '>', '<', '≥', '≤'],
 };
@@ -1256,11 +1402,11 @@ function evalFilter(art, { field, op, value }) {
     if (isNaN(n) || isNaN(v)) return true;
     return op==='=' ? n===v : op==='≠' ? n!==v : op==='>' ? n>v : op==='<' ? n<v : op==='≥' ? n>=v : n<=v;
   }
-  if (fMeta?.type === 'txt') {
+  if (fMeta?.type === 'txt' || op === 'contains' || op === 'not contains' || op === 'starts with') {
     const s = String(artVal||'').toLowerCase(), v = String(value||'').toLowerCase();
     return op==='contains' ? s.includes(v) : op==='not contains' ? !s.includes(v) : s.startsWith(v);
   }
-  // cat
+  // cat: 'is' / 'is not'
   return op === 'is' ? artVal === value : artVal !== value;
 }
 
@@ -1802,7 +1948,7 @@ function exportAsCsv(data, filename = 'article_master.csv') {
 // ── Article Master field schema (drives Card / Table / JSON layouts) ──
 const AM_SCHEMA = [
   { key: 'code',       label: 'Article Code',  mono: true,  required: true  },
-  { key: 'desc',       label: 'Description',                required: true  },
+  { key: 'desc',       label: 'Description',                required: true, full: true },
   { key: 'shortName',  label: 'Short Name'                                  },
   { key: 'buyerStyle', label: 'Buyer Style'                                 },
   { key: 'l1Division', label: 'Division'                                    },
@@ -1817,7 +1963,7 @@ const AM_SCHEMA = [
   { key: 'mrp',        label: 'MRP ₹',         mono: true                  },
   { key: 'hsnCode',    label: 'HSN Code',       mono: true                  },
   { key: 'status',     label: 'Status',         badge: true                 },
-  { key: 'tags',       label: 'Tags'                                        },
+  { key: 'tags',       label: 'Tags',                        full: true      },
 ];
 
 // ════════════════════════════════════════════════════════════════
@@ -1954,7 +2100,7 @@ function ArtDetailModal({ art, onClose, onPrev, onNext, artIndex, totalArts, onE
   );
 }
 
-// ── Card layout: 2-col grid showing ALL AM fields ──
+// ── Card layout: 2-col grid; `full: true` fields span both columns (§LAYOUT_VIEW-K) ──
 function ArtCardLayout({ art, M, A, uff, dff, fz }) {
   return (
     <div style={{ padding: '18px 20px' }}>
@@ -1963,7 +2109,7 @@ function ArtCardLayout({ art, M, A, uff, dff, fz }) {
           const val    = art[f.key];
           const hasVal = val !== undefined && val !== null && val !== '';
           return (
-            <div key={f.key}>
+            <div key={f.key} style={f.full ? { gridColumn: '1 / -1' } : undefined}>
               <div style={{ fontSize: 8.5, fontWeight: 900, color: M.tD, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: uff }}>
                 {f.label}{f.required && <span style={{ color: '#ef4444', marginLeft: 3 }}>*</span>}
               </div>
@@ -2471,10 +2617,10 @@ export function ArticleMasterLayoutPanel({ M: rawM, A, uff, dff, canEdit = true,
             })}
           </>}
 
-          {/* ── Right: article count ── */}
+          {/* ── Right: record count — §LAYOUT_VIEW-I format: "N groups · M / T records" ── */}
           <div style={{ marginLeft: 'auto', fontSize: 9, color: M.tD, fontFamily: uff, flexShrink: 0 }}>
-            {layoutTab !== "cards" && `${orgHierarchy.length} ${l1Label.toLowerCase()}s · `}
-            {processedData.length} / {AM_DATA.length} articles
+            {layoutTab !== "cards" && `${orgHierarchy.length} groups · `}
+            {processedData.length} / {AM_DATA.length} records
           </div>
         </div>
 

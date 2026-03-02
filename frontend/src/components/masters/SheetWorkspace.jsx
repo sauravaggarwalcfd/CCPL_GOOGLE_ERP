@@ -12,6 +12,7 @@ import ViewsPanel from './ViewsPanel';
 import StatusBar from './StatusBar';
 import ItemCategoryTab from './ItemCategoryTab';
 import { ArticleMasterLayoutPanel } from './ArticleMasterTab';
+import { TrimMasterLayoutPanel } from './TrimMasterTab';
 import api from '../../services/api';
 
 // ── Mapping: raw → schema keys ──
@@ -234,9 +235,10 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     return <ItemCategoryTab M={M} A={A} uff={uff} dff={dff} />;
   }
 
-  // ── Extra tabs for Article Master (Layout View appended to existing tabs) ──
+  // ── Extra tabs for Article Master + Trim Master (Layout View appended to existing tabs) ──
   const isArticleMaster = sheet.key === "article_master";
-  const displayTabs = isArticleMaster
+  const isTrimMaster    = sheet.key === "trim_master";
+  const displayTabs = (isArticleMaster || isTrimMaster)
     ? [...MAIN_TABS, { id: "layout", label: "Layout View", icon: "🖼" }]
     : MAIN_TABS;
 
@@ -401,6 +403,9 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         )}
         {mainTab === "layout" && isArticleMaster && (
           <ArticleMasterLayoutPanel M={M} A={A} uff={uff} dff={dff} canEdit={canEdit} onEditRecord={handleEditFromLayout} />
+        )}
+        {mainTab === "layout" && isTrimMaster && (
+          <TrimMasterLayoutPanel M={M} A={A} uff={uff} dff={dff} canEdit={canEdit} onEditRecord={handleEditFromLayout} />
         )}
       </div>
 

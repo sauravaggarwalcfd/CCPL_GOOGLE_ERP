@@ -751,6 +751,71 @@ function ViewEditModal({ allFields, allCols, initial, isDup, existingNames, onSa
 }
 
 // ═══════════════════════════════════════════════════════════════════
+//  ADVANCED FILTER / SORT — operator-based, Layout View style
+//  Used by both RecordsTab and BulkEntryTab (§RECORDS-G/H/I, §BULK_ENTRY-J/K/L)
+// ═══════════════════════════════════════════════════════════════════
+const ADV_FILTER_OPS = {
+  cat: ['is', 'is not'],
+  txt: ['contains', 'not contains', 'starts with'],
+  num: ['=', '≠', '>', '<', '≥', '≤'],
+};
+const ADV_SORT_MODES = [
+  { value: 'a_z',       label: 'A → Z'               },
+  { value: 'z_a',       label: 'Z → A'               },
+  { value: 'nil_first', label: 'Nil / Empty First'    },
+  { value: 'nil_last',  label: 'Nil / Empty Last'     },
+  { value: 'freq_hi',   label: 'Most Frequent First'  },
+  { value: 'freq_lo',   label: 'Least Frequent First' },
+  { value: 'num_lo',    label: 'Lowest → Highest'     },
+  { value: 'num_hi',    label: 'Highest → Lowest'     },
+  { value: 'val_first', label: 'Value is… First'      },
+  { value: 'val_last',  label: 'Value is… Last'       },
+];
+function advFieldType(f) {
+  if (!f) return 'txt';
+  if (f.type==='number'||f.type==='currency'||f.type==='calc') return 'num';
+  if (f.type==='select'||f.options?.length||f.opts?.length||['fk','multifk','dropdown'].includes(f.type)) return 'cat';
+  return 'txt';
+}
+function evalAdvFilter(row, { field, op, value }, fields) {
+  const f = fields?.find(x => (x.key||x.col) === field);
+  const fType = advFieldType(f);
+  const rv = row[field];
+  if (fType === 'num') {
+    const n = parseFloat(rv), v = parseFloat(value);
+    if (isNaN(n) || isNaN(v)) return true;
+    return op==='='?n===v:op==='≠'?n!==v:op==='>'?n>v:op==='<'?n<v:op==='≥'?n>=v:n<=v;
+  }
+  if (fType === 'txt') {
+    const s = String(rv||'').toLowerCase(), v = String(value||'').toLowerCase();
+    return op==='contains'?s.includes(v):op==='not contains'?!s.includes(v):s.startsWith(v);
+  }
+  return op === 'is' ? rv === value : rv !== value;
+}
+function applyAdvSort(arr, advSorts, freqMaps) {
+  if (!advSorts.length) return arr;
+  return [...arr].sort((a, b) => {
+    for (const s of advSorts) {
+      const av = a[s.field]??'', bv = b[s.field]??'';
+      const ae = av===''||av==null, be = bv===''||bv==null;
+      let cmp = 0;
+      if      (s.mode==='nil_first') { if(ae!==be) cmp=ae?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='nil_last')  { if(ae!==be) cmp=ae?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='freq_hi')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fb-fa; }
+      else if (s.mode==='freq_lo')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fa-fb; }
+      else if (s.mode==='num_lo')    cmp=parseFloat(av||0)-parseFloat(bv||0);
+      else if (s.mode==='num_hi')    cmp=parseFloat(bv||0)-parseFloat(av||0);
+      else if (s.mode==='val_first') { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm) cmp=am?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='val_last')  { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm) cmp=am?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='z_a')       cmp=String(bv).localeCompare(String(av),undefined,{sensitivity:'base'});
+      else                           cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'});
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
 //  SHARED VIEW HELPERS — used in both RecordsTab and BulkEntry
 // ═══════════════════════════════════════════════════════════════════
 function buildViewState(vs, allCols) {
@@ -836,16 +901,40 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
   const [dropCol,       setDropCol]       = useState(null);
   const [exportMenu,    setExportMenu]    = useState(false);
   const [toast,         setToast]         = useState(null);
+  // §RECORDS-G/H: Advanced filter + sort (Layout View style)
+  const [advFilters,     setAdvFilters]    = useState([]);
+  const [advSorts,       setAdvSorts]      = useState([]);
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  const [showAdvSorts,   setShowAdvSorts]   = useState(false);
 
   const showToast = (msg, color="#15803d") => { setToast({msg,color}); setTimeout(()=>setToast(null),3000); };
 
   const visCols = colOrder.filter(c => !hiddenC.includes(c) && allCols.includes(c));
   const activeFilters = Object.values(filters).filter(v=>v.trim()).length;
+  const activeAdvFilterCount = advFilters.filter(f => f.value !== "").length;
+  const isAdvSortActive = advSorts.length > 0;
+
+  // Advanced filter/sort helpers
+  const addAdvFilter    = () => { setAdvFilters(p=>[...p,{id:Date.now(),field:allFields[0]?.col||"",op:"is",value:""}]); };
+  const removeAdvFilter = id  => setAdvFilters(p=>p.filter(f=>f.id!==id));
+  const updateAdvFilter = (id,patch) => setAdvFilters(p=>p.map(f=>{if(f.id!==id)return f;const m={...f,...patch};if(patch.field&&patch.field!==f.field){const ft=advFieldType(allFields.find(x=>x.col===patch.field));m.op=ADV_FILTER_OPS[ft]?.[0]||"is";m.value="";}return m;}));
+  const addAdvSort    = () => setAdvSorts(p=>[...p,{id:Date.now(),field:allFields[0]?.col||"",mode:"a_z",value:""}]);
+  const removeAdvSort = id  => setAdvSorts(p=>p.length>1?p.filter(s=>s.id!==id):p);
+  const updateAdvSort = (id,patch) => setAdvSorts(p=>p.map(s=>s.id===id?{...s,...patch}:s));
+
+  // Build frequency maps for freq_hi / freq_lo sort modes
+  const freqMaps = {};
+  allFields.forEach(f=>{const c={};mockRecords.forEach(r=>{const v=String(r[f.col]??"");c[v]=(c[v]||0)+1;});freqMaps[f.col]=c;});
 
   let visRows = applySortFilter(
     search.trim() ? mockRecords.filter(r => Object.values(r).join(" ").toLowerCase().includes(search.toLowerCase())) : mockRecords,
     sorts, filters, allFields
   );
+  // Apply advanced filters
+  advFilters.forEach(fil => { if(fil.value!=="") visRows=visRows.filter(r=>evalAdvFilter(r,fil,allFields)); });
+  // Apply advanced sorts after column-click sorts
+  if (isAdvSortActive) visRows = applyAdvSort(visRows, advSorts, freqMaps);
+
   const grouped = buildGrouped(visRows, groupBy, subGroupBy);
 
   const aggCellClick = (col, el) => {
@@ -922,6 +1011,15 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
     <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden",position:"relative"}}>
       {/* ── Toolbar Row 1 ── */}
       <div style={{padding:"6px 12px",borderBottom:"1px solid "+M.div,display:"flex",alignItems:"center",gap:6,background:M.mid,flexShrink:0,flexWrap:"wrap"}}>
+        {/* §RECORDS-G/H: Advanced Filter + Sort — LEFT of toolbar, always visible */}
+        <button onClick={()=>{const op=!showAdvFilters;setShowAdvFilters(op);setShowAdvSorts(false);if(op&&advFilters.length===0)addAdvFilter();}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showAdvFilters||activeAdvFilterCount>0?"#0891B2":M.inBd),background:showAdvFilters||activeAdvFilterCount>0?"rgba(8,145,178,.1)":M.inBg,color:showAdvFilters||activeAdvFilterCount>0?"#0e7490":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          ＋ Filter {activeAdvFilterCount>0&&<span style={{background:"#0891B2",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeAdvFilterCount}</span>}
+        </button>
+        <button onClick={()=>{const op=!showAdvSorts;setShowAdvSorts(op);setShowAdvFilters(false);if(op&&advSorts.length===0)addAdvSort();}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showAdvSorts||isAdvSortActive?"#7C3AED":M.inBd),background:showAdvSorts||isAdvSortActive?"rgba(124,58,237,.1)":M.inBg,color:showAdvSorts||isAdvSortActive?"#7C3AED":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          ↑ Sort {isAdvSortActive&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{advSorts.length}</span>}
+        </button>
+        {(activeAdvFilterCount>0||isAdvSortActive)&&<button onClick={()=>{setAdvFilters([]);setAdvSorts([]);}} style={{padding:"5px 9px",borderRadius:5,border:"1px solid #fecaca",background:"#fef2f2",color:"#dc2626",fontSize:10,fontWeight:900,cursor:"pointer",flexShrink:0}}>✕ Reset</button>}
+        <div style={{width:1,height:22,background:M.div,margin:"0 2px",flexShrink:0}} />
         <div style={{position:"relative",display:"flex",alignItems:"center"}}>
           <span style={{position:"absolute",left:8,fontSize:11,color:M.tD}}>🔍</span>
           <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search all fields…"
@@ -931,10 +1029,10 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
         <span style={{fontSize:10,color:M.tC,fontWeight:700}}>{visRows.length} of {mockRecords.length} records</span>
         <div style={{width:1,height:22,background:M.div,margin:"0 2px"}} />
         <button onClick={()=>{setShowFP(p=>!p);setShowSortPanel(false);setShowCM(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showFP||activeFilters>0?A.a:M.inBd),background:showFP||activeFilters>0?A.al:M.inBg,color:showFP||activeFilters>0?A.a:M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-          🔍 Filter {activeFilters>0&&<span style={{background:A.a,color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeFilters}</span>}
+          ⚡ Filter {activeFilters>0&&<span style={{background:A.a,color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeFilters}</span>}
         </button>
         <button onClick={()=>{setShowSortPanel(true);setShowFP(false);setShowCM(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showSortPanel||sorts.length>0?"#7C3AED":M.inBd),background:showSortPanel||sorts.length>0?"#ede9fe":M.inBg,color:showSortPanel||sorts.length>0?"#6d28d9":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-          ↕ Sort {sorts.length>0&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{sorts.length}</span>}
+          ⇅ Sort {sorts.length>0&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{sorts.length}</span>}
         </button>
         <select value={groupBy||""} onChange={e=>{setGroupBy(e.target.value||null);if(!e.target.value)setSubGroupBy(null);}} style={{padding:"5px 8px",border:"1.5px solid "+(groupBy?"#059669":M.inBd),borderRadius:5,background:groupBy?"#f0fdf4":M.inBg,color:groupBy?"#15803d":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",outline:"none"}}>
           <option value="">⊞ Group by…</option>
@@ -1021,6 +1119,36 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
         <button onClick={()=>setShowSave(false)} style={{padding:"5px 10px",border:"1px solid "+M.inBd,borderRadius:5,background:M.inBg,color:M.tB,fontSize:10,fontWeight:800,cursor:"pointer"}}>Cancel</button>
       </div>}
       {showSortPanel&&<SortPanel sorts={sorts} setSorts={setSorts} allFields={allFields} M={M} A={A} onClose={()=>setShowSortPanel(false)}/>}
+      {/* §RECORDS-G: Advanced Filter Panel */}
+      {showAdvFilters&&<div style={{padding:"10px 12px 12px",borderBottom:"1px solid "+M.div,background:M.hi,flexShrink:0}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {advFilters.map((fil,fi)=>{const f=allFields.find(x=>x.col===fil.field);const ft=advFieldType(f);const ops=ADV_FILTER_OPS[ft]||ADV_FILTER_OPS.txt;const catOpts=ft==="cat"&&(f?.options||f?.opts)??(null);const isAct=fil.value!=="";const cs={fontSize:10,border:"1px solid "+M.div,borderRadius:5,padding:"3px 7px",background:M.inBg,color:M.tA,cursor:"pointer",outline:"none"};return(
+            <div key={fil.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:9,color:M.tD,minWidth:34,textAlign:"right",fontWeight:600}}>{fi===0?"Where":"And"}</span>
+              <select value={fil.field} onChange={e=>updateAdvFilter(fil.id,{field:e.target.value})} style={{...cs,fontWeight:700,color:"#0e7490",borderColor:"#0891B270",background:"#f0fdfa"}}>{allFields.map(fd=><option key={fd.col} value={fd.col}>{fd.h}</option>)}</select>
+              <select value={fil.op} onChange={e=>updateAdvFilter(fil.id,{op:e.target.value})} style={cs}>{ops.map(op=><option key={op} value={op}>{op}</option>)}</select>
+              {ft==="cat"&&catOpts?<select value={fil.value} onChange={e=>updateAdvFilter(fil.id,{value:e.target.value})} style={{...cs,minWidth:110,fontWeight:700,borderColor:isAct?"#0891B270":M.div,color:isAct?"#0e7490":M.tA}}><option value="">Select value…</option>{catOpts.map(v=><option key={v} value={v}>{v}</option>)}</select>:<input value={fil.value} onChange={e=>updateAdvFilter(fil.id,{value:e.target.value})} placeholder={ft==="num"?"Enter number…":"Enter text…"} type={ft==="num"?"number":"text"} style={{...cs,minWidth:110,fontWeight:700,borderColor:isAct?"#0891B270":M.div,color:isAct?"#0e7490":M.tA}}/>}
+              <button onClick={()=>removeAdvFilter(fil.id)} style={{border:"none",background:"transparent",color:"#dc2626",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 3px",fontWeight:900}}>×</button>
+            </div>);})}
+          <button onClick={addAdvFilter} style={{alignSelf:"flex-start",marginLeft:40,border:"none",background:"transparent",color:"#0e7490",fontSize:9,fontWeight:700,cursor:"pointer",padding:0}}>＋ Add another filter</button>
+        </div>
+      </div>}
+      {/* §RECORDS-H: Advanced Sort Panel */}
+      {showAdvSorts&&<div style={{padding:"10px 12px 12px",borderBottom:"1px solid "+M.div,background:M.hi,flexShrink:0}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {advSorts.map((srt,si)=>{const f=allFields.find(x=>x.col===srt.field);const ft=advFieldType(f);const needVal=srt.mode==="val_first"||srt.mode==="val_last";const catOpts=needVal&&ft==="cat"&&(f?.options||f?.opts)??(null);const cs={fontSize:10,border:"1px solid "+M.div,borderRadius:5,padding:"3px 7px",background:M.inBg,color:M.tA,cursor:"pointer",outline:"none"};return(
+            <div key={srt.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:9,color:M.tD,minWidth:34,textAlign:"right",fontWeight:600}}>{si===0?"Sort":"Then"}</span>
+              <select value={srt.field} onChange={e=>updateAdvSort(srt.id,{field:e.target.value,value:""})} style={{...cs,fontWeight:700,color:"#6d28d9",borderColor:"#7c3aed70",background:"#7c3aed10"}}>{allFields.map(fd=><option key={fd.col} value={fd.col}>{fd.h}</option>)}</select>
+              <select value={srt.mode} onChange={e=>updateAdvSort(srt.id,{mode:e.target.value,value:""})} style={cs}>{ADV_SORT_MODES.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select>
+              {needVal&&(catOpts?<select value={srt.value} onChange={e=>updateAdvSort(srt.id,{value:e.target.value})} style={{...cs,minWidth:120,fontWeight:700}}><option value="">Pick value…</option>{catOpts.map(v=><option key={v} value={v}>{v}</option>)}</select>:<input value={srt.value} onChange={e=>updateAdvSort(srt.id,{value:e.target.value})} placeholder="Enter value…" style={{...cs,minWidth:120,fontWeight:700}}/>)}
+              {advSorts.length>1&&<button onClick={()=>removeAdvSort(srt.id)} style={{border:"none",background:"transparent",color:"#dc2626",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 3px",fontWeight:900}}>×</button>}
+            </div>);})}
+          <button onClick={addAdvSort} style={{alignSelf:"flex-start",marginLeft:40,border:"none",background:"transparent",color:"#6d28d9",fontSize:9,fontWeight:700,cursor:"pointer",padding:0}}>＋ Add another sort</button>
+        </div>
+      </div>}
+      {/* §RECORDS-I: Combined Filter + Sort Summary Strip — always visible when active */}
+      {(()=>{const colEnt=Object.entries(filters).filter(([,v])=>v);const anyF=colEnt.length>0||activeAdvFilterCount>0;if(!anyF&&!isAdvSortActive)return null;const cF={display:"inline-flex",alignItems:"center",gap:3,background:"rgba(8,145,178,.08)",border:"1px solid rgba(8,145,178,.3)",borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:700,color:"#0e7490",flexShrink:0};const cS={display:"inline-flex",alignItems:"center",gap:3,background:"rgba(124,58,237,.08)",border:"1px solid rgba(124,58,237,.3)",borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:700,color:"#7C3AED",flexShrink:0};return(<div style={{background:M.hi,borderBottom:"1px solid "+M.div,padding:"4px 12px",display:"flex",alignItems:"center",gap:6,flexShrink:0,flexWrap:"wrap"}}>{anyF&&<><span style={{fontSize:9,fontWeight:900,color:"#0891B2",flexShrink:0}}>FILTERED:</span>{colEnt.map(([k,v])=>{const fd=allFields.find(x=>x.col===k);return(<span key={"c_"+k} style={cF}>{fd?.h||k} <span style={{fontWeight:400,color:"#0891B2"}}>contains</span> <strong>{v}</strong><span onClick={()=>setFilters(p=>{const n={...p};delete n[k];return n;})} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span></span>);})} {advFilters.filter(f=>f.value!=="").map(fil=>{const fd=allFields.find(x=>x.col===fil.field);return(<span key={fil.id} style={cF}>{fd?.h||fil.field} <span style={{fontWeight:400,color:"#0891B2"}}>{fil.op}</span> <strong>{fil.value}</strong><span onClick={()=>removeAdvFilter(fil.id)} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span></span>);})}</>}{anyF&&isAdvSortActive&&<div style={{width:1,height:14,background:M.div,flexShrink:0}}/>}{isAdvSortActive&&<><span style={{fontSize:9,fontWeight:900,color:"#7C3AED",flexShrink:0}}>SORT:</span>{advSorts.map(srt=>{const fd=allFields.find(x=>x.col===srt.field);const ml=ADV_SORT_MODES.find(m=>m.value===srt.mode)?.label||srt.mode;return(<span key={srt.id} style={cS}>{fd?.h||srt.field} <span style={{fontWeight:400,color:"#9333ea"}}>{ml}</span>{srt.value?<> <strong>{srt.value}</strong></>:null}{advSorts.length>1&&<span onClick={()=>removeAdvSort(srt.id)} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span>}</span>);})}</>}<div style={{flex:1}}/><button onClick={()=>{setFilters({});setAdvFilters([]);setAdvSorts([]);}} style={{fontSize:9,color:"#dc2626",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>✕ Clear all</button></div>);})()}
       {/* Table */}
       <div style={{flex:1,overflowX:"auto",overflowY:"auto"}}>
         <table style={{borderCollapse:"collapse",minWidth:"100%"}}>
@@ -1251,10 +1379,41 @@ function BulkEntryTab({ allFields, M, A, fz, pyV, rows, setRows, viewState, setV
   const [toast,        setToast]        = useState(null);
   const nextId = useRef(Date.now());
 
+  // ── §BULK_ENTRY-J/K: Advanced filter / sort ──
+  const [advFilters,     setAdvFilters]    = useState([]);
+  const [advSorts,       setAdvSorts]      = useState([]);
+  const [showAdvFilters, setShowAdvFilters] = useState(false);
+  const [showAdvSorts,   setShowAdvSorts]   = useState(false);
+
   const showToast = (msg,color="#15803d") => { setToast({msg,color}); setTimeout(()=>setToast(null),3000); };
   const visCols = colOrder.filter(c => !hiddenC.includes(c) && allCols.includes(c));
   const activeFilters = Object.values(filters).filter(v=>v.trim()).length;
-  const visRows = applySortFilter(rows, sorts, filters, allFields);
+
+  // §BULK_ENTRY-J: field defs for adv filter/sort (exclude auto/calc)
+  const advFieldDefs = allFields.filter(f=>!f.auto&&!["calc","autocode"].includes(f.type)).map(f=>({key:f.col,label:f.h||f.col,type:advFieldType(f),opts:f.opts||null}));
+  const activeAdvFilterCount = advFilters.filter(f=>f.value!=="").length;
+  const isAdvSortActive = advSorts.length > 0;
+
+  const addAdvFilter = () => { const fi=advFieldDefs[0]; const ft=fi?advFieldType(allFields.find(x=>x.col===fi.key)):"txt"; setAdvFilters(p=>[...p,{id:Date.now(),field:fi?.key||"",op:ADV_FILTER_OPS[ft]?.[0]||"is",value:""}]); };
+  const removeAdvFilter = id => setAdvFilters(p=>p.filter(f=>f.id!==id));
+  const updateAdvFilter = (id,patch) => setAdvFilters(p=>p.map(f=>{if(f.id!==id)return f;const m={...f,...patch};if(patch.field&&patch.field!==f.field){const ft=advFieldType(allFields.find(x=>x.col===patch.field));m.op=ADV_FILTER_OPS[ft]?.[0]||"is";m.value="";}return m;}));
+  const addAdvSort = () => { const fi=advFieldDefs[0]; setAdvSorts(p=>[...p,{id:Date.now(),field:fi?.key||"",mode:"a_z",value:""}]); };
+  const removeAdvSort = id => setAdvSorts(p=>p.length>1?p.filter(s=>s.id!==id):p);
+  const updateAdvSort = (id,patch) => setAdvSorts(p=>p.map(s=>s.id===id?{...s,...patch}:s));
+
+  // §BULK_ENTRY-K: frequency maps for sort modes
+  const freqMapsB = {};
+  advFieldDefs.forEach(f=>{const counts={};rows.forEach(r=>{const v=String(r[f.key]??"");counts[v]=(counts[v]||0)+1;});freqMapsB[f.key]=counts;});
+
+  // §BULK_ENTRY-J/K: visRows applies per-col filters → advFilters → per-col sorts → advSorts
+  const visRows = (()=>{
+    let rs=[...rows];
+    Object.entries(filters).forEach(([col,val])=>{if(!val.trim())return;rs=rs.filter(r=>String(r[col]||"").toLowerCase().includes(val.trim().toLowerCase()));});
+    advFilters.forEach(fil=>{if(fil.value!==""||advFieldType(allFields.find(x=>x.col===fil.field))==="num")rs=rs.filter(r=>evalAdvFilter(r,fil,allFields));});
+    rs=applySortFilter(rs,[...sorts],{},allFields);
+    if(isAdvSortActive)rs=applyAdvSort(rs,advSorts,freqMapsB);
+    return rs;
+  })();
   const grouped = buildGrouped(visRows, groupBy, subGroupBy);
   const dirtyCount = rows.filter(r=>r.__dirty||r.__new).length;
 
@@ -1350,8 +1509,14 @@ function BulkEntryTab({ allFields, M, A, fz, pyV, rows, setRows, viewState, setV
         {selRows.size>0&&<button onClick={deleteSelected} style={{padding:"5px 12px",border:"1px solid #fecaca",borderRadius:5,background:"#fef2f2",color:"#dc2626",fontSize:10,fontWeight:900,cursor:"pointer"}}>🗑 Delete {selRows.size}</button>}
         {dirtyCount>0&&<button onClick={saveDirty} style={{padding:"5px 14px",border:"none",borderRadius:5,background:"#15803d",color:"#fff",fontSize:10,fontWeight:900,cursor:"pointer"}}>✓ Save {dirtyCount} Changes</button>}
         <div style={{width:1,height:22,background:M.div,margin:"0 4px"}}/>
-        <button onClick={()=>{setShowFP(p=>!p);setShowSortPanel(false);setShowCM(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showFP||activeFilters>0?A.a:M.inBd),background:showFP||activeFilters>0?A.al:M.inBg,color:showFP||activeFilters>0?A.a:M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>🔍 Filter {activeFilters>0&&<span style={{background:A.a,color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeFilters}</span>}</button>
-        <button onClick={()=>{setShowSortPanel(true);setShowFP(false);setShowCM(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showSortPanel||sorts.length>0?"#7C3AED":M.inBd),background:showSortPanel||sorts.length>0?"#ede9fe":M.inBg,color:showSortPanel||sorts.length>0?"#6d28d9":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>↕ Sort {sorts.length>0&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{sorts.length}</span>}</button>
+        <button onClick={()=>{setShowFP(p=>!p);setShowSortPanel(false);setShowCM(false);setShowAdvFilters(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showFP||activeFilters>0?A.a:M.inBd),background:showFP||activeFilters>0?A.al:M.inBg,color:showFP||activeFilters>0?A.a:M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Col Filter {activeFilters>0&&<span style={{background:A.a,color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeFilters}</span>}</button>
+        <button onClick={()=>{const op=!showAdvFilters;setShowAdvFilters(op);setShowFP(false);setShowCM(false);setShowAdvSorts(false);if(op&&advFilters.length===0)addAdvFilter();}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showAdvFilters||activeAdvFilterCount>0?"#0891B2":M.inBd),background:showAdvFilters||activeAdvFilterCount>0?"rgba(8,145,178,.1)":M.inBg,color:showAdvFilters||activeAdvFilterCount>0?"#0e7490":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          ＋ Filter {activeAdvFilterCount>0&&<span style={{background:"#0891B2",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{activeAdvFilterCount}</span>}
+        </button>
+        <button onClick={()=>{setShowSortPanel(true);setShowFP(false);setShowCM(false);setShowAdvSorts(false);}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showSortPanel||sorts.length>0?"#7C3AED":M.inBd),background:showSortPanel||sorts.length>0?"#ede9fe":M.inBg,color:showSortPanel||sorts.length>0?"#6d28d9":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>Col Sort {sorts.length>0&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{sorts.length}</span>}</button>
+        <button onClick={()=>{const op=!showAdvSorts;setShowAdvSorts(op);setShowSortPanel(false);setShowFP(false);setShowAdvFilters(false);if(op&&advSorts.length===0)addAdvSort();}} style={{padding:"5px 10px",borderRadius:5,border:"1.5px solid "+(showAdvSorts||isAdvSortActive?"#7C3AED":M.inBd),background:showAdvSorts||isAdvSortActive?"rgba(124,58,237,.1)":M.inBg,color:showAdvSorts||isAdvSortActive?"#7C3AED":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:4,flexShrink:0}}>
+          ↑ Sort {isAdvSortActive&&<span style={{background:"#7C3AED",color:"#fff",borderRadius:10,padding:"0 5px",fontSize:8}}>{advSorts.length}</span>}
+        </button>
         <select value={groupBy||""} onChange={e=>{setGroupBy(e.target.value||null);if(!e.target.value)setSubGroupBy(null);}} style={{padding:"5px 8px",border:"1.5px solid "+(groupBy?"#059669":M.inBd),borderRadius:5,background:groupBy?"#f0fdf4":M.inBg,color:groupBy?"#15803d":M.tB,fontSize:10,fontWeight:900,cursor:"pointer",outline:"none"}}>
           <option value="">⊞ Group by…</option>
           {allFields.filter(f=>["dropdown","fk","manual"].includes(f.type)).map(f=><option key={f.col} value={f.col}>{f.col} — {f.h}</option>)}
@@ -1375,6 +1540,36 @@ function BulkEntryTab({ allFields, M, A, fz, pyV, rows, setRows, viewState, setV
       {showCM&&<div style={{padding:"10px 12px",borderBottom:"1px solid "+M.div,background:M.hi,flexShrink:0,display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}><span style={{fontSize:9,fontWeight:900,color:M.tD,textTransform:"uppercase",letterSpacing:.8,marginRight:4}}>COLUMNS:</span>{allCols.map(col=>{const f=allFields.find(x=>x.col===col);const hidden=hiddenC.includes(col);return(<button key={col} onClick={()=>setHiddenC(p=>hidden?p.filter(c=>c!==col):[...p,col])} style={{padding:"3px 8px",borderRadius:4,border:"1.5px solid "+(hidden?M.div:A.a),background:hidden?M.lo:A.al,color:hidden?M.tD:A.a,fontSize:9,fontWeight:hidden?700:900,cursor:"pointer",textDecoration:hidden?"line-through":"none"}}>{col} {f?.h}</button>);})}<button onClick={()=>setHiddenC([])} style={{padding:"3px 9px",border:"1px solid "+M.inBd,borderRadius:4,background:M.inBg,color:M.tB,fontSize:9,fontWeight:800,cursor:"pointer",marginLeft:4}}>Show All</button></div>}
       {showSave&&<div style={{padding:"8px 12px",borderBottom:"1px solid "+M.div,background:"#fdfbff",flexShrink:0,display:"flex",gap:8,alignItems:"center"}}><span style={{fontSize:9,fontWeight:900,color:"#6d28d9",textTransform:"uppercase",letterSpacing:.8}}>SAVE VIEW:</span><input value={tplName} onChange={e=>setTplName(e.target.value)} placeholder="View name…" style={{border:"1.5px solid #c4b5fd",borderRadius:5,background:"#fff",color:"#1a1a1a",fontSize:11,padding:"4px 9px",outline:"none",width:200}}/><button onClick={saveTemplate} style={{padding:"5px 14px",border:"none",borderRadius:5,background:"#7C3AED",color:"#fff",fontSize:10,fontWeight:900,cursor:"pointer"}}>💾 Save</button><button onClick={()=>setShowSave(false)} style={{padding:"5px 10px",border:"1px solid "+M.inBd,borderRadius:5,background:M.inBg,color:M.tB,fontSize:10,fontWeight:800,cursor:"pointer"}}>Cancel</button></div>}
       {showSortPanel&&<SortPanel sorts={sorts} setSorts={setSorts} allFields={allFields} M={M} A={A} onClose={()=>setShowSortPanel(false)}/>}
+      {/* §BULK_ENTRY-J: Advanced Operator Filter Panel */}
+      {showAdvFilters&&<div style={{padding:"10px 12px 12px",borderBottom:"1px solid "+M.div,background:M.hi,flexShrink:0}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {advFilters.map((fil,fi)=>{const f=allFields.find(x=>x.col===fil.field);const ft=advFieldType(f);const ops=ADV_FILTER_OPS[ft]||ADV_FILTER_OPS.txt;const catOpts=ft==="cat"&&(f?.options||f?.opts)??(null);const isAct=fil.value!=="";const cs={fontSize:10,border:"1px solid "+M.div,borderRadius:5,padding:"3px 7px",background:M.inBg,color:M.tA,cursor:"pointer",outline:"none"};return(
+            <div key={fil.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:9,color:M.tD,minWidth:34,textAlign:"right",fontWeight:600}}>{fi===0?"Where":"And"}</span>
+              <select value={fil.field} onChange={e=>updateAdvFilter(fil.id,{field:e.target.value})} style={{...cs,fontWeight:700,color:"#0e7490",borderColor:"#0891B270",background:"#f0fdfa"}}>{allFields.map(fd=><option key={fd.col} value={fd.col}>{fd.h}</option>)}</select>
+              <select value={fil.op} onChange={e=>updateAdvFilter(fil.id,{op:e.target.value})} style={cs}>{ops.map(op=><option key={op} value={op}>{op}</option>)}</select>
+              {ft==="cat"&&catOpts?<select value={fil.value} onChange={e=>updateAdvFilter(fil.id,{value:e.target.value})} style={{...cs,minWidth:110,fontWeight:700,borderColor:isAct?"#0891B270":M.div,color:isAct?"#0e7490":M.tA}}><option value="">Select value…</option>{catOpts.map(v=><option key={v} value={v}>{v}</option>)}</select>:<input value={fil.value} onChange={e=>updateAdvFilter(fil.id,{value:e.target.value})} placeholder={ft==="num"?"Enter number…":"Enter text…"} type={ft==="num"?"number":"text"} style={{...cs,minWidth:110,fontWeight:700,borderColor:isAct?"#0891B270":M.div,color:isAct?"#0e7490":M.tA}}/>}
+              <button onClick={()=>removeAdvFilter(fil.id)} style={{border:"none",background:"transparent",color:"#dc2626",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 3px",fontWeight:900}}>×</button>
+            </div>);})}
+          <button onClick={addAdvFilter} style={{alignSelf:"flex-start",marginLeft:40,border:"none",background:"transparent",color:"#0e7490",fontSize:9,fontWeight:700,cursor:"pointer",padding:0}}>＋ Add another filter</button>
+        </div>
+      </div>}
+      {/* §BULK_ENTRY-K: Advanced Multi-Mode Sort Panel */}
+      {showAdvSorts&&<div style={{padding:"10px 12px 12px",borderBottom:"1px solid "+M.div,background:M.hi,flexShrink:0}}>
+        <div style={{display:"flex",flexDirection:"column",gap:6}}>
+          {advSorts.map((srt,si)=>{const f=allFields.find(x=>x.col===srt.field);const ft=advFieldType(f);const needVal=srt.mode==="val_first"||srt.mode==="val_last";const catOpts=needVal&&ft==="cat"&&(f?.options||f?.opts)??(null);const cs={fontSize:10,border:"1px solid "+M.div,borderRadius:5,padding:"3px 7px",background:M.inBg,color:M.tA,cursor:"pointer",outline:"none"};return(
+            <div key={srt.id} style={{display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+              <span style={{fontSize:9,color:M.tD,minWidth:34,textAlign:"right",fontWeight:600}}>{si===0?"Sort":"Then"}</span>
+              <select value={srt.field} onChange={e=>updateAdvSort(srt.id,{field:e.target.value,value:""})} style={{...cs,fontWeight:700,color:"#6d28d9",borderColor:"#7c3aed70",background:"#7c3aed10"}}>{allFields.map(fd=><option key={fd.col} value={fd.col}>{fd.h}</option>)}</select>
+              <select value={srt.mode} onChange={e=>updateAdvSort(srt.id,{mode:e.target.value,value:""})} style={cs}>{ADV_SORT_MODES.map(m=><option key={m.value} value={m.value}>{m.label}</option>)}</select>
+              {needVal&&(catOpts?<select value={srt.value} onChange={e=>updateAdvSort(srt.id,{value:e.target.value})} style={{...cs,minWidth:120,fontWeight:700}}><option value="">Pick value…</option>{catOpts.map(v=><option key={v} value={v}>{v}</option>)}</select>:<input value={srt.value} onChange={e=>updateAdvSort(srt.id,{value:e.target.value})} placeholder="Enter value…" style={{...cs,minWidth:120,fontWeight:700}}/>)}
+              {advSorts.length>1&&<button onClick={()=>removeAdvSort(srt.id)} style={{border:"none",background:"transparent",color:"#dc2626",cursor:"pointer",fontSize:15,lineHeight:1,padding:"0 3px",fontWeight:900}}>×</button>}
+            </div>);})}
+          <button onClick={addAdvSort} style={{alignSelf:"flex-start",marginLeft:40,border:"none",background:"transparent",color:"#6d28d9",fontSize:9,fontWeight:700,cursor:"pointer",padding:0}}>＋ Add another sort</button>
+        </div>
+      </div>}
+      {/* §BULK_ENTRY-L: Combined Filter + Sort Summary Strip */}
+      {(()=>{const colEnt=Object.entries(filters).filter(([,v])=>v);const anyF=colEnt.length>0||activeAdvFilterCount>0;if(!anyF&&!isAdvSortActive)return null;const cF={display:"inline-flex",alignItems:"center",gap:3,background:"rgba(8,145,178,.08)",border:"1px solid rgba(8,145,178,.3)",borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:700,color:"#0e7490",flexShrink:0};const cS={display:"inline-flex",alignItems:"center",gap:3,background:"rgba(124,58,237,.08)",border:"1px solid rgba(124,58,237,.3)",borderRadius:20,padding:"2px 8px",fontSize:9,fontWeight:700,color:"#7C3AED",flexShrink:0};return(<div style={{background:M.hi,borderBottom:"1px solid "+M.div,padding:"4px 12px",display:"flex",alignItems:"center",gap:6,flexShrink:0,flexWrap:"wrap"}}>{anyF&&<><span style={{fontSize:9,fontWeight:900,color:"#0891B2",flexShrink:0}}>FILTERED:</span>{colEnt.map(([k,v])=>{const fd=allFields.find(x=>x.col===k);return(<span key={"c_"+k} style={cF}>{fd?.h||k} <span style={{fontWeight:400,color:"#0891B2"}}>contains</span> <strong>{v}</strong><span onClick={()=>setFilters(p=>{const n={...p};delete n[k];return n;})} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span></span>);})} {advFilters.filter(f=>f.value!=="").map(fil=>{const fd=allFields.find(x=>x.col===fil.field);return(<span key={fil.id} style={cF}>{fd?.h||fil.field} <span style={{fontWeight:400,color:"#0891B2"}}>{fil.op}</span> <strong>{fil.value}</strong><span onClick={()=>removeAdvFilter(fil.id)} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span></span>);})}</>}{anyF&&isAdvSortActive&&<div style={{width:1,height:14,background:M.div,flexShrink:0}}/>}{isAdvSortActive&&<><span style={{fontSize:9,fontWeight:900,color:"#7C3AED",flexShrink:0}}>SORT:</span>{advSorts.map(srt=>{const fd=allFields.find(x=>x.col===srt.field);const ml=ADV_SORT_MODES.find(m=>m.value===srt.mode)?.label||srt.mode;return(<span key={srt.id} style={cS}>{fd?.h||srt.field} <span style={{fontWeight:400,color:"#9333ea"}}>{ml}</span>{srt.value?<> <strong>{srt.value}</strong></>:null}{advSorts.length>1&&<span onClick={()=>removeAdvSort(srt.id)} style={{cursor:"pointer",color:M.tD,fontSize:11,lineHeight:1,marginLeft:1}}>×</span>}</span>);})}</>}<div style={{flex:1}}/><button onClick={()=>{setFilters({});setAdvFilters([]);setAdvSorts([]);}} style={{fontSize:9,color:"#dc2626",background:"transparent",border:"none",cursor:"pointer",flexShrink:0}}>✕ Clear all</button></div>);})()}
       {/* Grid */}
       <div style={{flex:1,overflowX:"auto",overflowY:"auto"}}>
         <table style={{borderCollapse:"collapse",minWidth:"100%"}}>
@@ -1501,6 +1696,783 @@ function FieldSpecsTab({ allFields, M, A, fz, pyV }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  LAYOUT VIEW — §LAYOUT_VIEW  (CC_ERP_MODULE_display_SKILL.md)
+//  Full rules: CC_ERP_LAYOUT_VIEW_RULES.md
+//  Source reference: ArticleMasterTab.jsx → ArticleMasterLayoutPanel
+// ════════════════════════════════════════════════════════════════════════
+
+// ── Theme adapter (required — run rawM through this before any use) ──
+function toM(M) {
+  return {
+    ...M,
+    sh:M.shellBg||M.surfHigh, shBd:M.shellBd||M.divider,
+    hi:M.surfHigh, mid:M.surfMid, lo:M.surfLow,
+    hov:M.hoverBg, inBg:M.inputBg, inBd:M.inputBd,
+    div:M.divider, thd:M.tblHead, tev:M.tblEven, tod:M.tblOdd,
+    bBg:M.badgeBg, bTx:M.badgeTx,
+    tA:M.textA, tB:M.textB, tC:M.textC, tD:M.textD,
+    scr:M.scrollThumb, shadow:M.shadow,
+  };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-GROUPABLE]  Fields that can be used as Group By L1 / L2
+//  ~9 fields, always include primary dimension + category + status
+// ═══════════════════════════════════════════════════════════
+const LV_GROUPABLE_FIELDS = [
+  // { key: "l1Division", label: "Division"   },
+  // { key: "l2Category", label: "Category"   },
+  // { key: "gender",     label: "Gender"     },
+  // { key: "season",     label: "Season"     },
+  // { key: "status",     label: "Status"     },
+  // { key: "fitType",    label: "Fit Type"   },
+  // Add module-specific groupable fields here
+];
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-PRESETS]  Quick grouping preset combinations (5–6)
+// ═══════════════════════════════════════════════════════════
+const LV_PRESETS = [
+  // { label: "Div › Category",    l1: "l1Division", l2: "l2Category" },
+  // { label: "Gender › Category", l1: "gender",     l2: "l2Category" },
+  // { label: "Season › Category", l1: "season",     l2: "l2Category" },
+  // { label: "Status › Div",      l1: "status",     l2: "l1Division" },
+];
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-META]  Color + icon per group value
+//  Define maps for each groupable dimension.
+//  Use hashColor() for unknown/dynamic values.
+// ═══════════════════════════════════════════════════════════
+const LV_PALETTE = ["#E8690A","#7C3AED","#15803D","#0078D4","#DC2626","#D97706","#059669","#2563EB","#DB2777","#0891B2","#65A30D","#9333EA"];
+function lvHashColor(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  return LV_PALETTE[h % LV_PALETTE.length];
+}
+// Example metadata maps — replace with module-specific values:
+// const LV_DIVISION_META = {
+//   "Men's Apparel":   { color: "#E8690A", icon: "👔" },
+//   "Women's Apparel": { color: "#7C3AED", icon: "👗" },
+// };
+// const LV_STATUS_META = {
+//   Active:      { color: "#15803D", icon: "✅" },
+//   Inactive:    { color: "#DC2626", icon: "⛔" },
+//   Development: { color: "#D97706", icon: "🔧" },
+// };
+function lvGetGroupMeta(field, value) {
+  // TODO: return { color, icon } for field/value — use metadata maps above
+  // Example:
+  // if (field === "l1Division") return LV_DIVISION_META[value] || { color: lvHashColor(value), icon: "📂" };
+  // if (field === "status")     return LV_STATUS_META[value]   || { color: lvHashColor(value), icon: "●"  };
+  return { color: lvHashColor(String(value)), icon: "◆" };
+}
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-SCHEMA]  Detail modal field schema
+//  Used by LayoutViewDetailModal to display record fields
+//  Flags: mono (dff font) | badge (status pill) | required (red *) | full (span full width in Card layout)
+// ═══════════════════════════════════════════════════════════
+const LV_SCHEMA = [
+  // { key: "code",   label: "Record Code",  mono: true, required: true },
+  // { key: "desc",   label: "Description",              required: true, full: true },
+  // { key: "status", label: "Status",        badge: true               },
+  // { key: "tags",   label: "Tags",                                     full: true },
+  // Add all display fields here
+];
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-DISPLAY]  Display options — which fields default ON
+// ═══════════════════════════════════════════════════════════
+const LV_DISPLAY_FIELDS = LV_SCHEMA.map(f => ({ key: f.key, label: f.label }));
+const LV_INIT_SHOW_FIELDS = Object.fromEntries(
+  LV_DISPLAY_FIELDS.map(f => [f.key, ["code","status"].includes(f.key)])
+  // TODO: set true for the fields you want shown by default (code + status always true)
+);
+const LV_INIT_DISPLAY_OPTS = {
+  thumbnail: false,
+  thumbSize: "md",      // "sm" | "md" | "lg"
+  density:   "summary", // "summary" | "detail"
+  showFields: LV_INIT_SHOW_FIELDS,
+};
+
+// ═══════════════════════════════════════════════════════════
+//  [TODO-LV-INIT-VIEWS]  Initial locked views (2–3 recommended)
+//  locked: true  = cannot be renamed/deleted (Default, and type presets)
+//  Always include at minimum: v_default
+// ═══════════════════════════════════════════════════════════
+const LV_INIT_VIEWS = [
+  { id: "v_default", name: "Default", icon: "🌳", color: "#0078D4", locked: true,
+    layoutTab: "classic",
+    groupByL1: LV_GROUPABLE_FIELDS[0]?.key || "",
+    groupByL2: LV_GROUPABLE_FIELDS[1]?.key || "",
+    filters: [], sorts: [{ id: 1, field: LV_SCHEMA[0]?.key || "code", mode: "a_z", value: "" }],
+    search: "", displayOpts: LV_INIT_DISPLAY_OPTS, cardsGroupBy: "", cardsSubGroupBy: "" },
+  // Add 1–2 more locked views for common layouts:
+  // { id: "v_cards",  name: "Cards",  icon: "▦", color: "#7C3AED", locked: true, layoutTab: "cards",  ... },
+  // { id: "v_matrix", name: "Matrix", icon: "⊞", color: "#E8690A", locked: true, layoutTab: "matrix", ... },
+];
+
+// ── Status badge colors (extend for module-specific statuses) ──
+const LV_STATUS_BG = {
+  Active: "#d1fae5", Development: "#fef3c7", Inactive: "#fee2e2",
+  Approved: "#d1fae5", Draft: "#f3f4f6", Completed: "#d1fae5",
+  Overdue: "#fee2e2", Blocked: "#fee2e2", Yes: "#d1fae5", No: "#fee2e2",
+};
+const LV_STATUS_TX = {
+  Active: "#065f46", Development: "#92400e", Inactive: "#991b1b",
+  Approved: "#065f46", Draft: "#6b7280", Completed: "#065f46",
+  Overdue: "#991b1b", Blocked: "#991b1b", Yes: "#065f46", No: "#991b1b",
+};
+
+// ── Filter operator sets ──
+const LV_FILTER_OPS = {
+  cat: ["is", "is not", "contains", "starts with"],
+  num: ["=", "≠", ">", "<", "≥", "≤"],
+  txt: ["contains", "starts with", "is", "is not"],
+};
+const LV_SORT_MODES = [
+  { value: "a_z",    label: "A → Z"          },
+  { value: "z_a",    label: "Z → A"          },
+  { value: "freq_h", label: "Most frequent"  },
+  { value: "freq_l", label: "Least frequent" },
+  { value: "num_h",  label: "High → Low"     },
+  { value: "num_l",  label: "Low → High"     },
+];
+
+// ── Layout View toggle switch ──
+function LvToggleSwitch({ on, onChange, A }) {
+  return (
+    <div onClick={onChange} style={{ width:30, height:16, borderRadius:8, background:on?A.a:"#aaa", cursor:"pointer", position:"relative", transition:"background .15s", flexShrink:0 }}>
+      <div style={{ position:"absolute", top:2, left:on?16:2, width:12, height:12, borderRadius:6, background:"#fff", transition:"left .15s", boxShadow:"0 1px 3px rgba(0,0,0,.2)" }} />
+    </div>
+  );
+}
+
+// ── Layout View Save-View Modal ──
+const LV_VICONS = ["⚡","📋","▦","⊞","🌳","⟁","≡","🎯","✅","📊","📦","🏷️","⚙️","🔑"];
+const LV_VCOLORS = ["#E8690A","#0078D4","#15803D","#7C3AED","#BE123C","#854d0e","#059669","#6b7280"];
+function LvSaveViewModal({ onSave, onClose, M, A, uff }) {
+  const [name,  setName]  = useState("");
+  const [icon,  setIcon]  = useState("📋");
+  const [color, setColor] = useState("#7C3AED");
+  return (
+    <>
+      <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.3)", zIndex:3000 }} />
+      <div style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:320, background:M.hi, borderRadius:12, border:`1px solid ${M.div}`, zIndex:3001, overflow:"hidden", boxShadow:"0 16px 48px rgba(0,0,0,.3)" }}>
+        <div style={{ padding:"11px 16px", borderBottom:`1px solid ${M.div}`, background:M.thd, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:11, fontWeight:900, color:M.tA, fontFamily:uff }}>💾 Save View As</span>
+          <button onClick={onClose} style={{ border:"none", background:"transparent", color:M.tD, fontSize:18, cursor:"pointer" }}>×</button>
+        </div>
+        <div style={{ padding:16 }}>
+          <div style={{ fontSize:9, fontWeight:800, color:M.tD, fontFamily:uff, marginBottom:4, textTransform:"uppercase" }}>View Name</div>
+          <input value={name} onChange={e=>setName(e.target.value)} autoFocus placeholder="e.g. My Custom View"
+            style={{ width:"100%", padding:"7px 10px", border:`1.5px solid ${A.a}`, borderRadius:6, background:M.inBg, color:M.tA, fontSize:12, fontFamily:uff, outline:"none", boxSizing:"border-box", marginBottom:12 }} />
+          <div style={{ fontSize:9, fontWeight:800, color:M.tD, fontFamily:uff, marginBottom:6, textTransform:"uppercase" }}>Icon</div>
+          <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:12 }}>
+            {LV_VICONS.map(ic => (
+              <button key={ic} onClick={()=>setIcon(ic)} style={{ width:28, height:28, border:`1.5px solid ${icon===ic?A.a:M.div}`, borderRadius:6, background:icon===ic?A.al:"transparent", cursor:"pointer", fontSize:14 }}>{ic}</button>
+            ))}
+          </div>
+          <div style={{ fontSize:9, fontWeight:800, color:M.tD, fontFamily:uff, marginBottom:6, textTransform:"uppercase" }}>Color</div>
+          <div style={{ display:"flex", gap:4, flexWrap:"wrap", marginBottom:16 }}>
+            {LV_VCOLORS.map(c => (
+              <button key={c} onClick={()=>setColor(c)} style={{ width:22, height:22, borderRadius:"50%", background:c, border:`2.5px solid ${color===c?M.tA:"transparent"}`, cursor:"pointer" }} />
+            ))}
+          </div>
+          <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
+            <button onClick={onClose} style={{ padding:"7px 16px", border:`1px solid ${M.div}`, borderRadius:6, background:"transparent", color:M.tB, fontSize:11, cursor:"pointer", fontFamily:uff }}>Cancel</button>
+            <button onClick={()=>name.trim()&&onSave({name:name.trim(),icon,color})}
+              style={{ padding:"7px 16px", border:"none", borderRadius:6, background:name.trim()?A.a:M.bBg, color:name.trim()?"#fff":M.tD, fontSize:11, fontWeight:800, cursor:name.trim()?"pointer":"default", fontFamily:uff }}>
+              Save View
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout View Detail Modal (3-layout: Card / Table / JSON) ──
+function LayoutViewDetailModal({ record, onClose, onPrev, onNext, recIndex, totalRecs, onEdit, canEdit = true, M, A, uff, dff, fz = 13 }) {
+  const [layout, setLayout] = useState("card"); // "card" | "table" | "json"
+  const codeKey = LV_SCHEMA[0]?.key || "code";
+  const codeVal = record[codeKey] || "—";
+  const LAYOUTS = [{ id:"card", label:"▦ Card" }, { id:"table", label:"≡ Table" }, { id:"json", label:"{ } JSON" }];
+
+  return (
+    <>
+      <div onClick={onClose} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.55)", backdropFilter:"blur(3px)", zIndex:1100 }} />
+      <div style={{ position:"fixed", top:"50%", left:"50%", transform:"translate(-50%,-50%)", width:660, maxWidth:"95vw", maxHeight:"88vh", background:M.hi, border:`1px solid ${M.div}`, borderRadius:12, zIndex:1101, boxShadow:M.shadow, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        {/* ── Header (A.a accent — MANDATORY) ── */}
+        <div style={{ background:A.a, padding:"12px 18px", display:"flex", alignItems:"center", gap:10, flexShrink:0 }}>
+          <span style={{ fontSize:16 }}>📋</span>
+          <div>
+            <div style={{ fontSize:13, fontWeight:900, color:"#fff", fontFamily:uff }}>Record Detail</div>
+            <div style={{ fontSize:10, color:"rgba(255,255,255,.75)", fontFamily:dff }}>{codeVal}</div>
+          </div>
+          <div style={{ flex:1 }} />
+          {/* Layout toggle */}
+          <div style={{ display:"flex", background:"rgba(255,255,255,.15)", borderRadius:6, overflow:"hidden", gap:1 }}>
+            {LAYOUTS.map(l => (
+              <button key={l.id} onClick={()=>setLayout(l.id)}
+                style={{ padding:"4px 10px", border:"none", cursor:"pointer", fontSize:9.5, fontWeight:layout===l.id?900:600, background:layout===l.id?"rgba(255,255,255,.3)":"transparent", color:"#fff", fontFamily:uff }}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+          {canEdit && <span style={{ fontSize:9, color:"rgba(255,255,255,.6)", fontFamily:uff }}>Read Only</span>}
+          {!canEdit && <span style={{ fontSize:9, color:"rgba(255,255,255,.6)", fontFamily:uff, background:"rgba(0,0,0,.2)", padding:"2px 7px", borderRadius:4 }}>🔒 Read Only</span>}
+          <button onClick={onClose} style={{ width:28, height:28, borderRadius:6, border:"none", background:"rgba(255,255,255,.2)", color:"#fff", cursor:"pointer", fontSize:14, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+        </div>
+        {/* ── Body ── */}
+        <div style={{ flex:1, overflowY:"auto" }}>
+          {layout === "card" && (
+            <div style={{ padding:"18px 20px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"12px 24px" }}>
+                {LV_SCHEMA.map(f => {
+                  const val = record[f.key];
+                  const hasVal = val !== undefined && val !== null && val !== "";
+                  return (
+                    <div key={f.key} style={{ gridColumn:(f.full||f.type==="textarea")?"1 / -1":undefined }}>
+                      <div style={{ fontSize:8.5, fontWeight:900, color:M.tD, textTransform:"uppercase", letterSpacing:0.5, marginBottom:4, fontFamily:uff }}>
+                        {f.label}{f.required&&<span style={{ color:"#ef4444", marginLeft:3 }}>*</span>}
+                      </div>
+                      <div style={{ fontSize:fz, fontWeight:f.key===codeKey?800:f.badge?700:400, color:f.key===codeKey?A.a:M.tA, fontFamily:f.mono?dff:uff, padding:"6px 10px", background:M.mid, borderRadius:5, minHeight:28, display:"flex", alignItems:"center", border:`1px solid ${M.div}` }}>
+                        {hasVal ? (
+                          f.badge
+                            ? <span style={{ fontSize:fz-1, fontWeight:800, padding:"2px 10px", borderRadius:12, background:LV_STATUS_BG[val]||"#f3f4f6", color:LV_STATUS_TX[val]||"#6b7280" }}>{val}</span>
+                            : String(val)
+                        ) : <span style={{ color:M.tD, fontStyle:"italic", fontSize:fz-2 }}>—</span>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {layout === "table" && (
+            <table style={{ width:"100%", borderCollapse:"collapse" }}>
+              <thead style={{ position:"sticky", top:0, zIndex:2 }}>
+                <tr style={{ background:M.thd }}>
+                  <th style={{ padding:"8px 14px", textAlign:"left", fontSize:9, fontWeight:900, color:M.tD, borderBottom:`2px solid ${M.div}`, fontFamily:uff, letterSpacing:0.5 }}>FIELD</th>
+                  <th style={{ padding:"8px 14px", textAlign:"left", fontSize:9, fontWeight:900, color:M.tD, borderBottom:`2px solid ${M.div}`, fontFamily:uff, letterSpacing:0.5 }}>VALUE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {LV_SCHEMA.map((f, i) => {
+                  const val = record[f.key];
+                  const hasVal = val !== undefined && val !== null && val !== "";
+                  return (
+                    <tr key={f.key} style={{ background:i%2===0?M.tev:M.tod, borderBottom:`1px solid ${M.div}` }}>
+                      <td style={{ padding:"7px 14px", fontSize:fz-2, fontWeight:700, color:f.key===codeKey?A.a:M.tC, fontFamily:uff, whiteSpace:"nowrap", borderRight:`1px solid ${M.div}`, width:180 }}>
+                        {f.label}{f.required&&<span style={{ color:"#ef4444", marginLeft:3, fontSize:9 }}>*</span>}
+                      </td>
+                      <td style={{ padding:"7px 14px", fontSize:fz-1, color:M.tA, fontFamily:f.mono?dff:uff }}>
+                        {hasVal ? (
+                          f.badge
+                            ? <span style={{ fontSize:fz-2, fontWeight:700, padding:"2px 8px", borderRadius:12, background:LV_STATUS_BG[val]||"#f3f4f6", color:LV_STATUS_TX[val]||"#6b7280" }}>{val}</span>
+                            : String(val)
+                        ) : <span style={{ color:M.tD, fontStyle:"italic", fontSize:fz-2 }}>—</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {layout === "json" && (() => {
+            const json = JSON.stringify(record, null, 2);
+            const [copied, setCopied] = useState(false);
+            return (
+              <div style={{ padding:16 }}>
+                <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:8 }}>
+                  <button onClick={()=>{navigator.clipboard?.writeText(json).then(()=>{setCopied(true);setTimeout(()=>setCopied(false),1500);});}}
+                    style={{ padding:"4px 12px", border:`1px solid ${M.inBd}`, borderRadius:5, background:M.inBg, color:M.tB, fontSize:10, fontWeight:700, cursor:"pointer", fontFamily:uff }}>
+                    {copied?"✓ Copied!":"⧉ Copy JSON"}
+                  </button>
+                </div>
+                <pre style={{ background:"#0f172a", color:"#e2e8f0", padding:16, borderRadius:8, fontFamily:"'IBM Plex Mono',monospace", fontSize:11.5, lineHeight:1.6, overflowX:"auto", margin:0, whiteSpace:"pre-wrap", wordBreak:"break-word" }}>
+                  {json}
+                </pre>
+              </div>
+            );
+          })()}
+        </div>
+        {/* ── Footer ── */}
+        <div style={{ padding:"10px 18px", borderTop:`1px solid ${M.div}`, display:"flex", alignItems:"center", gap:6, background:M.mid, flexShrink:0 }}>
+          {/* Prev / Next navigation */}
+          <button onClick={onPrev} disabled={recIndex===0}
+            style={{ padding:"5px 10px", border:`1px solid ${M.div}`, borderRadius:5, background:"transparent", color:recIndex===0?M.tD:M.tB, fontSize:10, fontWeight:700, cursor:recIndex===0?"default":"pointer", opacity:recIndex===0?.4:1 }}>‹ Prev</button>
+          <span style={{ fontSize:9, color:M.tD, minWidth:40, textAlign:"center" }}>{recIndex+1} / {totalRecs}</span>
+          <button onClick={onNext} disabled={recIndex===totalRecs-1}
+            style={{ padding:"5px 10px", border:`1px solid ${M.div}`, borderRadius:5, background:"transparent", color:recIndex===totalRecs-1?M.tD:M.tB, fontSize:10, fontWeight:700, cursor:recIndex===totalRecs-1?"default":"pointer", opacity:recIndex===totalRecs-1?.4:1 }}>Next ›</button>
+          <button onClick={()=>window.print()}
+            style={{ padding:"5px 10px", border:`1px solid ${M.div}`, borderRadius:5, background:"transparent", color:M.tB, fontSize:10, fontWeight:600, cursor:"pointer" }}>🖨 Print</button>
+          <div style={{ flex:1 }} />
+          <button onClick={onClose}
+            style={{ padding:"6px 18px", border:`1px solid ${M.inBd}`, borderRadius:6, background:M.inBg, color:M.tB, fontSize:11, fontWeight:700, cursor:"pointer" }}>Close</button>
+          {canEdit && onEdit
+            ? <button onClick={()=>{onEdit(record);onClose();}}
+                style={{ padding:"6px 18px", border:"none", borderRadius:6, background:A.a, color:"#fff", fontSize:11, fontWeight:900, cursor:"pointer" }}>✏ Edit Record</button>
+            : <span style={{ fontSize:9, color:"#991b1b", background:"#fee2e2", border:"1px solid #fecaca", borderRadius:5, padding:"4px 10px", fontWeight:700 }}>🔒 No Edit Rights — Contact Admin</span>
+          }
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ── Layout View Properties Panel ──
+function LvPropertiesPanel({ displayOpts, setDisplayOpts, onClose, M, A, uff }) {
+  const panelRef = useRef(null);
+  useEffect(() => {
+    const h = e => { if (panelRef.current && !panelRef.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+  const { thumbnail, thumbSize, density, showFields } = displayOpts;
+  return (
+    <div ref={panelRef} style={{ position:"absolute", right:0, top:38, width:240, background:M.hi, border:`1px solid ${M.div}`, borderRadius:10, boxShadow:"0 8px 28px rgba(0,0,0,.2)", zIndex:500, overflow:"hidden" }}>
+      <div style={{ padding:"10px 14px", borderBottom:`1px solid ${M.div}`, background:M.thd }}>
+        <span style={{ fontSize:11, fontWeight:900, color:M.tA, fontFamily:uff }}>⚙ Properties</span>
+      </div>
+      <div style={{ padding:"12px 14px", display:"flex", flexDirection:"column", gap:14 }}>
+        {/* Thumbnail */}
+        <div>
+          <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:6 }}>
+            <span style={{ fontSize:10, fontWeight:800, color:M.tB, fontFamily:uff }}>Thumbnail</span>
+            <LvToggleSwitch on={thumbnail} onChange={()=>setDisplayOpts(p=>({...p,thumbnail:!p.thumbnail}))} A={A} />
+          </div>
+          {thumbnail && (
+            <div style={{ display:"flex", gap:3 }}>
+              {["sm","md","lg"].map(s => (
+                <button key={s} onClick={()=>setDisplayOpts(p=>({...p,thumbSize:s}))}
+                  style={{ flex:1, padding:"4px", border:`1.5px solid ${thumbSize===s?A.a:M.div}`, borderRadius:5, background:thumbSize===s?A.al:"transparent", color:thumbSize===s?A.a:M.tB, fontSize:9, fontWeight:thumbSize===s?900:600, cursor:"pointer", fontFamily:uff }}>
+                  {s.toUpperCase()}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Density */}
+        <div>
+          <div style={{ fontSize:10, fontWeight:800, color:M.tB, fontFamily:uff, marginBottom:6 }}>Density</div>
+          <div style={{ display:"flex", borderRadius:5, overflow:"hidden", border:`1px solid ${M.div}` }}>
+            {[{v:"summary",l:"Summary"},{v:"detail",l:"Detail"}].map(d => (
+              <button key={d.v} onClick={()=>setDisplayOpts(p=>({...p,density:d.v}))}
+                style={{ flex:1, padding:"5px", border:"none", background:density===d.v?A.a:"transparent", color:density===d.v?"#fff":M.tB, fontSize:9, fontWeight:density===d.v?900:600, cursor:"pointer", fontFamily:uff }}>
+                {d.l}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Fields */}
+        <div>
+          <div style={{ fontSize:10, fontWeight:800, color:M.tB, fontFamily:uff, marginBottom:6 }}>Fields</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:5, maxHeight:160, overflowY:"auto" }}>
+            {LV_DISPLAY_FIELDS.map(f => (
+              <div key={f.key} style={{ display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+                <span style={{ fontSize:9.5, color:M.tB, fontFamily:uff }}>{f.label}</span>
+                <LvToggleSwitch on={!!showFields[f.key]} onChange={()=>setDisplayOpts(p=>({...p,showFields:{...p.showFields,[f.key]:!p.showFields[f.key]}}))} A={A} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════════
+//  LayoutViewPanel — NAMED EXPORT
+//  Inject into SheetWorkspace or any host as an extra tab.
+//  Props: { M: rawM, A, uff, dff, canEdit, onEditRecord }
+//
+//  RULES (mandatory — §LAYOUT_VIEW in CC_ERP_MODULE_display_SKILL.md):
+//  Row 1: Sub-tab bar (Classic/Hierarchy/Column/Cards/Matrix + Export/Print/MaxView/Properties)
+//  Row 2: Views Bar  (white bg — CC Red for locked, Purple for user views)
+//  Row 3: Unified Toolbar (Search + Filter + Sort | Group By + Presets | count)
+//  Row 4: Content Area
+// ════════════════════════════════════════════════════════════════════════
+export function LayoutViewPanel({ M: rawM, A, uff, dff, canEdit = true, onEditRecord }) {
+  const M  = toM(rawM);
+  const fz = 13;
+
+  // ── Layout & group state ──
+  const [layoutTab,   setLayoutTab]   = useState("classic");
+  const [groupByL1,   setGroupByL1]   = useState(LV_GROUPABLE_FIELDS[0]?.key || "");
+  const [groupByL2,   setGroupByL2]   = useState(LV_GROUPABLE_FIELDS[1]?.key || "");
+  const [displayOpts, setDisplayOpts] = useState(LV_INIT_DISPLAY_OPTS);
+  const [showPanel,   setShowPanel]   = useState(false);
+  const [isMaxView,   setIsMaxView]   = useState(false);
+
+  // ── Filter / sort / search ──
+  const [filters,     setFilters]     = useState([]);
+  const [sorts,       setSorts]       = useState([{ id:1, field:LV_SCHEMA[0]?.key||"code", mode:"a_z", value:"" }]);
+  const [search,      setSearch]      = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSorts,   setShowSorts]   = useState(false);
+
+  // ── Cards own grouping (lifted so views can capture it) ──
+  const [cardsGroupBy,    setCardsGroupBy]    = useState("");
+  const [cardsSubGroupBy, setCardsSubGroupBy] = useState("");
+
+  // ── Views system ──
+  const [layoutViews,   setLayoutViews]   = useState(LV_INIT_VIEWS);
+  const [activeViewId,  setActiveViewId]  = useState(LV_INIT_VIEWS[0]?.id || "v_default");
+  const [selectedRec,   setSelectedRec]   = useState(null);
+  const [showExport,    setShowExport]    = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
+  // ── Derived: is current config different from saved view? ──
+  const isViewDirty = useMemo(() => {
+    const av = layoutViews.find(v => v.id === activeViewId);
+    if (!av) return false;
+    const cur   = JSON.stringify({ layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts:JSON.stringify(displayOpts), cardsGroupBy, cardsSubGroupBy });
+    const saved = JSON.stringify({ layoutTab:av.layoutTab, groupByL1:av.groupByL1, groupByL2:av.groupByL2, filters:av.filters, sorts:av.sorts, search:av.search, displayOpts:JSON.stringify(av.displayOpts), cardsGroupBy:av.cardsGroupBy||"", cardsSubGroupBy:av.cardsSubGroupBy||"" });
+    return cur !== saved;
+  }, [layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts, cardsGroupBy, cardsSubGroupBy, layoutViews, activeViewId]);
+
+  // ── View helpers ──
+  const switchToView = useCallback((viewId) => {
+    const v = layoutViews.find(lv => lv.id === viewId);
+    if (!v) return;
+    setActiveViewId(viewId);
+    setLayoutTab(v.layoutTab);
+    setGroupByL1(v.groupByL1);
+    setGroupByL2(v.groupByL2);
+    setFilters(v.filters);
+    setSorts(v.sorts);
+    setSearch(v.search);
+    setDisplayOpts(v.displayOpts);
+    setCardsGroupBy(v.cardsGroupBy || "");
+    setCardsSubGroupBy(v.cardsSubGroupBy || "");
+    setShowFilters(false);
+    setShowSorts(false);
+  }, [layoutViews]);
+
+  const saveCurrentToView = useCallback(() => {
+    setLayoutViews(prev => prev.map(v => v.id === activeViewId
+      ? { ...v, layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts, cardsGroupBy, cardsSubGroupBy }
+      : v));
+  }, [activeViewId, layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts, cardsGroupBy, cardsSubGroupBy]);
+
+  const addNewView = useCallback(({ name, icon, color }) => {
+    const id = `v_${Date.now()}`;
+    setLayoutViews(prev => [...prev, { id, name, icon, color, locked:false, layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts, cardsGroupBy, cardsSubGroupBy }]);
+    setActiveViewId(id);
+    setShowSaveModal(false);
+  }, [layoutTab, groupByL1, groupByL2, filters, sorts, search, displayOpts, cardsGroupBy, cardsSubGroupBy]);
+
+  const deleteView = useCallback((viewId) => {
+    const v = layoutViews.find(lv => lv.id === viewId);
+    if (!v || v.locked) return;
+    setLayoutViews(prev => prev.filter(lv => lv.id !== viewId));
+    if (activeViewId === viewId) switchToView(LV_INIT_VIEWS[0]?.id || "v_default");
+  }, [layoutViews, activeViewId, switchToView]);
+
+  // ── Escape exits Max View (only when no modal open) ──
+  useEffect(() => {
+    if (!isMaxView || selectedRec) return;
+    const h = e => { if (e.key === "Escape") setIsMaxView(false); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [isMaxView, selectedRec]);
+
+  // ── Data processing — apply search → filters → sort ──
+  // TODO: replace MODULE_MOCK_RECORDS with your module's data source
+  const processedData = useMemo(() => {
+    let r = MODULE_MOCK_RECORDS;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      r = r.filter(d => Object.values(d).some(v => String(v||"").toLowerCase().includes(q)));
+    }
+    // TODO: apply LV filters and sorts here (wire evalFilter + applyMultiSort)
+    return r;
+  }, [search, filters, sorts]);
+
+  // ── Group By hierarchy ──
+  const orgHierarchy = useMemo(() => {
+    const h = {};
+    processedData.forEach(r => {
+      const l1val = r[groupByL1] || "(blank)";
+      const l2val = r[groupByL2] || "(blank)";
+      if (!h[l1val]) { const { color, icon } = lvGetGroupMeta(groupByL1, l1val); h[l1val] = { label:l1val, color, icon, l2s:{} }; }
+      if (!h[l1val].l2s[l2val]) h[l1val].l2s[l2val] = [];
+      h[l1val].l2s[l2val].push(r);
+    });
+    return Object.keys(h).sort().map(k => h[k]);
+  }, [processedData, groupByL1, groupByL2]);
+
+  const PROPS_VIEWS = ["classic","hierarchy","column","cards"];
+  const propsSupported = PROPS_VIEWS.includes(layoutTab);
+
+  const layoutBtnS = (active) => ({
+    padding:"4px 13px", border:`1px solid ${active?A.a:M.div}`,
+    borderRadius:5, background:active?A.al:"transparent",
+    color:active?A.a:M.tB, fontSize:10, fontWeight:active?900:600,
+    cursor:"pointer", fontFamily:uff, outline:"none",
+  });
+
+  return (
+    <div style={isMaxView
+      ? { position:"fixed", inset:0, zIndex:1200, background:M.hi, display:"flex", flexDirection:"column", overflow:"hidden" }
+      : { flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+
+      {/* ══ ROW 1: Sub-tab bar ══ */}
+      <div style={{ padding:"6px 16px", display:"flex", gap:4, borderBottom:`1px solid ${M.div}`, background:M.thd, flexShrink:0, flexWrap:"wrap", alignItems:"center" }}>
+        {[
+          { id:"classic",   label:"🌳 Classic"  },
+          { id:"hierarchy", label:"⟁ Hierarchy" },
+          { id:"column",    label:"≡ Column"    },
+          { id:"cards",     label:"▦ Cards"     },
+          { id:"matrix",    label:"⊞ Matrix"    },
+        ].map(({ id, label }) => (
+          <button key={id} onClick={()=>{ setLayoutTab(id); if(!PROPS_VIEWS.includes(id)) setShowPanel(false); }}
+            style={layoutBtnS(layoutTab===id)}>{label}</button>
+        ))}
+        {/* Right-side controls */}
+        <div style={{ marginLeft:"auto", display:"flex", gap:6, alignItems:"center" }}>
+          {/* Export */}
+          <div style={{ position:"relative" }}>
+            {showExport && <div onClick={()=>setShowExport(false)} style={{ position:"fixed", inset:0, zIndex:499 }} />}
+            <button onClick={()=>setShowExport(v=>!v)}
+              style={{ padding:"4px 11px", border:`1px solid ${showExport?A.a:M.div}`, borderRadius:5, background:showExport?A.al:"transparent", color:showExport?A.a:M.tB, fontSize:10, fontWeight:600, cursor:"pointer", fontFamily:uff }}>
+              ⬇ Export
+            </button>
+            {showExport && (
+              <div style={{ position:"absolute", right:0, top:30, zIndex:500, background:M.hi, border:`1px solid ${M.div}`, borderRadius:8, boxShadow:"0 8px 24px rgba(0,0,0,.18)", minWidth:160, overflow:"hidden" }}>
+                {[
+                  { label:"📄 Export CSV",  fn:()=>{ /* TODO: exportAsCsv(processedData) */ } },
+                  { label:"🖨 Print / PDF", fn:()=>window.print() },
+                ].map(({ label, fn }) => (
+                  <button key={label} onClick={()=>{ fn(); setShowExport(false); }}
+                    style={{ display:"block", width:"100%", padding:"8px 14px", border:"none", background:"transparent", color:M.tA, fontSize:10, fontWeight:600, cursor:"pointer", fontFamily:uff, textAlign:"left" }}
+                    onMouseEnter={e=>e.currentTarget.style.background=M.mid}
+                    onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          {/* Print */}
+          <button onClick={()=>window.print()}
+            style={{ padding:"4px 10px", border:`1px solid ${M.div}`, borderRadius:5, background:"transparent", color:M.tB, fontSize:10, fontWeight:600, cursor:"pointer", fontFamily:uff }}>
+            🖨 Print
+          </button>
+          {/* Max View */}
+          <button onClick={()=>setIsMaxView(v=>!v)} title={isMaxView?"Restore (Esc)":"Expand to full page"}
+            style={{ padding:"4px 10px", border:`1px solid ${isMaxView?A.a:M.div}`, borderRadius:5, background:isMaxView?A.al:"transparent", color:isMaxView?A.a:M.tB, fontSize:10, fontWeight:isMaxView?800:600, cursor:"pointer", fontFamily:uff, whiteSpace:"nowrap" }}>
+            {isMaxView?"⊡ Restore":"⛶ Max View"}
+          </button>
+          {/* Properties */}
+          {propsSupported && (
+            <div style={{ position:"relative" }}>
+              <button onClick={()=>setShowPanel(p=>!p)}
+                style={{ padding:"4px 12px", border:`1px solid ${showPanel?A.a:M.div}`, borderRadius:5, background:showPanel?A.al:"transparent", color:showPanel?A.a:M.tB, fontSize:10, fontWeight:showPanel?800:600, cursor:"pointer", fontFamily:uff, display:"flex", alignItems:"center", gap:5 }}>
+                <span style={{ fontSize:12 }}>⚙</span> Properties
+                {(displayOpts.thumbnail||displayOpts.density!=="summary") && (
+                  <span style={{ width:6, height:6, borderRadius:3, background:A.a, flexShrink:0 }} />
+                )}
+              </button>
+              {showPanel && <LvPropertiesPanel displayOpts={displayOpts} setDisplayOpts={setDisplayOpts} onClose={()=>setShowPanel(false)} M={M} A={A} uff={uff} />}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ══ ROW 2: Views Bar — bg #ffffff ALWAYS ══ */}
+      <div style={{ padding:"5px 12px", display:"flex", gap:5, alignItems:"center", borderBottom:`1px solid ${M.div}`, background:"#ffffff", flexShrink:0, flexWrap:"nowrap", overflowX:"auto" }}>
+        <span style={{ fontSize:8.5, fontWeight:900, color:M.tD, textTransform:"uppercase", letterSpacing:0.8, fontFamily:uff, flexShrink:0, marginRight:2 }}>VIEWS:</span>
+        {layoutViews.map(v => {
+          const isActive  = v.id === activeViewId;
+          const isDirty   = isActive && isViewDirty;
+          const isDefault = !!v.locked;
+          const CC_RED    = "#CC0000";
+          const CC_PUR    = "#7C3AED";
+          const borderStyle = isDefault
+            ? `1.5px solid ${isActive?CC_RED:"#CC000055"}`
+            : isActive ? `1.5px solid ${CC_PUR}` : `1.5px dashed #c4b5fd`;
+          const pillBg = isActive ? (isDefault?"#fff0f0":"#f5f3ff") : "transparent";
+          return (
+            <div key={v.id} style={{ display:"flex", alignItems:"center", gap:0, flexShrink:0 }}>
+              <button onClick={()=>switchToView(v.id)}
+                style={{ display:"flex", alignItems:"center", gap:5, padding:"3px 10px", border:borderStyle, borderRadius:6, background:pillBg, color:isActive?(isDefault?CC_RED:CC_PUR):M.tB, fontSize:10, fontWeight:isActive?900:600, cursor:"pointer", fontFamily:uff, whiteSpace:"nowrap" }}>
+                <span>{v.icon}</span>
+                <span>{v.name}</span>
+                {isDefault && <span style={{ fontSize:7, fontWeight:900, padding:"1px 5px", borderRadius:4, background:"#f3f4f6", color:"#6b7280", letterSpacing:0.3 }}>LOCKED</span>}
+                {isDirty   && <span style={{ fontSize:7, fontWeight:900, padding:"1px 5px", borderRadius:4, background:"#fef3c7", color:"#92400e", letterSpacing:0.3 }}>MODIFIED</span>}
+              </button>
+              {!isDefault && isActive && isDirty && (
+                <button onClick={saveCurrentToView}
+                  style={{ padding:"3px 8px", border:`1px solid ${CC_PUR}`, borderRadius:"0 5px 5px 0", background:"#f5f3ff", color:CC_PUR, fontSize:9, fontWeight:800, cursor:"pointer", fontFamily:uff, whiteSpace:"nowrap", marginLeft:1 }}>
+                  💾 Update View
+                </button>
+              )}
+              {!isDefault && (
+                <button onClick={()=>deleteView(v.id)} title="Delete view"
+                  style={{ width:14, height:14, borderRadius:3, border:"none", background:"transparent", color:M.tD, cursor:"pointer", fontSize:10, lineHeight:"14px", textAlign:"center", marginLeft:1 }}>×</button>
+              )}
+            </div>
+          );
+        })}
+        {/* + New View — purple dashed */}
+        <button onClick={()=>setShowSaveModal(true)}
+          style={{ padding:"3px 10px", border:"1.5px dashed #c4b5fd", borderRadius:6, background:"#fdf4ff", color:"#7C3AED", fontSize:9.5, fontWeight:700, cursor:"pointer", fontFamily:uff, flexShrink:0, whiteSpace:"nowrap" }}>
+          ＋ New View
+        </button>
+      </div>
+
+      {/* ══ ROW 3: Unified Toolbar — ONE row ══ */}
+      <div style={{ padding:"5px 14px", borderBottom:`1px solid ${M.div}`, background:M.hi, flexShrink:0 }}>
+        <div style={{ display:"flex", gap:6, alignItems:"center", flexWrap:"wrap" }}>
+          {/* Search */}
+          <div style={{ position:"relative", display:"flex", alignItems:"center" }}>
+            <span style={{ position:"absolute", left:7, fontSize:10, color:M.tD }}>🔍</span>
+            <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
+              style={{ border:`1px solid ${search?A.a:M.div}`, borderRadius:5, background:M.inBg, color:M.tA, fontSize:10, padding:"3px 8px 3px 22px", outline:"none", width:150, fontFamily:uff }} />
+            {search && <button onClick={()=>setSearch("")} style={{ position:"absolute", right:5, border:"none", background:"none", cursor:"pointer", color:M.tD, fontSize:11 }}>×</button>}
+          </div>
+          {/* Filter */}
+          <button onClick={()=>setShowFilters(v=>!v)}
+            style={{ padding:"3px 10px", border:`1px solid ${showFilters||filters.filter(f=>f.value!=="").length>0?A.a:M.div}`, borderRadius:5, background:showFilters||filters.filter(f=>f.value!=="").length>0?A.al:"transparent", color:showFilters||filters.filter(f=>f.value!=="").length>0?A.a:M.tB, fontSize:10, fontWeight:600, cursor:"pointer", fontFamily:uff, display:"flex", alignItems:"center", gap:4 }}>
+            ⊞ Filter {filters.filter(f=>f.value!=="").length>0 && <span style={{ background:A.a, color:"#fff", borderRadius:8, padding:"0 5px", fontSize:8 }}>{filters.filter(f=>f.value!=="").length}</span>}
+          </button>
+          {/* Sort */}
+          <button onClick={()=>setShowSorts(v=>!v)}
+            style={{ padding:"3px 10px", border:`1px solid ${showSorts||sorts.some(s=>s.mode!=="a_z")?"#7C3AED":M.div}`, borderRadius:5, background:showSorts||sorts.some(s=>s.mode!=="a_z")?"#ede9fe":"transparent", color:showSorts||sorts.some(s=>s.mode!=="a_z")?"#6d28d9":M.tB, fontSize:10, fontWeight:600, cursor:"pointer", fontFamily:uff }}>
+            ↕ Sort
+          </button>
+          {/* Reset */}
+          <button onClick={()=>{ setFilters([]); setSorts([{id:1,field:LV_SCHEMA[0]?.key||"code",mode:"a_z",value:""}]); setSearch(""); setShowFilters(false); setShowSorts(false); }}
+            style={{ padding:"3px 9px", border:`1px solid ${M.div}`, borderRadius:5, background:"transparent", color:M.tC, fontSize:9.5, cursor:"pointer", fontFamily:uff }}>
+            ✕ Reset
+          </button>
+          {/* Divider + Group By (hidden in Cards) */}
+          {layoutTab !== "cards" && <>
+            <div style={{ width:1, height:16, background:M.div, flexShrink:0 }} />
+            <span style={{ fontSize:9, fontWeight:900, color:M.tD, textTransform:"uppercase", letterSpacing:0.5, fontFamily:uff, flexShrink:0 }}>⊞ Group By</span>
+            <select value={groupByL1} onChange={e=>setGroupByL1(e.target.value)}
+              style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:5, padding:"3px 7px", background:M.inBg, color:M.tA, fontFamily:uff, cursor:"pointer", outline:"none" }}>
+              {LV_GROUPABLE_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+            <span style={{ color:M.tD, fontSize:11 }}>›</span>
+            <select value={groupByL2} onChange={e=>setGroupByL2(e.target.value)}
+              style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:5, padding:"3px 7px", background:M.inBg, color:M.tA, fontFamily:uff, cursor:"pointer", outline:"none" }}>
+              {LV_GROUPABLE_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+            {LV_PRESETS.length > 0 && <>
+              <div style={{ width:1, height:14, background:M.div }} />
+              {LV_PRESETS.map(p => {
+                const active = p.l1===groupByL1 && p.l2===groupByL2;
+                return (
+                  <button key={p.label} onClick={()=>{ setGroupByL1(p.l1); setGroupByL2(p.l2); }}
+                    style={{ padding:"2px 8px", border:`1px solid ${active?A.a:M.div}`, borderRadius:4, background:active?A.al:"transparent", color:active?A.a:M.tC, fontSize:9, fontWeight:active?800:600, cursor:"pointer", fontFamily:uff, whiteSpace:"nowrap" }}>
+                    {p.label}
+                  </button>
+                );
+              })}
+            </>}
+          </>}
+          {/* Count */}
+          <span style={{ fontSize:9, color:M.tD, fontFamily:uff, marginLeft:"auto" }}>
+            {orgHierarchy.length} groups · {processedData.length} records
+          </span>
+        </div>
+        {/* Expandable filter rows */}
+        {showFilters && (
+          <div style={{ marginTop:6, display:"flex", flexDirection:"column", gap:4 }}>
+            {filters.map(fil => (
+              <div key={fil.id} style={{ display:"flex", gap:4, alignItems:"center" }}>
+                <select value={fil.field} onChange={e=>setFilters(p=>p.map(f=>f.id===fil.id?{...f,field:e.target.value,value:""}:f))}
+                  style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:4, padding:"2px 6px", background:M.inBg, color:M.tA, fontFamily:uff, outline:"none" }}>
+                  {LV_SCHEMA.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </select>
+                <select value={fil.op} onChange={e=>setFilters(p=>p.map(f=>f.id===fil.id?{...f,op:e.target.value}:f))}
+                  style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:4, padding:"2px 6px", background:M.inBg, color:M.tA, fontFamily:uff, outline:"none" }}>
+                  {LV_FILTER_OPS.cat.map(op => <option key={op} value={op}>{op}</option>)}
+                </select>
+                <input value={fil.value} onChange={e=>setFilters(p=>p.map(f=>f.id===fil.id?{...f,value:e.target.value}:f))}
+                  style={{ flex:1, fontSize:10, border:`1px solid ${M.div}`, borderRadius:4, padding:"2px 8px", background:M.inBg, color:M.tA, fontFamily:uff, outline:"none" }} placeholder="value…" />
+                <button onClick={()=>setFilters(p=>p.filter(f=>f.id!==fil.id))} style={{ border:"none", background:"transparent", color:M.tD, cursor:"pointer", fontSize:13 }}>×</button>
+              </div>
+            ))}
+            <button onClick={()=>setFilters(p=>[...p,{id:Date.now(),field:LV_SCHEMA[0]?.key||"code",op:"contains",value:""}])}
+              style={{ alignSelf:"flex-start", padding:"2px 9px", border:`1px dashed ${A.a}`, borderRadius:4, background:A.al, color:A.a, fontSize:9, fontWeight:700, cursor:"pointer", fontFamily:uff }}>
+              + Add Filter
+            </button>
+          </div>
+        )}
+        {/* Expandable sort rows */}
+        {showSorts && (
+          <div style={{ marginTop:6, display:"flex", flexDirection:"column", gap:4 }}>
+            {sorts.map(s => (
+              <div key={s.id} style={{ display:"flex", gap:4, alignItems:"center" }}>
+                <select value={s.field} onChange={e=>setSorts(p=>p.map(x=>x.id===s.id?{...x,field:e.target.value}:x))}
+                  style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:4, padding:"2px 6px", background:M.inBg, color:M.tA, fontFamily:uff, outline:"none" }}>
+                  {LV_SCHEMA.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </select>
+                <select value={s.mode} onChange={e=>setSorts(p=>p.map(x=>x.id===s.id?{...x,mode:e.target.value}:x))}
+                  style={{ fontSize:10, border:`1px solid ${M.div}`, borderRadius:4, padding:"2px 6px", background:M.inBg, color:M.tA, fontFamily:uff, outline:"none" }}>
+                  {LV_SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+                {sorts.length > 1 && <button onClick={()=>setSorts(p=>p.filter(x=>x.id!==s.id))} style={{ border:"none", background:"transparent", color:M.tD, cursor:"pointer", fontSize:13 }}>×</button>}
+              </div>
+            ))}
+            <button onClick={()=>setSorts(p=>[...p,{id:Date.now(),field:LV_SCHEMA[0]?.key||"code",mode:"a_z",value:""}])}
+              style={{ alignSelf:"flex-start", padding:"2px 9px", border:`1px dashed #7C3AED`, borderRadius:4, background:"#f5f3ff", color:"#7C3AED", fontSize:9, fontWeight:700, cursor:"pointer", fontFamily:uff }}>
+              + Add Sort
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ══ ROW 4: Content Area ══ */}
+      {/* TODO: Replace this placeholder with module-specific layout views */}
+      {/* Reference: ArticleMasterTab.jsx for Classic/Hierarchy/Column/Cards/Matrix implementations */}
+      <div style={{ flex:1, overflowY:"auto", padding:16 }}>
+        {processedData.length === 0
+          ? <div style={{ textAlign:"center", padding:40, color:M.tD, fontFamily:uff, fontSize:12 }}>No records match the current filters</div>
+          : orgHierarchy.map(grp => (
+              <div key={grp.label} style={{ marginBottom:16 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 10px", background:M.thd, borderRadius:6, marginBottom:8, borderLeft:`3px solid ${grp.color}` }}>
+                  <span>{grp.icon}</span>
+                  <span style={{ fontSize:11, fontWeight:900, color:grp.color, fontFamily:uff }}>{grp.label}</span>
+                  <span style={{ fontSize:9, color:"#fff", background:grp.color, borderRadius:10, padding:"1px 8px", fontWeight:900 }}>{Object.values(grp.l2s).flat().length}</span>
+                </div>
+                {/* Implement Classic/Hierarchy/Column/Cards/Matrix rendering here */}
+              </div>
+            ))
+        }
+      </div>
+
+      {/* Detail Modal */}
+      {selectedRec && (() => {
+        const idx = processedData.findIndex(r => r === selectedRec);
+        return (
+          <LayoutViewDetailModal
+            record={selectedRec}
+            onClose={()=>setSelectedRec(null)}
+            onPrev={()=>setSelectedRec(processedData[Math.max(0,idx-1)])}
+            onNext={()=>setSelectedRec(processedData[Math.min(processedData.length-1,idx+1)])}
+            recIndex={idx}
+            totalRecs={processedData.length}
+            onEdit={canEdit&&onEditRecord?r=>{onEditRecord(r);setSelectedRec(null);}:null}
+            canEdit={canEdit}
+            M={M} A={A} uff={uff} dff={dff} fz={fz}
+          />
+        );
+      })()}
+
+      {/* Save View Modal */}
+      {showSaveModal && <LvSaveViewModal onSave={addNewView} onClose={()=>setShowSaveModal(false)} M={M} A={A} uff={uff} />}
     </div>
   );
 }

@@ -386,6 +386,199 @@ const AGG_COLORS = {
 - [ ] Export options in toolbar: PDF · Excel · Google Sheet · Print
 - [ ] Export respects current `visCols` + `visRows` (filtered data, not all rows)
 
+## §RECORDS-G — Advanced Operator Filter Panel (Layout View style)
+
+*Operator-based multi-condition filter — lives alongside the existing per-column `⚡ Filter` panel. Both coexist; do NOT remove the per-column panel.*
+
+- [ ] **`＋ Filter` button** placed on the **LEFT** side of toolbar, **before** the `flex:1` spacer — always visible
+- [ ] Button accent: teal `A.a` when active/open, neutral `M.inputBd` otherwise
+- [ ] Button shows count badge `[N]` of filters with a non-empty value
+- [ ] Clicking when `advFilters.length === 0` → **auto-adds one blank row** (no empty panel)
+- [ ] Toggling the button also **closes the sort panel** (`setShowAdvSorts(false)`)
+- [ ] **`✕ Reset` button** shown between Filter + Sort and the spacer — only when `activeAdvFilterCount > 0 || isAdvSortActive`; clears both `advFilters` and `advSorts`
+
+### State
+```js
+const [advFilters,     setAdvFilters]    = useState([]);
+const [showAdvFilters, setShowAdvFilters] = useState(false);
+// Each entry: { id: Date.now(), field: firstFieldKey, op: 'is', value: '' }
+const activeAdvFilterCount = advFilters.filter(f => f.value !== '').length;
+```
+
+### Filter Operators (by field type)
+```js
+const FILTER_OPS = {
+  cat: ['is', 'is not'],
+  txt: ['contains', 'not contains', 'starts with'],
+  num: ['=', '≠', '>', '<', '≥', '≤'],
+};
+```
+
+### Field type detection
+```js
+function advFieldType(f) {
+  if (!f) return 'txt';
+  if (f.type === 'number' || f.type === 'currency') return 'num';
+  if (f.type === 'select' || f.options?.length || f.opts?.length) return 'cat';
+  return 'txt';
+}
+```
+
+### Evaluation function
+```js
+function evalAdvFilter(row, { field, op, value }, fields) {
+  const f = fields?.find(x => x.key === field || x.col === field);
+  const fType = advFieldType(f);
+  const rv = row[field];
+  if (fType === 'num') {
+    const n = parseFloat(rv), v = parseFloat(value);
+    if (isNaN(n) || isNaN(v)) return true;
+    return op==='='?n===v : op==='≠'?n!==v : op==='>'?n>v : op==='<'?n<v : op==='≥'?n>=v : n<=v;
+  }
+  if (fType === 'txt') {
+    const s = String(rv||'').toLowerCase(), v = String(value||'').toLowerCase();
+    return op==='contains'?s.includes(v) : op==='not contains'?!s.includes(v) : s.startsWith(v);
+  }
+  return op === 'is' ? rv === value : rv !== value;
+}
+```
+
+### Panel UI
+- [ ] Panel renders below toolbar when `showAdvFilters` is true
+- [ ] Background `M.surfHigh`, bottom border `M.divider`, `flexShrink: 0`
+- [ ] Each row: `Where / And` label (9px, `M.textD`) + **field select** (teal `#0e7490`, `#f0fdfa` bg) + **op select** + **value** (input or select for `cat` type) + `×` remove button
+- [ ] `Where` label for row index 0; `And` for all others
+- [ ] **`＋ Add another filter`** link at bottom (teal, no border, `marginLeft: 40`)
+- [ ] When field changes → auto-reset op to first valid op + clear value
+- [ ] Apply to `filtered` useMemo — after per-column `filters`, skip rows where `value === ''`
+
+### Helpers
+```js
+const addAdvFilter    = () => setAdvFilters(p => [...p, { id: Date.now(), field: allFields[0]?.key, op: 'is', value: '' }]);
+const removeAdvFilter = (id) => setAdvFilters(p => p.filter(f => f.id !== id));
+const updateAdvFilter = (id, patch) => setAdvFilters(p => p.map(f => {
+  if (f.id !== id) return f;
+  const merged = { ...f, ...patch };
+  if (patch.field && patch.field !== f.field) {
+    const ft = advFieldType(allFields.find(x => x.key === patch.field));
+    merged.op = FILTER_OPS[ft]?.[0] || 'is'; merged.value = '';
+  }
+  return merged;
+}));
+```
+
+## §RECORDS-H — Multi-Mode Advanced Sort Panel (Layout View style)
+
+*10-mode sort — lives alongside the existing `⇅ Sort` SortPanel. Both coexist.*
+
+- [ ] **`↑ Sort` button** placed on LEFT of toolbar (after `＋ Filter`), before `flex:1` spacer
+- [ ] Button accent: purple `#7C3AED` when active/open
+- [ ] Shows count badge `[N]` when `advSorts.length > 0`
+- [ ] Clicking when empty → **auto-adds one blank row**
+- [ ] Toggling closes the filter panel (`setShowAdvFilters(false)`)
+
+### State
+```js
+const [advSorts,     setAdvSorts]    = useState([]);
+const [showAdvSorts, setShowAdvSorts] = useState(false);
+const isAdvSortActive = advSorts.length > 0;
+```
+
+### 10 Sort Modes (mandatory — all must be available in dropdown)
+```js
+const SORT_MODES = [
+  { value: 'a_z',       label: 'A → Z'                },
+  { value: 'z_a',       label: 'Z → A'                },
+  { value: 'nil_first', label: 'Nil / Empty First'     },
+  { value: 'nil_last',  label: 'Nil / Empty Last'      },
+  { value: 'freq_hi',   label: 'Most Frequent First'   },
+  { value: 'freq_lo',   label: 'Least Frequent First'  },
+  { value: 'num_lo',    label: 'Lowest → Highest'      },
+  { value: 'num_hi',    label: 'Highest → Lowest'      },
+  { value: 'val_first', label: 'Value is… First'       },
+  { value: 'val_last',  label: 'Value is… Last'        },
+];
+```
+
+### Sort Engine
+```js
+function applyAdvSort(arr, advSorts, freqMaps) {
+  if (!advSorts.length) return arr;
+  return [...arr].sort((a, b) => {
+    for (const s of advSorts) {
+      const av = a[s.field]??'', bv = b[s.field]??'';
+      const ae = av===''||av==null, be = bv===''||bv==null;
+      let cmp = 0;
+      if      (s.mode==='nil_first') { if(ae!==be) cmp=ae?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='nil_last')  { if(ae!==be) cmp=ae?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='freq_hi')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fb-fa; }
+      else if (s.mode==='freq_lo')   { const fa=freqMaps[s.field]?.[String(av)]||0,fb=freqMaps[s.field]?.[String(bv)]||0; cmp=fa-fb; }
+      else if (s.mode==='num_lo')    cmp=parseFloat(av||0)-parseFloat(bv||0);
+      else if (s.mode==='num_hi')    cmp=parseFloat(bv||0)-parseFloat(av||0);
+      else if (s.mode==='val_first') { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm) cmp=am?-1:1; else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='val_last')  { const am=String(av)===String(s.value||''),bm=String(bv)===String(s.value||''); if(am!==bm) cmp=am?1:-1;  else cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'}); }
+      else if (s.mode==='z_a')       cmp=String(bv).localeCompare(String(av),undefined,{sensitivity:'base'});
+      else                           cmp=String(av).localeCompare(String(bv),undefined,{sensitivity:'base'});
+      if (cmp !== 0) return cmp;
+    }
+    return 0;
+  });
+}
+```
+
+### Frequency maps (required for freq_hi/freq_lo modes)
+```js
+const freqMaps = useMemo(() => {
+  const m = {};
+  allFields.forEach(f => {
+    const counts = {};
+    rows.forEach(r => { const v = String(r[f.key]??''); counts[v] = (counts[v]||0) + 1; });
+    m[f.key] = counts;
+  });
+  return m;
+}, [rows, allFields]);
+```
+
+### Panel UI
+- [ ] Each row: `Sort / Then` label + **field select** (purple bg) + **mode select** (10 options) + **optional value** input (only for `val_first`/`val_last`) + `×` remove (only when >1 row)
+- [ ] `Sort` label for index 0; `Then` for all others
+- [ ] **`＋ Add another sort`** link at bottom (purple)
+- [ ] Field/mode change resets value to `''`
+- [ ] Applied in `sorted` useMemo AFTER the existing `applySort(filtered, sorts)` call
+
+### Sorted useMemo pattern
+```js
+const sorted = useMemo(() => {
+  const base = applySort(filtered, sorts, schema);    // existing column-click sort
+  if (!advSorts.length) return base;
+  const fMaps = {}; /* build freq maps */
+  return applyAdvSort(base, advSorts, fMaps);
+}, [filtered, sorts, advSorts]);
+```
+
+## §RECORDS-I — Combined Filter + Sort Summary Strip
+
+*Single persistent row just above the table — always visible when any filter or sort is active.*
+
+- [ ] Strip shows when `Object.values(filters).some(v=>v) || activeAdvFilterCount > 0 || isAdvSortActive`
+- [ ] Uses IIFE pattern `{(() => { ... return <div>...</div>; })()}` for inline logic
+- [ ] Background `M.surfHigh`, bottom border `M.divider`, `flexWrap: 'wrap'`
+
+### Layout (left to right)
+```
+[FILTERED: label]  [col chip ×]...  [adv chip ×]...  |divider|  [SORT: label]  [sort chip ×]...  flex:1  [✕ Clear all]
+```
+
+- [ ] **FILTERED section** (teal `#0891B2`) shown when either per-column or adv filters active
+  - Per-column chips: `Field contains value ×` — clicking × does `setFilters(p => {delete p[key]; return {...p}})`
+  - Adv filter chips: `Field op value ×` — clicking × calls `removeAdvFilter(id)`
+  - Chip style: `rgba(8,145,178,.08)` bg, `rgba(8,145,178,.3)` border, `#0e7490` text
+- [ ] **Thin `M.divider` separator** between FILTERED and SORT sections (only when both active)
+- [ ] **SORT section** (purple `#7C3AED`) shown when `isAdvSortActive`
+  - Sort chips: `Field mode [value]` — × only shown when `advSorts.length > 1`
+  - Chip style: `rgba(124,58,237,.08)` bg, `rgba(124,58,237,.3)` border, `#7C3AED` text
+- [ ] **`✕ Clear all`** pushed to far right — clears ALL three: `setFilters({})` + `setAdvFilters([])` + `setAdvSorts([])`
+
 ---
 ---
 
@@ -571,6 +764,32 @@ Same as §RECORDS-D but with `hasCheckbox={true}` to offset the checkbox column.
 - [ ] Triggered when navigating away with `(bulkRows[id]||[]).filter(r=>r.__dirty||r.__new).length > 0`
 - [ ] Same guard modal as §DATA_ENTRY-E with bulk-specific message
 - [ ] Tip in guard modal: "Fill all mandatory fields (marked ⚠) and click ✓ Save Changes"
+
+## §BULK_ENTRY-J — Advanced Operator Filter (same as §RECORDS-G)
+
+- [ ] **`＋ Filter` button** on LEFT of toolbar — teal `#0891B2` accent
+- [ ] Renamed existing per-column filter button to **`Col Filter`** to distinguish from adv filter
+- [ ] Same `FILTER_OPS` constants, `advFieldType()`, `evalAdvFilter()` pattern as §RECORDS-G
+- [ ] Field defs derived from `allFields` excluding auto/calc fields
+- [ ] Cat options from `f.opts` array (BulkEntry uses `opts`, Records uses `options`)
+- [ ] Applied in `visRows` derivation AFTER per-column `filters` pass
+- [ ] Panel renders below sort panel area with same `Where / And / ＋ Add another filter` UI
+
+## §BULK_ENTRY-K — Multi-Mode Advanced Sort (same as §RECORDS-H)
+
+- [ ] **`↑ Sort` button** on LEFT of toolbar — purple `#7C3AED` accent
+- [ ] Renamed existing simple sort button to **`Col Sort`** to distinguish
+- [ ] Same `SORT_MODES` (10 modes) and `applyAdvSort()` pattern as §RECORDS-H
+- [ ] Applied in `visRows` derivation AFTER per-column `sorts` pass
+- [ ] Panel renders below the adv filter panel
+
+## §BULK_ENTRY-L — Combined Filter + Sort Summary Strip (same as §RECORDS-I)
+
+- [ ] Exactly same strip layout as §RECORDS-I placed just above the data table
+- [ ] Uses `M.hi` (BulkEntry theme token) instead of `M.surfHigh` for strip bg
+- [ ] Uses `M.div` instead of `M.divider` for borders (BulkEntry uses shorter token names)
+- [ ] Per-column filter chips use `advFieldDefs.find(x => x.key === col)?.label` for display
+- [ ] `✕ Clear all` clears `setFilters({})` + `setAdvFilters([])` + `setAdvSorts([])`
 
 ---
 ---
@@ -871,8 +1090,8 @@ Row 4:        Content Area — the active layout view render
 - [ ] **Count** (far right): "N groups · M / T records"
 - [ ] **Expandable filter rows** below toolbar: field + operator + value + (×)
 - [ ] **Expandable sort rows** below toolbar: field + mode + (×)
-- [ ] Filter operators by type: `cat: ['is','is not','contains','starts with']` / `num: ['=','≠','>','<','≥','≤']`
-- [ ] Sort modes: `a_z, z_a, freq_h, freq_l, num_h, num_l`
+- [ ] Filter operators by type: `cat: ['is','is not','contains','starts with']` / `txt: ['contains','not contains','starts with']` / `num: ['=','≠','>','<','≥','≤']`; `evalFilter` must handle all `cat` text ops too
+- [ ] Sort modes: `a_z, z_a, nil_first, nil_last, freq_hi, freq_lo, num_lo, num_hi, val_first, val_last` (10 modes — consistent with §RECORDS-H)
 
 ## §LAYOUT_VIEW-J — Properties Panel (ViewOptionsPanel)
 
@@ -889,7 +1108,7 @@ Row 4:        Content Area — the active layout view render
 - [ ] Header center: `▦ Card` | `≡ Table` | `{ } JSON` layout toggle
 - [ ] Header right: `✏ Edit` (if `canEdit`) + `×` close
 - [ ] When `canEdit = false`: show `🔒 Read Only` label instead of Edit
-- [ ] **Card layout**: 2-col grid, uppercase labels, bordered value boxes. Full-width for textarea fields.
+- [ ] **Card layout**: 2-col grid, uppercase labels, bordered value boxes. Mark long-text fields with `full: true` in `LV_SCHEMA`/`AM_SCHEMA` to span full width (`gridColumn: "1 / -1"`). Always apply to `desc`, `tags`, and any `textarea` field.
 - [ ] **Table layout**: sticky FIELD/VALUE header, alternating `M.tev/tod` row colors
 - [ ] **JSON layout**: dark `#0f172a` pre block + `⧉ Copy JSON` button with `✓ Copied!` feedback
 - [ ] **Footer**: `‹ Prev | N/M | Next ›` + `🖨 Print` + `⬇ Export` + [spacer] + `Close` + `✏ Edit Record`
