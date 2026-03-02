@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { FieldInput, DtBadge, IcoCell } from './helpers/fieldInput';
 
+// CC_RED — mandatory for Save to Sheet button and inline mode header
+const CC_RED = '#CC0000';
+
 /**
  * DataEntryTab — Form + Inline entry modes for a master sheet.
  * Props: {
@@ -14,6 +17,18 @@ export default function DataEntryTab({
   entryMode, visibleKeys, onClear, onSave, saving,
   M, A, uff, dff,
 }) {
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const handleSaveClick = () => {
+    // Show confirm modal before actually saving
+    setShowConfirm(true);
+  };
+
+  const handleConfirmSave = () => {
+    setShowConfirm(false);
+    onSave();
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ flex: 1, overflowY: "auto" }}>
@@ -22,17 +37,104 @@ export default function DataEntryTab({
           : <InlineView enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
         }
       </div>
+
       {/* Entry Footer */}
       <div style={{ padding: "8px 14px", borderTop: `1px solid ${M.divider}`, display: "flex", alignItems: "center", gap: 8, background: M.surfMid, flexShrink: 0 }}>
         {isDirty && <span style={{ fontSize: 9, color: "#f59e0b", fontWeight: 900, fontFamily: uff }}>● Unsaved changes</span>}
         <div style={{ flex: 1 }} />
         <button onClick={onClear} style={{ padding: "6px 14px", border: `1px solid ${M.inputBd}`, borderRadius: 5, background: M.inputBg, color: M.textB, fontSize: 10, fontWeight: 800, cursor: "pointer", fontFamily: uff }}>↺ Clear</button>
-        <button onClick={onSave} disabled={saving}
-          style={{ padding: "6px 20px", border: "none", borderRadius: 5, background: saving ? M.textD : A.a, color: "#fff", fontSize: 10, fontWeight: 900, cursor: saving ? "default" : "pointer", fontFamily: uff }}>
+        {/* Save to Sheet — CC_RED per spec */}
+        <button onClick={handleSaveClick} disabled={saving}
+          style={{ padding: "6px 20px", border: "none", borderRadius: 5, background: saving ? M.textD : CC_RED, color: "#fff", fontSize: 10, fontWeight: 900, cursor: saving ? "default" : "pointer", fontFamily: uff }}>
           {saving ? "Saving…" : "✓ Save to Sheet"}
         </button>
       </div>
+
+      {/* ── Confirm Save Modal ── */}
+      {showConfirm && (
+        <ConfirmSaveModal
+          enriched={enriched}
+          formData={formData}
+          visibleKeys={visibleKeys}
+          onConfirm={handleConfirmSave}
+          onCancel={() => setShowConfirm(false)}
+          M={M} A={A} uff={uff} dff={dff}
+        />
+      )}
     </div>
+  );
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  CONFIRM SAVE MODAL — 2-col summary, warning, ← Edit / ✅ Confirm & Save
+// ═══════════════════════════════════════════════════════════════════════════════
+function ConfirmSaveModal({ enriched, formData, visibleKeys, onConfirm, onCancel, M, A, uff, dff }) {
+  const visFields = enriched.fields.filter(f => visibleKeys.includes(f.key) && !f.hidden);
+  const filledFields = visFields.filter(f => formData[f.key]);
+  const emptyRequired = visFields.filter(f => f.required && !formData[f.key]);
+
+  return (
+    <>
+      <div onClick={onCancel} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", backdropFilter: "blur(3px)", zIndex: 1300 }} />
+      <div style={{
+        position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+        width: 560, maxWidth: "95vw", maxHeight: "85vh",
+        background: M.surfHigh, border: `1px solid ${M.divider}`,
+        borderRadius: 12, zIndex: 1301, boxShadow: M.shadow,
+        display: "flex", flexDirection: "column", overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{ background: CC_RED, padding: "12px 18px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 16 }}>📋</span>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: "#fff", fontFamily: uff }}>Confirm Save to Sheet</div>
+            <div style={{ fontSize: 9.5, color: "rgba(255,255,255,.8)", fontFamily: uff, marginTop: 2 }}>Review the record before it is written to the Google Sheet</div>
+          </div>
+          <div style={{ flex: 1 }} />
+          <button onClick={onCancel} style={{ width: 26, height: 26, borderRadius: 5, border: "none", background: "rgba(255,255,255,.2)", color: "#fff", cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+        </div>
+
+        {/* Warning banner if required fields empty */}
+        {emptyRequired.length > 0 && (
+          <div style={{ background: "#fef3c7", borderBottom: "1px solid #fde68a", padding: "8px 18px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <span style={{ fontSize: 14 }}>⚠️</span>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "#92400e", fontFamily: uff }}>
+              {emptyRequired.length} required field{emptyRequired.length > 1 ? "s" : ""} not filled: {emptyRequired.map(f => f.label).join(", ")}
+            </span>
+          </div>
+        )}
+
+        {/* Body — 2-col grid of fields */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "16px 18px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px 20px" }}>
+            {filledFields.map(f => (
+              <div key={f.key} style={{ gridColumn: f.type === "textarea" ? "1 / -1" : undefined }}>
+                <div style={{ fontSize: 8.5, fontWeight: 900, color: M.textD, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 3, fontFamily: uff }}>
+                  {f.label}{f.required && <span style={{ color: "#ef4444", marginLeft: 3 }}>*</span>}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: f.auto ? 600 : 700, color: f.auto ? A.a : M.textA, fontFamily: f.mono ? dff : uff, padding: "5px 9px", background: M.surfMid, borderRadius: 4, border: `1px solid ${M.divider}`, wordBreak: "break-word" }}>
+                  {String(formData[f.key])}
+                </div>
+              </div>
+            ))}
+          </div>
+          {filledFields.length === 0 && (
+            <div style={{ textAlign: "center", padding: 24, color: M.textD, fontSize: 12, fontFamily: uff }}>No fields filled yet.</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "12px 18px", borderTop: `1px solid ${M.divider}`, display: "flex", justifyContent: "flex-end", gap: 8, background: M.surfMid, flexShrink: 0 }}>
+          <button onClick={onCancel} style={{ padding: "8px 20px", border: `1px solid ${M.inputBd}`, borderRadius: 6, background: M.inputBg, color: M.textB, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: uff }}>
+            ← Edit
+          </button>
+          <button onClick={onConfirm} style={{ padding: "8px 24px", border: "none", borderRadius: 6, background: CC_RED, color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer", fontFamily: uff }}>
+            ✅ Confirm & Save
+          </button>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -124,13 +226,13 @@ function InlineView({ enriched, formData, onChange, errors, visibleKeys, M, A, u
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      {/* Inline toolbar */}
-      <div style={{ padding: "6px 14px", borderBottom: `1px solid ${M.divider}`, display: "flex", alignItems: "center", gap: 8, background: M.surfMid, flexShrink: 0 }}>
-        <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, letterSpacing: 0.5, fontFamily: uff }}>⚡ INLINE ENTRY</div>
-        <div style={{ width: 1, height: 14, background: M.divider }} />
+      {/* Inline toolbar — CC_RED header */}
+      <div style={{ padding: "6px 14px", borderBottom: `1px solid ${M.divider}`, display: "flex", alignItems: "center", gap: 8, background: CC_RED, flexShrink: 0 }}>
+        <div style={{ fontSize: 9, fontWeight: 900, color: "#fff", letterSpacing: 0.5, fontFamily: uff }}>⚡ INLINE ENTRY</div>
+        <div style={{ width: 1, height: 14, background: "rgba(255,255,255,.3)" }} />
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter fields…"
-          style={{ border: `1px solid ${M.inputBd}`, borderRadius: 4, background: M.inputBg, color: M.textA, fontSize: 11, padding: "3px 8px", outline: "none", width: 180, fontFamily: uff }} />
-        <div style={{ marginLeft: "auto", fontSize: 9, color: M.textC, fontWeight: 700, fontFamily: uff }}>
+          style={{ border: "1px solid rgba(255,255,255,.4)", borderRadius: 4, background: "rgba(255,255,255,.15)", color: "#fff", fontSize: 11, padding: "3px 8px", outline: "none", width: 180, fontFamily: uff }} />
+        <div style={{ marginLeft: "auto", fontSize: 9, color: "rgba(255,255,255,.85)", fontWeight: 700, fontFamily: uff }}>
           {filledCount} / {manualCount.length} filled
         </div>
       </div>
@@ -148,7 +250,7 @@ function InlineView({ enriched, formData, onChange, errors, visibleKeys, M, A, u
             <col style={{ width: 50 }} />
           </colgroup>
           <thead style={{ position: "sticky", top: 0, zIndex: 10 }}>
-            <tr style={{ background: A.a }}>
+            <tr style={{ background: CC_RED }}>
               {["COL", "#", "ICON", "FIELD", "TYPE", "VALUE", "STATUS"].map(h => (
                 <th key={h} style={{ padding: "7px 8px", textAlign: "left", fontSize: 9, fontWeight: 900, color: "#fff", letterSpacing: 0.5, whiteSpace: "nowrap", fontFamily: uff }}>{h}</th>
               ))}

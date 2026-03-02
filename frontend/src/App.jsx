@@ -8,6 +8,7 @@ import { aColor, ini, ago, greet, todayStr, timeStr } from './utils/helpers';
 import { Avatar } from './components/ui';
 import { Tile } from './components/modules';
 import { NotifPanel, CmdPalette, SettingsPanel } from './components/panels';
+import SidebarStylePreview from './components/panels/SidebarStylePreview';
 import Procurement from './components/procurement/Procurement';
 import { Masters } from './components/masters';
 import { UsersPanel } from './components/users';
@@ -21,6 +22,9 @@ export default function App(){
   const [actMod,  setActMod]  = useState(null);
   const [hovMod,  setHovMod]  = useState(null);
   const [showAll, setShowAll] = useState(false);
+  const [expandedMod, setExpandedMod] = useState(null);
+  const [navPreview,  setNavPreview]  = useState(false);
+  const [navStyle,    setNavStyle]    = useState(1);
   const [notifs,      setNotifs]    = useState([]);
   const [notifOpen,   setNotifOpen] = useState(false);
   const [cmdOpen,     setCmdOpen]   = useState(false);
@@ -376,29 +380,86 @@ export default function App(){
 
             {/* Module Nav */}
             {!collapsed&&(
-              <div style={{padding:"5px 12px 3px",fontSize:8,fontWeight:900,color:M.textD,letterSpacing:1.2,textTransform:"uppercase"}}>Modules</div>
+              <div style={{padding:"10px 14px 5px",display:"flex",alignItems:"center",gap:6}}>
+                <span style={{fontSize:9,fontWeight:900,color:M.textD,letterSpacing:1.4,textTransform:"uppercase",flex:1}}>Modules</span>
+                <button onClick={()=>setNavPreview(true)} title="Preview nav styles" style={{fontSize:9,padding:"2px 7px",borderRadius:4,border:`1px solid ${M.divider}`,background:M.surfMid,color:M.textD,cursor:"pointer",fontFamily:uff,fontWeight:700,lineHeight:1.4}}>Style</button>
+              </div>
             )}
             {mods.map(mod=>{
-              const active=actMod===mod.id;
+              const active   = actMod===mod.id;
+              const expanded = expandedMod===mod.id;
+              const hover    = hovMod===mod.id;
+
+              /* ── Collapsed: icon only ── */
+              if(collapsed){
+                return(
+                  <button key={mod.id} onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);}}
+                    style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"12px 0",border:"none",background:active?`${A.a}14`:"transparent",cursor:"pointer",fontFamily:uff}}>
+                    <span style={{fontSize:20}}>{mod.icon}</span>
+                  </button>
+                );
+              }
+
+              /* ── Expanded + active: solid pill header fused to card body ── */
+              if(active && expanded){
+                return(
+                  <div key={mod.id} style={{margin:"3px 8px 6px",borderRadius:10,border:`1.5px solid ${A.a}40`,overflow:"hidden"}}>
+                    {/* Solid accent pill header */}
+                    <button onClick={()=>setExpandedMod(null)}
+                      style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"10px 12px",border:"none",background:A.a,cursor:"pointer",fontFamily:uff}}>
+                      <span style={{fontSize:9,color:"#ffffffaa",width:12,flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",transform:"rotate(90deg)"}}>▶</span>
+                      <span style={{fontSize:20}}>{mod.icon}</span>
+                      <span style={{fontSize:fz+1,fontWeight:800,color:"#fff",flex:1,textAlign:"left"}}>{mod.lbl}</span>
+                      {mod.badge>0&&<span style={{fontSize:9,minWidth:17,height:17,borderRadius:9,background:"#ffffff33",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px",border:"1px solid #ffffff55"}}>{mod.badge}</span>}
+                    </button>
+                    {/* Card body: sub-items with dividers */}
+                    {mod.sub&&mod.sub.map((sub,i)=>(
+                      <button key={i} onClick={()=>setActMod(mod.id)}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 16px",border:"none",borderTop:`1px solid ${M.divider}`,background:M.sidebarBg,cursor:"pointer",fontFamily:uff}}>
+                        <span style={{fontSize:14,color:A.a+"99",flexShrink:0}}>{sub.icon}</span>
+                        <span style={{fontSize:fz,fontWeight:600,color:M.textB}}>{sub.lbl}</span>
+                      </button>
+                    ))}
+                  </div>
+                );
+              }
+
+              /* ── Inactive: ghost pill on hover ── */
               return(
-                <button key={mod.id} onClick={()=>setActMod(mod.id)}
-                  style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:9,padding:collapsed?"9px 0":"7px 12px",justifyContent:collapsed?"center":"flex-start",background:active?`${A.a}12`:"transparent",borderLeft:active?`3px solid ${A.a}`:"3px solid transparent",border:"none",cursor:"pointer",transition:"all .12s",fontFamily:uff}}>
-                  <span style={{fontSize:15,flexShrink:0}}>{mod.icon}</span>
-                  {!collapsed&&<>
-                    <span style={{fontSize:fz-1,fontWeight:700,color:active?A.a:M.textB,flex:1}}>{mod.lbl}</span>
-                    {mod.badge>0&&<span style={{fontSize:9,fontWeight:900,minWidth:18,height:18,borderRadius:9,background:"#ef4444",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{mod.badge}</span>}
-                  </>}
-                </button>
+                <div key={mod.id} style={{padding:"2px 8px"}}>
+                  <button
+                    onMouseEnter={()=>setHovMod(mod.id)} onMouseLeave={()=>setHovMod(null)}
+                    onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);}}
+                    style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",
+                      border:hover?`1px solid ${A.a}`:"1px solid transparent",
+                      borderRadius:8,
+                      background:hover?`${A.a}10`:"transparent",
+                      cursor:"pointer",fontFamily:uff,transition:"all .15s"}}>
+                    <span style={{fontSize:9,color:M.textD,width:12,flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center"}}>▶</span>
+                    <span style={{fontSize:20}}>{mod.icon}</span>
+                    <span style={{fontSize:fz+1,fontWeight:700,color:hover?A.a:M.textB,flex:1,textAlign:"left"}}>{mod.lbl}</span>
+                    {mod.badge>0&&<span style={{fontSize:9,minWidth:17,height:17,borderRadius:9,background:"#ef4444",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 4px"}}>{mod.badge}</span>}
+                  </button>
+                </div>
               );
             })}
 
-            <div style={{height:1,background:M.divider,margin:"4px 10px"}}/>
+            <div style={{height:1,background:M.divider,margin:"6px 10px"}}/>
             {[{icon:"⚙️",lbl:"Settings",fn:()=>setCfgOpen(true),act:cfgOpen},
               {icon:"👥",lbl:"Users",    fn:()=>setActMod("users"),act:actMod==="users"}].map((x,i)=>(
-              <button key={i} onClick={x.fn} style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:9,padding:collapsed?"9px 0":"7px 12px",justifyContent:collapsed?"center":"flex-start",background:x.act?`${A.a}12`:"transparent",borderLeft:x.act?`3px solid ${A.a}`:"3px solid transparent",border:"none",cursor:"pointer",fontFamily:uff}}>
-                <span style={{fontSize:15}}>{x.icon}</span>
-                {!collapsed&&<span style={{fontSize:fz-1,fontWeight:700,color:M.textC}}>{x.lbl}</span>}
-              </button>
+              <div key={i} style={{padding:collapsed?"0":"2px 8px"}}>
+                <button onClick={x.fn}
+                  onMouseEnter={()=>setHovMod("__"+x.lbl)} onMouseLeave={()=>setHovMod(null)}
+                  style={{width:"100%",display:"flex",alignItems:"center",gap:collapsed?0:9,padding:collapsed?"12px 0":"9px 12px",
+                    justifyContent:collapsed?"center":"flex-start",
+                    border:!collapsed&&hovMod==="__"+x.lbl?`1px solid ${A.a}`:"1px solid transparent",
+                    borderRadius:collapsed?0:8,
+                    background:x.act?`${A.a}14`:hovMod==="__"+x.lbl?`${A.a}10`:"transparent",
+                    cursor:"pointer",fontFamily:uff,transition:"all .15s"}}>
+                  <span style={{fontSize:20}}>{x.icon}</span>
+                  {!collapsed&&<span style={{fontSize:fz+1,fontWeight:700,color:x.act?A.a:hovMod==="__"+x.lbl?A.a:M.textC}}>{x.lbl}</span>}
+                </button>
+              </div>
             ))}
           </div>
 
@@ -425,7 +486,7 @@ export default function App(){
         {actMod === "procurement" ? (
           <Procurement M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod === "masters" ? (
-          <Masters M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
+          <Masters M={M} A={A} cfg={cfg} fz={fz} dff={dff} setCfg={setCfg} />
         ) : actMod === "users" ? (
           <UsersPanel M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod && actMod !== "dashboard" ? (
@@ -596,6 +657,15 @@ export default function App(){
 
       {/* Backdrop for overflow dropdown */}
       {showAll&&<div onClick={()=>setShowAll(false)} style={{position:"fixed",inset:0,zIndex:9000}}/>}
+
+      {/* Sidebar Style Preview */}
+      {navPreview&&(
+        <SidebarStylePreview
+          M={M} A={A} fz={fz} uff={uff}
+          onSelect={s=>{setNavStyle(s);setNavPreview(false);}}
+          onClose={()=>setNavPreview(false)}
+        />
+      )}
     </div>
   );
 }

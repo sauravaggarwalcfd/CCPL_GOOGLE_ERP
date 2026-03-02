@@ -11,6 +11,7 @@ import ViewBuilder from './ViewBuilder';
 import ViewsPanel from './ViewsPanel';
 import StatusBar from './StatusBar';
 import ItemCategoryTab from './ItemCategoryTab';
+import { ArticleMasterLayoutPanel } from './ArticleMasterTab';
 import api from '../../services/api';
 
 // ── Mapping: raw → schema keys ──
@@ -43,7 +44,7 @@ const MAIN_TABS = [
  * SheetWorkspace — 3-tab workspace container.
  * Props: { sheet, fileKey, fileLabel, M, A, uff, dff, sheetCounts }
  */
-export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, dff, sheetCounts }) {
+export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, dff, fz = 13, pyV = 7, sheetCounts, canEdit = true }) {
   // ── Tab state ──
   const [mainTab, setMainTab] = useState("records");
   const [entryMode, setEntryMode] = useState("form");
@@ -135,6 +136,20 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     setIsDirty(false);
   };
 
+  // ── Edit from Layout Panel → pre-load DataEntry form and switch tab ──
+  const handleEditFromLayout = (art) => {
+    if (!canEdit) return;
+    const fd = {};
+    enriched.fields.forEach(f => {
+      if (art[f.key] !== undefined) fd[f.key] = art[f.key];
+    });
+    setFormData(fd);
+    setErrors({});
+    setIsDirty(false);
+    setMainTab("entry");
+    setEntryMode("form");
+  };
+
   // ── Bulk save handler ──
   const handleBulkSave = async (rowsData) => {
     setSaving(true);
@@ -219,6 +234,12 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     return <ItemCategoryTab M={M} A={A} uff={uff} dff={dff} />;
   }
 
+  // ── Extra tabs for Article Master (Layout View appended to existing tabs) ──
+  const isArticleMaster = sheet.key === "article_master";
+  const displayTabs = isArticleMaster
+    ? [...MAIN_TABS, { id: "layout", label: "Layout View", icon: "🖼" }]
+    : MAIN_TABS;
+
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
@@ -246,7 +267,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
 
         {/* ── Tab bar ── */}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
-          {MAIN_TABS.map(t => {
+          {displayTabs.map(t => {
             const active = mainTab === t.id;
             return (
               <button key={t.id} onClick={() => setMainTab(t.id)} style={{
@@ -374,9 +395,12 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
             sheet={sheet}
             fileKey={fileKey}
             fileLabel={fileLabel}
-            M={M} A={A} uff={uff} dff={dff}
+            M={M} A={A} uff={uff} dff={dff} fz={fz} pyV={pyV}
             sheetCounts={sheetCounts}
           />
+        )}
+        {mainTab === "layout" && isArticleMaster && (
+          <ArticleMasterLayoutPanel M={M} A={A} uff={uff} dff={dff} canEdit={canEdit} onEditRecord={handleEditFromLayout} />
         )}
       </div>
 
@@ -418,9 +442,9 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         />
       )}
 
-      {/* ── Toast ── */}
+      {/* ── Toast — bottom:24 right:24 (§COMMON) ── */}
       {toast && (
-        <div style={{ position: "fixed", bottom: 60, left: "50%", transform: "translateX(-50%)", background: M.textA, color: M.bg, padding: "10px 24px", borderRadius: 8, fontSize: 12, fontWeight: 800, fontFamily: uff, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.2)" }}>
+        <div style={{ position: "fixed", bottom: 24, right: 24, background: "#0078D4", color: "#fff", padding: "10px 20px", borderRadius: 8, fontSize: 12, fontWeight: 800, fontFamily: uff, zIndex: 9999, boxShadow: "0 4px 20px rgba(0,0,0,0.25)", maxWidth: 340 }}>
           {toast}
         </div>
       )}

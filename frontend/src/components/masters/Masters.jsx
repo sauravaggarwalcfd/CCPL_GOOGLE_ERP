@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { uiFF } from '../../constants/fonts';
 import api from '../../services/api';
 import SheetWorkspace from './SheetWorkspace';
+import MastersUpgradePreview from './MastersUpgradePreview';
 
 // ── All master sheets by file (v2 full list) ──
 const FILES = {
@@ -229,12 +230,20 @@ function FileSidebar({ activeSheet, activeFileKey, expandedFile, setExpandedFile
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN MASTERS PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function Masters({ M, A, cfg, fz, dff }) {
+const PY_MAP = { compact: 4, comfortable: 7, spacious: 11 };
+
+export default function Masters({ M, A, cfg, fz, dff, setCfg }) {
   const uff = uiFF(cfg.uiFont);
+  const pyV = PY_MAP[cfg?.density] ?? 7;
 
   // Navigation state
-  const [activeSheet, setActiveSheet]   = useState(null);   // { fileKey, sheet } | null
-  const [expandedFile, setExpandedFile] = useState("1A");
+  const [activeSheet,   setActiveSheet]   = useState(null);  // { fileKey, sheet } | null
+  const [expandedFile,  setExpandedFile]  = useState("1A");
+  const [fileSideOpen,  setFileSideOpen]  = useState(false); // animated slide-in
+  const [search,        setSearch]        = useState("");
+
+  // Upgrade preview overlay
+  const [showUpgradePreview, setShowUpgradePreview] = useState(false);
 
   // API state
   const [sheetCounts, setSheetCounts]     = useState({});
@@ -257,39 +266,54 @@ export default function Masters({ M, A, cfg, fz, dff }) {
   function handleSelectSheet(fileKey, sheet) {
     setActiveSheet({ fileKey, sheet });
     setExpandedFile(fileKey);
+    setFileSideOpen(true);
+    if (setCfg) setCfg(c => ({ ...c, compactSide: true }));
+  }
+
+  function handleOpenFileSide(fileKey) {
+    setExpandedFile(fileKey);
+    setFileSideOpen(true);
+    if (setCfg) setCfg(c => ({ ...c, compactSide: true }));
   }
 
   function handleCloseSidebar() {
+    setFileSideOpen(false);
     setActiveSheet(null);
+    if (setCfg) setCfg(c => ({ ...c, compactSide: false }));
   }
-
-  const showSidebar = !!activeSheet;
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: M.bg, fontFamily: uff }}>
 
       {/* ── CONTENT HEADER ── */}
-      <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: "12px 24px", display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
-        <div style={{ flex: 1 }}>
+      <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: uff }}>
-            {activeSheet ? `${FILES[activeSheet.fileKey].label} ›` : "Masters"} {activeSheet ? activeSheet.sheet.name : "Data Hub"}
+            {activeSheet ? `${FILES[activeSheet.fileKey].label} ›` : "Masters"}{" "}
+            {activeSheet ? activeSheet.sheet.name : "Data Hub"}
           </div>
           <div style={{ fontSize: 17, fontWeight: 900, color: M.textA, fontFamily: uff }}>
             {activeSheet ? activeSheet.sheet.name : "📋 Master Data Hub"}
           </div>
         </div>
 
-        {activeSheet ? (
-          <button onClick={handleCloseSidebar}
-            style={{ padding: "6px 14px", background: M.surfMid, border: `1px solid ${M.divider}`, borderRadius: 7, fontSize: 11, fontWeight: 800, color: M.textB, cursor: "pointer", fontFamily: uff }}>
-            ← Back to Hub
-          </button>
-        ) : (
-          <div style={{ display: "flex", gap: 8 }}>
+        {/* Global search — always present */}
+        <div style={{ position: "relative" }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: M.textD, pointerEvents: "none" }}>🔍</span>
+          <input
+            value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search masters…"
+            style={{ padding: "6px 12px 6px 30px", background: M.surfMid, border: `1px solid ${M.divider}`, borderRadius: 7, fontSize: 11, fontFamily: uff, color: M.textA, width: 200, outline: "none" }}
+          />
+        </div>
+
+        {/* Hub: file shortcut buttons that slide open the file sidebar */}
+        {!activeSheet && (
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             {Object.values(FILES).map(f => (
-              <button key={f.key} onClick={() => { setExpandedFile(f.key); handleSelectSheet(f.key, f.sheets[0]); }}
+              <button key={f.key} onClick={() => handleOpenFileSide(f.key)}
                 style={{ padding: "6px 14px", background: f.accent, border: `1.5px solid ${f.badge}`, borderRadius: 7, fontSize: 11, fontWeight: 800, color: f.color, cursor: "pointer", fontFamily: uff }}>
-                {f.icon} {f.label}
+                {f.icon} {f.short}
               </button>
             ))}
           </div>
@@ -320,19 +344,21 @@ export default function Masters({ M, A, cfg, fz, dff }) {
       {/* ── BODY: SIDEBAR + CONTENT ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
 
-        {/* File sidebar (visible when a sheet is selected) */}
-        {showSidebar && (
-          <FileSidebar
-            activeSheet={activeSheet.sheet}
-            activeFileKey={activeSheet.fileKey}
-            expandedFile={expandedFile}
-            setExpandedFile={setExpandedFile}
-            onSelectSheet={handleSelectSheet}
-            onClose={handleCloseSidebar}
-            M={M} A={A} uff={uff} dff={dff}
-            sheetCounts={sheetCounts}
-          />
-        )}
+        {/* File sidebar — animated slide-in (width 0 → 260) */}
+        <div style={{ width: fileSideOpen ? 260 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.25s cubic-bezier(.4,0,.2,1)" }}>
+          {fileSideOpen && (
+            <FileSidebar
+              activeSheet={activeSheet?.sheet ?? null}
+              activeFileKey={activeSheet?.fileKey ?? null}
+              expandedFile={expandedFile}
+              setExpandedFile={setExpandedFile}
+              onSelectSheet={handleSelectSheet}
+              onClose={handleCloseSidebar}
+              M={M} A={A} uff={uff} dff={dff}
+              sheetCounts={sheetCounts}
+            />
+          )}
+        </div>
 
         {/* Main content */}
         {activeSheet
@@ -340,7 +366,7 @@ export default function Masters({ M, A, cfg, fz, dff }) {
               sheet={activeSheet.sheet}
               fileKey={activeSheet.fileKey}
               fileLabel={FILES[activeSheet.fileKey].label}
-              M={M} A={A} uff={uff} dff={dff}
+              M={M} A={A} uff={uff} dff={dff} fz={fz} pyV={pyV}
               sheetCounts={sheetCounts}
             />
           : <MastersHome
@@ -360,6 +386,15 @@ export default function Masters({ M, A, cfg, fz, dff }) {
         .add-btn { opacity: 0; transition: opacity 0.15s; }
         .card-wrap:hover .add-btn { opacity: 1; }
       `}</style>
+
+      {/* Upgrade preview overlay */}
+      {showUpgradePreview && (
+        <MastersUpgradePreview
+          M={M} A={A} uff={uff}
+          onCancel={() => setShowUpgradePreview(false)}
+          onConfirm={() => setShowUpgradePreview(false)}
+        />
+      )}
     </div>
   );
 }
