@@ -403,6 +403,10 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
   // ─── CREATE FORM STATE ───
   const [form, setForm] = useState({ master: "", l1: "", l2: "", l3: "", hsn: "", active: "Yes", remarks: "" });
   const [formErrors, setFormErrors] = useState({});
+  // ─── SESSION-LEVEL CUSTOM OPTIONS (add new L1/L2/L3) ───
+  const [extraOpts, setExtraOpts]     = useState({});     // { [master]: { l1:[], l2:{}, l3:{} } }
+  const [addingLevel, setAddingLevel] = useState(null);   // 'l1'|'l2'|'l3'|null
+  const [newOptVal, setNewOptVal]     = useState('');
 
   const hierarchy = form.master ? CATEGORY_HIERARCHY[form.master] : null;
 
@@ -419,9 +423,41 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
   };
   const setL3 = (v) => setForm(f => ({ ...f, l3: v }));
 
-  const l1Opts = hierarchy ? (hierarchy.l1Behavior === "FIXED" ? [hierarchy.l1Fixed] : hierarchy.l1Options) : [];
-  const l2Opts = hierarchy && form.l1 ? (hierarchy.l2Options[form.l1] || []) : [];
-  const l3Opts = hierarchy && form.l2 ? (hierarchy.l3Options[form.l2] || []) : [];
+  // ─── ADD-NEW HELPERS ───
+  const _pushExtra = (level, key, val) => {
+    if (!val.trim() || !form.master) return;
+    setExtraOpts(prev => {
+      const m = { ...(prev[form.master] || {}) };
+      if (level === 'l1') m.l1 = [...(m.l1 || []), val.trim()];
+      else if (level === 'l2') m.l2 = { ...(m.l2 || {}), [key]: [...((m.l2 || {})[key] || []), val.trim()] };
+      else if (level === 'l3') m.l3 = { ...(m.l3 || {}), [key]: [...((m.l3 || {})[key] || []), val.trim()] };
+      return { ...prev, [form.master]: m };
+    });
+  };
+  const confirmAddLevel = (level) => {
+    const v = newOptVal.trim();
+    if (!v) { setAddingLevel(null); return; }
+    _pushExtra(level, level === 'l2' ? form.l1 : form.l2, v);
+    if (level === 'l1') setL1(v);
+    else if (level === 'l2') setL2(v);
+    else if (level === 'l3') setL3(v);
+    setAddingLevel(null);
+    setNewOptVal('');
+  };
+
+  const masterExtra = form.master ? (extraOpts[form.master] || {}) : {};
+  const l1Opts = hierarchy ? [
+    ...(hierarchy.l1Behavior === "FIXED" ? [hierarchy.l1Fixed] : hierarchy.l1Options),
+    ...(masterExtra.l1 || []),
+  ] : [];
+  const l2Opts = hierarchy && form.l1 ? [
+    ...(hierarchy.l2Options[form.l1] || []),
+    ...((masterExtra.l2 || {})[form.l1] || []),
+  ] : [];
+  const l3Opts = hierarchy && form.l2 ? [
+    ...(hierarchy.l3Options[form.l2] || []),
+    ...((masterExtra.l3 || {})[form.l2] || []),
+  ] : [];
 
   // Generate next code
   const nextCode = useMemo(() => {
@@ -702,21 +738,46 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
                           <span>🔒</span> {hierarchy.l1Fixed}
                         </div>
                       ) : (
-                        <select value={form.l1} onChange={e => setL1(e.target.value)}
-                          style={{ ...inp, cursor: "pointer", ...(formErrors.l1 ? { borderColor: "#BE123C" } : {}) }}>
-                          <option value="">— Select L1 —</option>
-                          {l1Opts.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        <>
+                          <select value={addingLevel==='l1'?'__NEW__':form.l1}
+                            onChange={e => e.target.value === '__NEW__' ? (setAddingLevel('l1'), setNewOptVal('')) : setL1(e.target.value)}
+                            style={{ ...inp, cursor: "pointer", ...(formErrors.l1 ? { borderColor: "#BE123C" } : {}) }}>
+                            <option value="">— Select L1 —</option>
+                            {l1Opts.map(o => <option key={o} value={o}>{o}</option>)}
+                            <option value="__NEW__">➕ Add new L1…</option>
+                          </select>
+                          {addingLevel==='l1' && (
+                            <div style={{ display:'flex', gap:4, marginTop:6 }}>
+                              <input autoFocus value={newOptVal} onChange={e=>setNewOptVal(e.target.value)}
+                                onKeyDown={e=>{ if(e.key==='Enter') confirmAddLevel('l1'); if(e.key==='Escape'){setAddingLevel(null);setNewOptVal('');} }}
+                                placeholder="New L1 value…" style={{ ...inp, flex:1, fontSize:fz-1 }} />
+                              <button onClick={()=>confirmAddLevel('l1')} style={{...btn('#dcfce7','#15803d'),padding:'6px 12px',fontSize:13}}>✓</button>
+                              <button onClick={()=>{setAddingLevel(null);setNewOptVal('');}} style={{...btn(M.bBg,M.bTx),padding:'6px 12px',fontSize:13}}>✕</button>
+                            </div>
+                          )}
+                        </>
                       )}
                       {formErrors.l1 && <span style={{ color: "#BE123C", fontSize: 10, fontWeight: 700 }}>⚠ {formErrors.l1}</span>}
                     </div>
                     <div>
                       <label style={lbl}>L2 Type</label>
-                      <select value={form.l2} onChange={e => setL2(e.target.value)} disabled={!form.l1}
+                      <select value={addingLevel==='l2'?'__NEW__':form.l2}
+                        onChange={e => e.target.value === '__NEW__' ? (setAddingLevel('l2'), setNewOptVal('')) : setL2(e.target.value)}
+                        disabled={!form.l1}
                         style={{ ...inp, cursor: "pointer", opacity: form.l1 ? 1 : .4, ...(formErrors.l2 ? { borderColor: "#BE123C" } : {}) }}>
                         <option value="">— Select L2 —</option>
                         {l2Opts.map(o => <option key={o} value={o}>{o}</option>)}
+                        {form.l1 && <option value="__NEW__">➕ Add new L2…</option>}
                       </select>
+                      {addingLevel==='l2' && (
+                        <div style={{ display:'flex', gap:4, marginTop:6 }}>
+                          <input autoFocus value={newOptVal} onChange={e=>setNewOptVal(e.target.value)}
+                            onKeyDown={e=>{ if(e.key==='Enter') confirmAddLevel('l2'); if(e.key==='Escape'){setAddingLevel(null);setNewOptVal('');} }}
+                            placeholder="New L2 value…" style={{ ...inp, flex:1, fontSize:fz-1 }} />
+                          <button onClick={()=>confirmAddLevel('l2')} style={{...btn('#dcfce7','#15803d'),padding:'6px 12px',fontSize:13}}>✓</button>
+                          <button onClick={()=>{setAddingLevel(null);setNewOptVal('');}} style={{...btn(M.bBg,M.bTx),padding:'6px 12px',fontSize:13}}>✕</button>
+                        </div>
+                      )}
                       {formErrors.l2 && <span style={{ color: "#BE123C", fontSize: 10, fontWeight: 700 }}>⚠ {formErrors.l2}</span>}
                     </div>
                   </div>
@@ -725,11 +786,23 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                     <div>
                       <label style={lbl}>L3 Style</label>
-                      <select value={form.l3} onChange={e => setL3(e.target.value)} disabled={!form.l2}
+                      <select value={addingLevel==='l3'?'__NEW__':form.l3}
+                        onChange={e => e.target.value === '__NEW__' ? (setAddingLevel('l3'), setNewOptVal('')) : setL3(e.target.value)}
+                        disabled={!form.l2}
                         style={{ ...inp, cursor: "pointer", opacity: form.l2 ? 1 : .4, ...(formErrors.l3 ? { borderColor: "#BE123C" } : {}) }}>
                         <option value="">— Select L3 —</option>
                         {l3Opts.map(o => <option key={o} value={o}>{o}</option>)}
+                        {form.l2 && <option value="__NEW__">➕ Add new L3…</option>}
                       </select>
+                      {addingLevel==='l3' && (
+                        <div style={{ display:'flex', gap:4, marginTop:6 }}>
+                          <input autoFocus value={newOptVal} onChange={e=>setNewOptVal(e.target.value)}
+                            onKeyDown={e=>{ if(e.key==='Enter') confirmAddLevel('l3'); if(e.key==='Escape'){setAddingLevel(null);setNewOptVal('');} }}
+                            placeholder="New L3 value…" style={{ ...inp, flex:1, fontSize:fz-1 }} />
+                          <button onClick={()=>confirmAddLevel('l3')} style={{...btn('#dcfce7','#15803d'),padding:'6px 12px',fontSize:13}}>✓</button>
+                          <button onClick={()=>{setAddingLevel(null);setNewOptVal('');}} style={{...btn(M.bBg,M.bTx),padding:'6px 12px',fontSize:13}}>✕</button>
+                        </div>
+                      )}
                       {formErrors.l3 && <span style={{ color: "#BE123C", fontSize: 10, fontWeight: 700 }}>⚠ {formErrors.l3}</span>}
                     </div>
                     <div>
