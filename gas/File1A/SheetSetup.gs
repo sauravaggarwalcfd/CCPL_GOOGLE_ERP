@@ -142,13 +142,14 @@ function setColumnValidation_(sheet, col, values, startRow) {
    INDIVIDUAL SHEET SETUP FUNCTIONS
    ═══════════════════════════════════════════════════════════ */
 
-/* ── 01. ARTICLE_MASTER (26 cols) ── */
+/* ── 01. ARTICLE_MASTER (27 cols) — V9: +1 col L3 Style at col I ── */
 function setupArticleMaster_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.ARTICLE_MASTER);
   var headers = [
     '🔑 Article Code', 'Article Description', 'Short Name', 'IMAGE LINK',
     '⟷ SKETCH DRIVE LINKS', 'Buyer Style No', 'L1 Division',
-    'L2 Product Category', 'Season', 'Gender', 'Fit Type', 'Neckline',
+    'L2 Product Category', 'L3 Style',
+    'Season', 'Gender', 'Fit Type', 'Neckline',
     'Sleeve Type', '→ MAIN FABRIC USED', '← Fabric Name (Auto)',
     'Color Code(s)', 'Size Range', '∑ FINAL MARKUP %', '∑ FINAL MARKDOWN %',
     'W.S.P (Rs)', 'MRP (Rs)', '→ HSN Code', '← GST % (Auto)',
@@ -157,7 +158,9 @@ function setupArticleMaster_(ss) {
   var descriptions = [
     '4-5 digits + 2 CAPS. No space. Manual.', 'Full name with construction', 'Max 25 chars',
     'Google Drive link', 'Popup log. Appends only.', 'Optional buyer ref',
-    'Auto: Apparel', 'Dropdown', 'Multi-select', 'Dropdown', 'Dropdown',
+    'Dropdown: Men\'s/Women\'s/Kids/Unisex Apparel', 'Dropdown: Tops/Sweatshirt/Tracksuit/Bottoms',
+    'Dropdown: style type (Pique, Hoodie, Crew Neck, etc.)',
+    'Multi-select', 'Dropdown', 'Dropdown',
     'Dropdown', 'Dropdown', 'FK → RM_MASTER_FABRIC', 'Auto-filled by GAS',
     'Multi-select → COLOR_MASTER', 'Display only', '(MRP−WSP)÷WSP×100',
     '(MRP−WSP)÷MRP×100', 'Wholesale price/pc', 'Max retail price',
@@ -169,23 +172,25 @@ function setupArticleMaster_(ss) {
     'CC ERP FILE 1A — ARTICLE_MASTER — Finished Garments',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  // Validations
-  setColumnValidation_(sheet, 8, ['Tops-Polo', 'Tops-Tee', 'Sweatshirt', 'Tracksuit', 'Bottoms']);
-  setColumnValidation_(sheet, 10, ['Men', 'Women', 'Kids', 'Unisex']);
-  setColumnValidation_(sheet, 11, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
-  setColumnValidation_(sheet, 12, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
-  setColumnValidation_(sheet, 13, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
-  setColumnValidation_(sheet, 24, CONFIG.STATUS_LIST);
-
-  // L1 Division auto-fill
-  sheet.getRange(4, 7, 500, 1).setValue('Apparel');
+  // Validations — col numbers reflect V9 (+1 shift from col I onwards)
+  setColumnValidation_(sheet, 7, ["Men's Apparel", "Women's Apparel", "Kids Apparel", "Unisex Apparel"]);
+  setColumnValidation_(sheet, 8, ['Tops - Polo', 'Tops - Tee', 'Sweatshirt', 'Tracksuit', 'Bottoms']);
+  setColumnValidation_(sheet, 9, ['Basic', 'Pique', 'Striper', 'Jacquard', 'Designer', 'Henley',
+    'V-Neck', 'Oversized', 'Hoodie', 'Crew Neck', 'Quarter Zip', 'Half Zip',
+    'Fleece', 'Bomber', 'Pullover', 'Slim Fit', 'Relaxed Fit', 'Athletic', 'Cargo']);
+  setColumnValidation_(sheet, 11, ['Men', 'Women', 'Kids', 'Unisex']);
+  setColumnValidation_(sheet, 12, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
+  setColumnValidation_(sheet, 13, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
+  setColumnValidation_(sheet, 14, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
+  setColumnValidation_(sheet, 25, CONFIG.STATUS_LIST);
 }
 
-/* ── 02. RM_MASTER_FABRIC (25 cols) ── */
+/* ── 02. RM_MASTER_FABRIC (27 cols) — V9: +2 cols L1/L2 at cols C,D ── */
 function setupRMFabric_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.RM_MASTER_FABRIC);
   var headers = [
-    '# RM Code', '∑ FINAL FABRIC SKU', 'KNIT NAME / STRUCTURE',
+    '# RM Code', '∑ FINAL FABRIC SKU',
+    'L1 Division', 'L2 Category', 'L3 Knit Type',
     '⟷ YARN COMPOSITION', '← Yarn Names (Auto)', 'FABRIC TYPE', 'COLOUR',
     'GSM (Min)', 'GSM (Max)', 'Width (inches)', 'UOM', '→ HSN Code',
     '← GST % (Auto)', '→ Primary Supplier', 'Supplier Code',
@@ -194,7 +199,9 @@ function setupRMFabric_(ss) {
     '← FINISHED FABRIC COST (Auto)', '⟷ Tags'
   ];
   var descriptions = [
-    'AUTO: RM-FAB-xxx', 'GAS builds: KNIT+YARN', 'FK → FABRIC_TYPE_MASTER',
+    'AUTO: RM-FAB-xxx', 'GAS builds: KNIT+YARN',
+    'Auto: Raw Material. Read-only.', 'Auto: Knit Fabric. Read-only.',
+    'Dropdown: Single Jersey, Pique, Fleece, French Terry, Rib, etc.',
     'Multi-select FK → RM_MASTER_YARN', 'Auto from yarn codes', 'KORA / FINISHED',
     'KORA/COLOURED/DYED/MEL', 'Grams per sq meter min', 'Grams per sq meter max',
     'Tube/Open width', 'KG/MTR', 'FK → HSN_MASTER', 'Auto from HSN',
@@ -208,24 +215,36 @@ function setupRMFabric_(ss) {
     'CC ERP FILE 1A — RM_MASTER_FABRIC — Knit Fabrics',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 6, ['KORA', 'FINISHED']);
-  setColumnValidation_(sheet, 7, ['KORA', 'COLOURED', 'DYED', 'MEL']);
-  setColumnValidation_(sheet, 11, CONFIG.UOM_LIST);
-  setColumnValidation_(sheet, 22, CONFIG.STATUS_LIST);
+  // L1/L2 auto-fill (green read-only concept)
+  sheet.getRange(4, 3, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
+  sheet.getRange(4, 4, 500, 1).setValue('Knit Fabric').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+2 shift from col C onwards)
+  setColumnValidation_(sheet, 5, ['Single Jersey', 'Pique', 'Fleece', 'French Terry', 'Rib',
+    'Interlock', 'Autostriper', 'Waffle Knit', 'Lycra Jersey', 'Textured / Yarn Dyed', 'Other Knit']);
+  setColumnValidation_(sheet, 8, ['KORA', 'FINISHED']);
+  setColumnValidation_(sheet, 9, ['KORA', 'COLOURED', 'DYED', 'MEL']);
+  setColumnValidation_(sheet, 13, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 24, CONFIG.STATUS_LIST);
 }
 
-/* ── 03. RM_MASTER_YARN (15 cols) ── */
+/* ── 03. RM_MASTER_YARN (18 cols) — V9: +3 cols L1/L2/L3 at cols B–D ── */
 function setupRMYarn_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.RM_MASTER_YARN);
   var headers = [
-    '# RM Code', 'Yarn Name', 'Colour Type', 'Colour (if dyed)',
+    '# RM Code',
+    'L1 Division', 'L2 Category', 'L3 Yarn Type',
+    'Yarn Name', 'Colour Type', 'Colour (if dyed)',
     '→ HSN Code', '← GST % (Auto)', '→ Supplier Code',
     '← Primary Supplier', '← Supplier Name (Auto)',
     'Season for Cost', 'Avg Cost (excl GST)', 'GST % for Cost',
     '∑ Total Cost (incl GST)', 'Status', 'Remarks'
   ];
   var descriptions = [
-    'AUTO: RM-YRN-xxx', 'Full yarn description', 'Raw/Dyed/Melange',
+    'AUTO: RM-YRN-xxx',
+    'Auto: Raw Material. Read-only.', 'Auto: Yarn. Read-only.',
+    'Dropdown: Cotton Combed, Polyester, PC Blend, etc.',
+    'Full yarn description', 'Raw/Dyed/Melange',
     'If dyed/melange only', 'FK → HSN_MASTER', 'Auto from HSN',
     'FK → SUPPLIER_MASTER', 'Supplier name ref', 'Auto from SUPPLIER',
     'SS25/AW25 etc', '₹ per KG excl GST', 'GST rate %',
@@ -236,21 +255,33 @@ function setupRMYarn_(ss) {
     'CC ERP FILE 1A — RM_MASTER_YARN — Yarn',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 3, ['Raw', 'Dyed', 'Melange']);
-  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
+  // L1/L2 auto-fill (green read-only concept)
+  sheet.getRange(4, 2, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
+  sheet.getRange(4, 3, 500, 1).setValue('Yarn').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+3 shift from col B onwards)
+  setColumnValidation_(sheet, 4, ['Cotton Combed', 'Cotton Carded', 'Polyester', 'PC Blend',
+    'Viscose', 'Melange', 'Lycra / Spandex', 'Nylon', 'Other Yarn']);
+  setColumnValidation_(sheet, 6, ['Raw', 'Dyed', 'Melange']);
+  setColumnValidation_(sheet, 17, CONFIG.STATUS_LIST);
 }
 
-/* ── 04. RM_MASTER_WOVEN (15 cols) ── */
+/* ── 04. RM_MASTER_WOVEN (17 cols) — V9: +2 cols L1/L2 at cols B,C ── */
 function setupRMWoven_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.RM_MASTER_WOVEN);
   var headers = [
-    '# RM Code', 'Woven/Interlining Name', 'Type', 'Composition',
+    '# RM Code',
+    'L1 Division', 'L2 Category',
+    'Woven/Interlining Name', 'L3 Woven Type', 'Composition',
     'Width (inches)', 'Weight (GSM)', 'UOM', '→ HSN Code',
     '← GST % (Auto)', '→ Primary Supplier', '← Supplier Name (Auto)',
     'Cost per UOM', 'Reorder Level', 'Status', 'Remarks'
   ];
   var descriptions = [
-    'AUTO: RM-WVN-xxx', 'Full description', 'Woven/Interlining/Fusing',
+    'AUTO: RM-WVN-xxx',
+    'Auto: Raw Material. Read-only.', 'Auto: Woven / Interlining. Read-only.',
+    'Full description',
+    'Dropdown: Fusible, Non-Fusible, Woven Fabric, Collar Canvas, etc.',
     'Fabric blend', 'Width', 'GSM', 'MTR/KG', 'FK → HSN_MASTER',
     'Auto from HSN', 'FK → SUPPLIER_MASTER', 'Auto from SUPPLIER',
     '₹ per UOM', 'Stock trigger qty', 'Active/Inactive', 'Notes'
@@ -260,17 +291,24 @@ function setupRMWoven_(ss) {
     'CC ERP FILE 1A — RM_MASTER_WOVEN — Woven & Interlining',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 3, ['Woven', 'Interlining', 'Fusing']);
-  setColumnValidation_(sheet, 7, CONFIG.UOM_LIST);
-  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
+  // L1/L2 auto-fill (green read-only concept)
+  sheet.getRange(4, 2, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
+  sheet.getRange(4, 3, 500, 1).setValue('Woven / Interlining').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+2 shift from col B onwards)
+  setColumnValidation_(sheet, 5, ['Fusible Interlining', 'Non-Fusible Interlining',
+    'Woven Fabric', 'Collar Canvas', 'Lining', 'Tape', 'Other']);
+  setColumnValidation_(sheet, 9, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 16, CONFIG.STATUS_LIST);
 }
 
-/* ── 05. TRIM_MASTER (29 cols) ── */
+/* ── 05. TRIM_MASTER (30 cols) — V9: +1 col L1 Division at col D ── */
 function setupTrimMaster_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.TRIM_MASTER);
   var headers = [
-    '# TRM Code', 'Parent Code', '⚠ Trim Name', '⚠ Trim Category',
-    'Trim Sub-Category', 'IMAGE LINK', '→ COLOUR CODE',
+    '# TRM Code', 'Parent Code', '⚠ Trim Name',
+    'L1 Division', 'L2 Trim Category', 'L3 Sub-Category',
+    'IMAGE LINK', '→ COLOUR CODE',
     '← Color/Shade Name (Auto)', 'UOM', '→ HSN Code',
     '← GST % (Auto)', '→ Primary Supplier', 'Supplier Code',
     'Lead Time (Days)', 'Reorder Level', 'Status',
@@ -280,8 +318,10 @@ function setupTrimMaster_(ss) {
     'Remarks'
   ];
   var descriptions = [
-    'AUTO: TRM-[CAT]-xxx', 'FK → self (variant)', 'Required', 'Required dropdown',
-    'Sub-category text', 'Google Drive link', 'FK → COLOR_MASTER',
+    'AUTO: TRM-[CAT]-xxx', 'FK → self (variant)', 'Required',
+    'Auto: Trim. Read-only.', 'Dropdown: THD/LBL/ELS/ZIP/BUT/TPE/DRW/VLC/RVT/THP/OTH',
+    'Dropdown: specific sub-type',
+    'Google Drive link', 'FK → COLOR_MASTER',
     'Auto from COLOR_MASTER', 'CONE/MTR/PCS/KG/SET/ROLL', 'FK → HSN_MASTER',
     'Auto from HSN', 'FK → SUPPLIER_MASTER', 'Supplier cat code',
     'Days', 'Stock trigger', 'Active/Inactive/Dev/Discontinued',
@@ -292,13 +332,16 @@ function setupTrimMaster_(ss) {
   ];
 
   applyStandardFormat_(sheet,
-    'CC ERP FILE 1A — TRIM_MASTER — All Trims (29 Columns)',
+    'CC ERP FILE 1A — TRIM_MASTER — All Trims (30 Columns)',
     headers, descriptions, CONFIG.TAB_COLORS.TRIM_MASTER);
 
-  // Trim Category dropdown
-  setColumnValidation_(sheet, 4, CONFIG.TRIM_CATEGORY_LIST);
-  setColumnValidation_(sheet, 9, CONFIG.UOM_LIST);
-  setColumnValidation_(sheet, 16, CONFIG.STATUS_LIST);
+  // L1 auto-fill (green read-only concept)
+  sheet.getRange(4, 4, 500, 1).setValue('Trim').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
+  setColumnValidation_(sheet, 5, CONFIG.TRIM_CATEGORY_LIST);
+  setColumnValidation_(sheet, 10, CONFIG.UOM_LIST);
+  setColumnValidation_(sheet, 17, CONFIG.STATUS_LIST);
 }
 
 /* ── 06. TRIM_ATTR_NAMES ── */
@@ -351,12 +394,13 @@ function setupTrimAttrValues_(ss) {
     headers, descriptions, CONFIG.TAB_COLORS.TRIM_ATTR_VALUES);
 }
 
-/* ── 08. CONSUMABLE_MASTER ── */
+/* ── 08. CONSUMABLE_MASTER (23 cols) — V9: +1 col L1 Division at col D ── */
 function setupConsumableMaster_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.CONSUMABLE_MASTER);
   var headers = [
-    '# CON Code', 'Parent Code', '⚠ Consumable Name', '⚠ Category',
-    'Sub-Category', 'UOM', '→ HSN Code', '← GST % (Auto)',
+    '# CON Code', 'Parent Code', '⚠ Consumable Name',
+    'L1 Division', 'L2 Category', 'L3 Sub Type',
+    'UOM', '→ HSN Code', '← GST % (Auto)',
     '→ Primary Supplier', '← Supplier Name (Auto)', 'Cost per UOM',
     'Reorder Level', 'Status',
     '⟷ Attr 1 Name', 'Attr 1 Value', '⟷ Attr 2 Name', 'Attr 2 Value',
@@ -364,8 +408,11 @@ function setupConsumableMaster_(ss) {
     'Remarks'
   ];
   var descriptions = [
-    'AUTO: CON-[CAT]-xxx', 'FK → self (variant)', 'Required', 'Required dropdown',
-    'Sub-category text', 'KG/LTR/PCS/SET', 'FK → HSN_MASTER', 'Auto from HSN',
+    'AUTO: CON-[CAT]-xxx', 'FK → self (variant)', 'Required',
+    'Auto: Consumable. Read-only.',
+    'Dropdown: Softener, Fixer, Needle, Oil, Fuel, Cleaning, Other',
+    'Dropdown: specific consumable sub-type',
+    'KG/LTR/PCS/SET', 'FK → HSN_MASTER', 'Auto from HSN',
     'FK → SUPPLIER_MASTER', 'Auto', '₹ per UOM', 'Stock trigger',
     'Active/Inactive', 'Auto-filled', 'Dropdown', 'Auto-filled', 'Dropdown',
     'Auto-filled', 'Dropdown', 'Auto-filled', 'Dropdown', 'Notes'
@@ -375,7 +422,12 @@ function setupConsumableMaster_(ss) {
     'CC ERP FILE 1A — CONSUMABLE_MASTER — Dyes, Chemicals, Needles, Oils',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 13, CONFIG.STATUS_LIST);
+  // L1 auto-fill (green read-only concept)
+  sheet.getRange(4, 4, 500, 1).setValue('Consumable').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
+  setColumnValidation_(sheet, 5, ['Softener', 'Fixer', 'Needle', 'Oil', 'Fuel', 'Cleaning', 'Other']);
+  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
 /* ── 09. CON_ATTR_NAMES ── */
@@ -408,12 +460,13 @@ function setupConAttrValues_(ss) {
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
-/* ── 11. PACKAGING_MASTER ── */
+/* ── 11. PACKAGING_MASTER (23 cols) — V9: +1 col L1 Division at col D ── */
 function setupPackagingMaster_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.PACKAGING_MASTER);
   var headers = [
-    '# PKG Code', 'Parent Code', '⚠ Packaging Name', '⚠ Category',
-    'Sub-Category', 'UOM', '→ HSN Code', '← GST % (Auto)',
+    '# PKG Code', 'Parent Code', '⚠ Packaging Name',
+    'L1 Division', 'L2 Category', 'L3 Sub-Category',
+    'UOM', '→ HSN Code', '← GST % (Auto)',
     '→ Primary Supplier', '← Supplier Name (Auto)', 'Cost per UOM',
     'Reorder Level', 'Status',
     '⟷ Attr 1 Name', 'Attr 1 Value', '⟷ Attr 2 Name', 'Attr 2 Value',
@@ -421,8 +474,11 @@ function setupPackagingMaster_(ss) {
     'Remarks'
   ];
   var descriptions = [
-    'AUTO: PKG-[CAT]-xxx', 'FK → self (variant)', 'Required', 'Required dropdown',
-    'Sub-category text', 'PCS/ROLL/KG', 'FK → HSN_MASTER', 'Auto from HSN',
+    'AUTO: PKG-[CAT]-xxx', 'FK → self (variant)', 'Required',
+    'Auto: Packaging. Read-only.',
+    'Dropdown: Poly Bag, Carton, Hanger, Price Tag, Tissue, Sticker, Other',
+    'Dropdown: specific packaging sub-type',
+    'PCS/ROLL/KG', 'FK → HSN_MASTER', 'Auto from HSN',
     'FK → SUPPLIER_MASTER', 'Auto', '₹ per UOM', 'Stock trigger',
     'Active/Inactive', 'Auto-filled', 'Dropdown', 'Auto-filled', 'Dropdown',
     'Auto-filled', 'Dropdown', 'Auto-filled', 'Dropdown', 'Notes'
@@ -432,7 +488,12 @@ function setupPackagingMaster_(ss) {
     'CC ERP FILE 1A — PACKAGING_MASTER — Poly Bags, Cartons, Hangers',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  setColumnValidation_(sheet, 13, CONFIG.STATUS_LIST);
+  // L1 auto-fill (green read-only concept)
+  sheet.getRange(4, 4, 500, 1).setValue('Packaging').setBackground('#D5E8D4').setFontColor('#2E7D32');
+
+  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
+  setColumnValidation_(sheet, 5, ['Poly Bag', 'Carton', 'Hanger', 'Price Tag', 'Tissue', 'Sticker', 'Other']);
+  setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
 /* ── 12. PKG_ATTR_NAMES ── */
@@ -508,11 +569,24 @@ function setupItemCategories_(ss) {
 }
 
 /**
- * Returns the full 83-row seed data array for ITEM_CATEGORIES.
+ * Returns the full 138-row V9 seed data array for ITEM_CATEGORIES.
  * Columns: Code, L1, L2, L3, Master, HSN, Active, Remarks, Behavior
- * Can also be called standalone to re-seed the sheet.
+ * V9 code ranges:
+ *   ARTICLE:    CAT-001 to CAT-023
+ *   RM-FABRIC:  CAT-100 to CAT-110
+ *   RM-YARN:    CAT-120 to CAT-127
+ *   RM-WOVEN:   CAT-140 to CAT-143
+ *   TRIM:       CAT-200 to CAT-237
+ *   CONSUMABLE: CAT-300 to CAT-325
+ *   PACKAGING:  CAT-400 to CAT-427
  */
 function getItemCategorySeedData_() {
+  // Delegates to V9 data defined in V9_Update.gs (138 rows, CAT-001 to CAT-427)
+  return getV9ItemCategorySeedData_();
+}
+
+// ── LEGACY STUB — kept for reference; actual data is in getV9ItemCategorySeedData_() ──
+function _getItemCategorySeedData_LEGACY_() {
   return [
     // ── ARTICLE — SELECTABLE L1 ──
     ['CAT-001', "Men's Apparel", 'Tops - Polo', 'Pique Polo', 'ARTICLE', '6105', 'Yes', 'Classic polo', 'SELECTABLE'],
@@ -605,12 +679,12 @@ function getItemCategorySeedData_() {
     ['CAT-106', 'Packaging', 'Ticket / Tag', 'Barcode Label', 'PACKAGING', '4821', 'Yes', '', 'FIXED'],
     ['CAT-107', 'Packaging', 'Other', 'Tissue Paper', 'PACKAGING', '4818', 'Yes', '', 'FIXED'],
   ];
-}
+} // end _getItemCategorySeedData_LEGACY_
 
 /**
- * Standalone function to re-seed ITEM_CATEGORIES sheet.
+ * Standalone function to re-seed ITEM_CATEGORIES sheet with V9 data (138 rows).
  * Run this from Apps Script menu: CC ERP > Seed Item Categories
- * Clears existing data (rows 4+) and writes fresh seed data.
+ * Clears existing data (rows 4+) and writes fresh V9 seed data.
  */
 function seedItemCategories() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -624,9 +698,9 @@ function seedItemCategories() {
   if (lastRow >= 4) {
     sheet.getRange(4, 1, lastRow - 3, sheet.getLastColumn()).clearContent();
   }
-  var catData = getItemCategorySeedData_();
+  var catData = getItemCategorySeedData_(); // delegates to V9 138-row data
   sheet.getRange(4, 1, catData.length, catData[0].length).setValues(catData);
-  SpreadsheetApp.getUi().alert('Seeded ' + catData.length + ' item categories (CAT-001 to CAT-107).');
+  SpreadsheetApp.getUi().alert('Seeded ' + catData.length + ' item categories (V9: CAT-001 to CAT-427).');
 }
 
 /* ── 15. UOM_MASTER ── */
@@ -875,7 +949,7 @@ function setupMasterRelations_(ss) {
     ['REL-002', 'ARTICLE_MASTER', '→ HSN Code', 'HSN_MASTER', 'HSN Code', 'HSN Description', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Article → HSN'],
     ['REL-003', 'ARTICLE_MASTER', 'Color Code(s)', 'COLOR_MASTER', 'Color Code', 'Color Name', 'Yes', '', 'Yes', 'No', 'FILE_1A', 'Yes', 'Article → Colors (multi)'],
     ['REL-004', 'ARTICLE_MASTER', '⟷ Tags', 'TAG_MASTER', 'Tag Code', 'Tag Name', 'Yes', 'ARTICLE_MASTER', 'Yes', 'No', 'FILE_1A', 'Yes', 'Article → Tags (multi)'],
-    ['REL-005', 'RM_MASTER_FABRIC', 'KNIT NAME / STRUCTURE', 'FABRIC_TYPE_MASTER', 'Fabric Type Code', 'Knit Construction', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Fabric → Knit Type'],
+    ['REL-005', 'RM_MASTER_FABRIC', 'L3 Knit Type', 'FABRIC_TYPE_MASTER', 'Fabric Type Code', 'Knit Construction', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Fabric → Knit Type (V9: renamed from KNIT NAME / STRUCTURE)'],
     ['REL-006', 'RM_MASTER_FABRIC', '⟷ YARN COMPOSITION', 'RM_MASTER_YARN', '# RM Code', 'Yarn Name', 'Yes', '', 'Yes', 'No', 'FILE_1A', 'Yes', 'Fabric → Yarn (multi)'],
     ['REL-007', 'RM_MASTER_FABRIC', '→ HSN Code', 'HSN_MASTER', 'HSN Code', 'HSN Description', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Fabric → HSN'],
     ['REL-008', 'RM_MASTER_FABRIC', '→ Primary Supplier', 'SUPPLIER_MASTER', 'Supplier Code', 'Supplier Name', 'No', '', 'No', 'Yes', 'FILE_1C', 'Yes', 'Fabric → Supplier (cross-file)'],

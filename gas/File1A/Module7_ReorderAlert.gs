@@ -8,7 +8,7 @@
  * reorder level.
  *
  * Checked sheets:
- *   - TRIM_MASTER          (Reorder Level: col 15)
+ *   - TRIM_MASTER          (Reorder Level: col 16 in V9, was col 15 in V8)
  *   - RM_MASTER_FABRIC     (Current Stock vs Reorder Level)
  *   - RM_MASTER_YARN       (Current Stock vs Reorder Level)
  *   - CONSUMABLE_MASTER    (Current Stock vs Reorder Level)
@@ -40,24 +40,26 @@ var RA_TRIGGER_MINUTE = 0;
  *   statusCol  - Column index for Status field
  *   uomCol     - Column index for UOM field
  *
- * Column indices are based on the V4 master sheet structures.
- * TRIM_MASTER: Reorder Level is col 15 (per spec).
+ * Column indices are based on the V9 master sheet structures.
+ * V9 update: L1 Division column inserted at col D for TRIM/CON/PKG (all cols D+ shifted +1).
+ *            RM_MASTER_YARN: +3 cols at B,C,D (Yarn Name shifted from col 2 to col 5).
+ * TRIM_MASTER: Reorder Level is col 16 in V9 (was col 15 in V8).
  */
 var RA_SHEET_CONFIGS = {
   TRIM_MASTER: {
     sheetName:  'TRIM_MASTER',
     codeCol:    1,   // # TRM Code
-    nameCol:    3,   // Trim Name
+    nameCol:    3,   // Trim Name (col 3 unchanged; insert at col D did not affect cols A-C)
     stockCol:   0,   // TRIM_MASTER does not have a Current Stock column in masters
                      // (stock is tracked in Phase 3 Inventory); uses Reorder Level only
-    reorderCol: 15,  // Reorder Level (col 15 per V4 spec)
-    statusCol:  16,  // Status
-    uomCol:     9    // UOM
+    reorderCol: 16,  // Reorder Level — V9: shifted +1 from col 15 to col 16 (L1 Division at col 4)
+    statusCol:  17,  // Status — V9: shifted +1 from col 16 to col 17
+    uomCol:     10   // UOM — V9: shifted +1 from col 9 to col 10
   },
   RM_MASTER_FABRIC: {
     sheetName:  'RM_MASTER_FABRIC',
     codeCol:    1,   // # RM Code
-    nameCol:    2,   // Final Fabric SKU
+    nameCol:    2,   // ∑ FINAL FABRIC SKU (col 2 unchanged; L1/L2 inserted at cols C/D)
     stockCol:   0,   // Current Stock — column TBD (Phase 3 Inventory)
     reorderCol: 0,   // Reorder Level — column TBD (Phase 3 Inventory)
     statusCol:  0,   // Status column
@@ -66,7 +68,7 @@ var RA_SHEET_CONFIGS = {
   RM_MASTER_YARN: {
     sheetName:  'RM_MASTER_YARN',
     codeCol:    1,   // # RM Code
-    nameCol:    2,   // Yarn Name
+    nameCol:    5,   // Yarn Name — V9: shifted from col 2 to col 5 (L1/L2/L3 inserted at cols B,C,D)
     stockCol:   0,   // Current Stock — column TBD (Phase 3 Inventory)
     reorderCol: 0,   // Reorder Level — column TBD (Phase 3 Inventory)
     statusCol:  0,   // Status column
@@ -75,7 +77,7 @@ var RA_SHEET_CONFIGS = {
   CONSUMABLE_MASTER: {
     sheetName:  'CONSUMABLE_MASTER',
     codeCol:    1,   // # CON Code
-    nameCol:    2,   // Consumable Name (assumed)
+    nameCol:    3,   // ⚠ Consumable Name — col 3 (Code=1, Parent Code=2, Name=3)
     stockCol:   0,   // Current Stock — column TBD
     reorderCol: 0,   // Reorder Level — column TBD
     statusCol:  0,   // Status column
@@ -84,7 +86,7 @@ var RA_SHEET_CONFIGS = {
   PACKAGING_MASTER: {
     sheetName:  'PACKAGING_MASTER',
     codeCol:    1,   // # PKG Code
-    nameCol:    2,   // Packaging Name (assumed)
+    nameCol:    3,   // ⚠ Packaging Name — col 3 (Code=1, Parent Code=2, Name=3)
     stockCol:   0,   // Current Stock — column TBD
     reorderCol: 0,   // Reorder Level — column TBD
     statusCol:  0,   // Status column

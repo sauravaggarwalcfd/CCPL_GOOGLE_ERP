@@ -70,9 +70,9 @@ var YEAR_CODE_CONFIG = {
  * Category is read from the designated column.
  */
 var CATEGORY_CODE_CONFIG = {
-  'TRIM_MASTER':       { prefix: 'TRM-', digits: 3, categoryCol: 4 },
-  'CONSUMABLE_MASTER': { prefix: 'CON-', digits: 3, categoryCol: 4 },
-  'PACKAGING_MASTER':  { prefix: 'PKG-', digits: 3, categoryCol: 4 }
+  'TRIM_MASTER':       { prefix: 'TRM-', digits: 3, categoryCol: 5 }, // V9: L1 Division inserted at col 4; L2 Category shifted to col 5
+  'CONSUMABLE_MASTER': { prefix: 'CON-', digits: 3, categoryCol: 5 }, // V9: L1 Division inserted at col 4; L2 Category shifted to col 5
+  'PACKAGING_MASTER':  { prefix: 'PKG-', digits: 3, categoryCol: 5 }  // V9: L1 Division inserted at col 4; L2 Category shifted to col 5
 };
 
 /**
