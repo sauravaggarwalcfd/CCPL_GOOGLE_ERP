@@ -56,6 +56,21 @@ function onEdit(e) {
   // Ignore edits on ITEM_CHANGE_LOG itself (prevent recursion)
   if (sheetName === CONFIG.SHEETS.ITEM_CHANGE_LOG) return;
 
+  // ── Auto Description: ARTICLE_MASTER col B = L1 › L2 › L3 ──
+  if (sheetName === CONFIG.SHEETS.ARTICLE_MASTER && (col === 7 || col === 8 || col === 9)) {
+    try {
+      var l1Val = sheet.getRange(row, 7).getValue() || '';
+      var l2Val = sheet.getRange(row, 8).getValue() || '';
+      var l3Val = sheet.getRange(row, 9).getValue() || '';
+      var parts = [l1Val, l2Val, l3Val].filter(function(p) { return String(p).trim() !== ''; });
+      if (parts.length > 0) {
+        sheet.getRange(row, 2).setValue(parts.join(' › '));
+      }
+    } catch (err) {
+      Logger.log('Auto Description error: ' + err.message);
+    }
+  }
+
   // ── Module 1: Auto Code Generation ──
   try {
     handleCodeGeneration(e);

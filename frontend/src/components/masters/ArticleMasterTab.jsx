@@ -35,10 +35,13 @@ import { SEED_DATA as CAT_SEED } from './ItemCategoryTab';
 const _articleCats = CAT_SEED.filter(c => c.master === "ARTICLE" && c.active === "Yes");
 const DIVISIONS = [...new Set(_articleCats.map(c => c.l1))];
 const L2_BY_DIV = {};
+const L3_BY_L2 = {};
 const L2_HSN = {};
 for (const c of _articleCats) {
   if (!L2_BY_DIV[c.l1]) L2_BY_DIV[c.l1] = [];
   if (!L2_BY_DIV[c.l1].includes(c.l2)) L2_BY_DIV[c.l1].push(c.l2);
+  if (!L3_BY_L2[c.l2]) L3_BY_L2[c.l2] = [];
+  if (c.l3 && !L3_BY_L2[c.l2].includes(c.l3)) L3_BY_L2[c.l2].push(c.l3);
   if (c.hsn && !L2_HSN[c.l2]) L2_HSN[c.l2] = c.hsn;
 }
 
@@ -442,20 +445,28 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   }, []);
 
   // ─── CREATE FORM STATE ───
-  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", wsp: "", mrp: "", hsnCode: "", buyerStyle: "", status: "Active", tags: "" };
+  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", l3Style: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", wsp: "", mrp: "", hsnCode: "", buyerStyle: "", status: "Active", tags: "" };
   const [form, setForm]           = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
 
+  // Auto-description helper: L1 › L2 › L3
+  const buildDesc = (l1, l2, l3) => [l1, l2, l3].filter(p => p && p.trim()).join(' › ');
+
   const setL1Division = (v) => {
-    setForm(f => ({ ...f, l1Division: v, l2Category: "", hsnCode: "" }));
+    setForm(f => ({ ...f, l1Division: v, l2Category: "", l3Style: "", hsnCode: "", desc: buildDesc(v, "", "") }));
     setFormErrors({});
   };
   const setL2Category = (v) => {
-    setForm(f => ({ ...f, l2Category: v, hsnCode: L2_HSN[v] || "" }));
+    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: L2_HSN[v] || "", desc: buildDesc(f.l1Division, v, "") }));
+    setFormErrors({});
+  };
+  const setL3Style = (v) => {
+    setForm(f => ({ ...f, l3Style: v, desc: buildDesc(f.l1Division, f.l2Category, v) }));
     setFormErrors({});
   };
 
   const l2Opts = form.l1Division ? (L2_BY_DIV[form.l1Division] || []) : [];
+  const l3Opts = form.l2Category ? (L3_BY_L2[form.l2Category] || []) : [];
 
   // ─── Article code validation (4-5 digits + 2 CAPS, e.g. 5249HP) ───
   const ARTICLE_CODE_REGEX = /^[0-9]{4,5}[A-Z]{2}$/;
@@ -473,9 +484,9 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       const codeErr = validateArticleCode(form.code);
       if (codeErr) errs.code = codeErr;
     }
-    if (!form.desc.trim())   errs.desc       = "Required";
     if (!form.l1Division)    errs.l1Division = "Required";
     if (!form.l2Category)    errs.l2Category = "Required";
+    if (!form.desc.trim())   errs.desc       = "Select L1/L2/L3 to auto-fill";
     if (Object.keys(errs).length) { setFormErrors(errs); return; }
 
     if (editItem) {
@@ -505,6 +516,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       code: item.code || "",
       desc: item.desc || "", shortName: item.shortName || "",
       l1Division: item.l1Division || "", l2Category: item.l2Category || "",
+      l3Style: item.l3Style || "",
       gender: item.gender || "", fitType: item.fitType || "",
       neckline: item.neckline || "", sleeveType: item.sleeveType || "",
       season: item.season || "", wsp: item.wsp || "", mrp: item.mrp || "",
@@ -591,24 +603,8 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
               </div>
             )}
 
-            {/* Row 1: Description + Short Name */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>Description *</label>
-                <input value={form.desc} onChange={e => setForm(f => ({ ...f, desc: e.target.value }))}
-                  style={{ ...inp, borderColor: formErrors.desc ? '#ef4444' : M.inBd }}
-                  placeholder="e.g. Classic Pique Polo" />
-                {formErrors.desc && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.desc}</div>}
-              </div>
-              <div>
-                <label style={lbl}>Short Name</label>
-                <input value={form.shortName} onChange={e => setForm(f => ({ ...f, shortName: e.target.value }))}
-                  style={inp} placeholder="e.g. Pique Polo" />
-              </div>
-            </div>
-
-            {/* Row 2: L1 Division + L2 Category + HSN */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 110px", gap: 14, marginBottom: 14 }}>
+            {/* Row 1: L1 Division + L2 Category + L3 Style + HSN */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 110px", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>L1 Division *</label>
                 <select value={form.l1Division} onChange={e => setL1Division(e.target.value)}
@@ -629,9 +625,34 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 {formErrors.l2Category && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.l2Category}</div>}
               </div>
               <div>
+                <label style={lbl}>L3 Style</label>
+                <select value={form.l3Style} onChange={e => setL3Style(e.target.value)}
+                  disabled={!form.l2Category}
+                  style={{ ...inp, opacity: form.l2Category ? 1 : 0.5 }}>
+                  <option value="">Select Style…</option>
+                  {l3Opts.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
                 <label style={lbl}>HSN Code</label>
                 <input value={form.hsnCode} onChange={e => setForm(f => ({ ...f, hsnCode: e.target.value }))}
                   style={inp} placeholder="Auto" />
+              </div>
+            </div>
+
+            {/* Row 2: Description (auto from L1›L2›L3) + Short Name */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, marginBottom: 14 }}>
+              <div>
+                <label style={lbl}>Description (auto: L1 › L2 › L3)</label>
+                <input value={form.desc} readOnly
+                  style={{ ...inp, background: '#f0f4f0', cursor: 'default', borderColor: formErrors.desc ? '#ef4444' : M.inBd }}
+                  placeholder="Auto-filled from levels" />
+                {formErrors.desc && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.desc}</div>}
+              </div>
+              <div>
+                <label style={lbl}>Short Name</label>
+                <input value={form.shortName} onChange={e => setForm(f => ({ ...f, shortName: e.target.value }))}
+                  style={inp} placeholder="e.g. Pique Polo" />
               </div>
             </div>
 
@@ -707,7 +728,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
             </div>
 
             {/* Preview */}
-            {form.desc && form.l1Division && form.l2Category && (
+            {form.l1Division && form.l2Category && (
               <div style={{ padding: 14, borderRadius: 8, border: `1px dashed ${A.a}`, background: A.al, marginBottom: 16 }}>
                 <div style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", color: A.a, letterSpacing: 0.5, marginBottom: 6 }}>Preview</div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
@@ -716,6 +737,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                   <span style={{ fontWeight: 700, color: M.tA }}>{form.l1Division}</span>
                   <span style={{ color: M.tD }}>›</span>
                   <span style={{ fontWeight: 600, color: M.tB }}>{form.l2Category}</span>
+                  {form.l3Style && <><span style={{ color: M.tD }}>›</span><span style={{ fontWeight: 600, color: M.tB }}>{form.l3Style}</span></>}
                   <span style={{ color: M.div }}>│</span>
                   <span style={{ fontWeight: 800, color: M.tA }}>{form.desc}</span>
                   {form.hsnCode && <><span style={{ color: M.div }}>│</span><span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: M.tC }}>HSN {form.hsnCode}</span></>}

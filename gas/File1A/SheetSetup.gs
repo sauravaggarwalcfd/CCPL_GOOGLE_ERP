@@ -11,6 +11,45 @@
 /* ───────────────────────────────────────────────────────────
    MASTER SETUP — Creates/formats all File 1A sheets
    ─────────────────────────────────────────────────────────── */
+/* ───────────────────────────────────────────────────────────
+   V10 PATCH — Run this to apply V10 changes to an existing sheet.
+   Creates ARTICLE_DROPDOWNS, rebuilds ITEM_CATEGORIES (column-grouped),
+   and refreshes ARTICLE_MASTER dropdown validations.
+   ─────────────────────────────────────────────────────────── */
+function applyV10Updates() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log('V10: Starting updates...');
+
+  // 1. Create ARTICLE_DROPDOWNS sheet (new)
+  setupArticleDropdowns_(ss);
+  Logger.log('V10: ARTICLE_DROPDOWNS created.');
+
+  // 2. Rebuild ITEM_CATEGORIES in column-grouped format
+  //    NOTE: Only writes seed data if sheet has < 4 rows.
+  //    If old data exists, delete rows 4+ manually first, or delete the sheet.
+  setupItemCategories_(ss);
+  Logger.log('V10: ITEM_CATEGORIES rebuilt (column-grouped).');
+
+  // 3. Refresh ARTICLE_MASTER dropdown validations (reads from new sources)
+  setupArticleMaster_(ss);
+  Logger.log('V10: ARTICLE_MASTER dropdowns refreshed.');
+
+  // 4. Refresh other masters (TRIM/CONSUMABLE/PACKAGING read from new ITEM_CATEGORIES)
+  setupTrimMaster_(ss);
+  setupConsumableMaster_(ss);
+  setupPackagingMaster_(ss);
+  setupRMFabric_(ss);
+  setupRMYarn_(ss);
+  setupRMWoven_(ss);
+  Logger.log('V10: All master dropdowns refreshed.');
+
+  SpreadsheetApp.flush();
+  Logger.log('V10: All updates complete!');
+}
+
+/* ───────────────────────────────────────────────────────────
+   MASTER SETUP — Creates/formats all File 1A sheets (fresh install)
+   ─────────────────────────────────────────────────────────── */
 function setupAllSheets() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
@@ -28,6 +67,7 @@ function setupAllSheets() {
   setupPkgAttrNames_(ss);
   setupPkgAttrValues_(ss);
   setupItemCategories_(ss);
+  setupArticleDropdowns_(ss);
   setupUOMMaster_(ss);
   setupHSNMaster_(ss);
   setupColorMaster_(ss);
@@ -138,6 +178,68 @@ function setColumnValidation_(sheet, col, values, startRow) {
   sheet.getRange(startRow, col, 500, 1).setDataValidation(rule);
 }
 
+/* ───────────────────────────────────────────────────────────
+   HELPER: Read ITEM_CATEGORIES (V10 column-grouped layout) and return
+   dropdown lists for a given master.
+   Column groups: ARTICLE=B,C,D  FABRIC=E,F,G  YARN=H,I,J
+                  WOVEN=K,L,M    TRIM=N,O,P    CONSUMABLE=Q,R,S
+                  PACKAGING=T,U,V
+   Returns { l1: string[], l2Flat: string[], l3Flat: string[],
+             l2Map: { [l1]: string[] }, l3Map: { [l2]: string[] } }
+   ─────────────────────────────────────────────────────────── */
+function getCategoryDropdownsForMaster_(ss, masterKey) {
+  // Map master key to column offset (1-based: B=2, C=3, D=4, ...)
+  var COL_MAP = {
+    'ARTICLE':    2,
+    'RM-FABRIC':  5,
+    'RM-YARN':    8,
+    'RM-WOVEN':   11,
+    'TRIM':       14,
+    'CONSUMABLE': 17,
+    'PACKAGING':  20
+  };
+  var startCol = COL_MAP[masterKey];
+  if (!startCol) return { l1: [], l2Flat: [], l3Flat: [], l2Map: {}, l3Map: {} };
+
+  var catSheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
+  if (!catSheet) return { l1: [], l2Flat: [], l3Flat: [], l2Map: {}, l3Map: {} };
+
+  var lastRow = catSheet.getLastRow();
+  if (lastRow < 4) return { l1: [], l2Flat: [], l3Flat: [], l2Map: {}, l3Map: {} };
+
+  // Read the 3 columns for this master (startCol = L1, startCol+1 = L2, startCol+2 = L3)
+  var numRows = lastRow - 3;
+  var data = catSheet.getRange(4, startCol, numRows, 3).getValues();
+  var l1Set = [];
+  var l2Map = {};  // l1 → [l2 values]
+  var l3Map = {};  // l2 → [l3 values]
+
+  for (var i = 0; i < data.length; i++) {
+    var l1 = String(data[i][0]).trim();
+    var l2 = String(data[i][1]).trim();
+    var l3 = String(data[i][2]).trim();
+    if (!l1 && !l2 && !l3) continue;  // empty row for this master
+
+    if (l1 && l1Set.indexOf(l1) === -1) l1Set.push(l1);
+    if (l1 && l2) {
+      if (!l2Map[l1]) l2Map[l1] = [];
+      if (l2Map[l1].indexOf(l2) === -1) l2Map[l1].push(l2);
+    }
+    if (l2 && l3) {
+      if (!l3Map[l2]) l3Map[l2] = [];
+      if (l3Map[l2].indexOf(l3) === -1) l3Map[l2].push(l3);
+    }
+  }
+
+  // Flatten l2/l3 into unique arrays for static dropdown (non-cascading sheet validation)
+  var allL2 = [];
+  for (var k1 in l2Map) { for (var j = 0; j < l2Map[k1].length; j++) { if (allL2.indexOf(l2Map[k1][j]) === -1) allL2.push(l2Map[k1][j]); } }
+  var allL3 = [];
+  for (var k2 in l3Map) { for (var j2 = 0; j2 < l3Map[k2].length; j2++) { if (allL3.indexOf(l3Map[k2][j2]) === -1) allL3.push(l3Map[k2][j2]); } }
+
+  return { l1: l1Set, l2Flat: allL2, l3Flat: allL3, l2Map: l2Map, l3Map: l3Map };
+}
+
 /* ═══════════════════════════════════════════════════════════
    INDIVIDUAL SHEET SETUP FUNCTIONS
    ═══════════════════════════════════════════════════════════ */
@@ -172,17 +274,47 @@ function setupArticleMaster_(ss) {
     'CC ERP FILE 1A — ARTICLE_MASTER — Finished Garments',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  // Validations — col numbers reflect V9 (+1 shift from col I onwards)
-  setColumnValidation_(sheet, 7, ["Men's Apparel", "Women's Apparel", "Kids Apparel", "Unisex Apparel"]);
-  setColumnValidation_(sheet, 8, ['Tops - Polo', 'Tops - Tee', 'Sweatshirt', 'Tracksuit', 'Bottoms']);
-  setColumnValidation_(sheet, 9, ['Basic', 'Pique', 'Striper', 'Jacquard', 'Designer', 'Henley',
-    'V-Neck', 'Oversized', 'Hoodie', 'Crew Neck', 'Quarter Zip', 'Half Zip',
-    'Fleece', 'Bomber', 'Pullover', 'Slim Fit', 'Relaxed Fit', 'Athletic', 'Cargo']);
-  setColumnValidation_(sheet, 11, ['Men', 'Women', 'Kids', 'Unisex']);
-  setColumnValidation_(sheet, 12, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
-  setColumnValidation_(sheet, 13, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
-  setColumnValidation_(sheet, 14, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
-  setColumnValidation_(sheet, 25, CONFIG.STATUS_LIST);
+  // Validations — L1/L2/L3 from ITEM_CATEGORIES grouped by master=ARTICLE
+  var catDropdowns = getCategoryDropdownsForMaster_(ss, 'ARTICLE');
+  if (catDropdowns.l1.length > 0) {
+    setColumnValidation_(sheet, 7, catDropdowns.l1);
+  } else {
+    setColumnValidation_(sheet, 7, ["Men's Apparel", "Women's Apparel", "Kids Apparel", "Unisex Apparel"]);
+  }
+  if (catDropdowns.l2Flat.length > 0) {
+    setColumnValidation_(sheet, 8, catDropdowns.l2Flat);
+  } else {
+    setColumnValidation_(sheet, 8, ['Tops - Polo', 'Tops - Tee', 'Sweatshirt', 'Tracksuit', 'Bottoms']);
+  }
+  if (catDropdowns.l3Flat.length > 0) {
+    setColumnValidation_(sheet, 9, catDropdowns.l3Flat);
+  } else {
+    setColumnValidation_(sheet, 9, ['Pique Polo', 'Round Neck Tee', 'Hoodie', 'Jogger']);
+  }
+  // Read other dropdowns from ARTICLE_DROPDOWNS sheet (single source of truth)
+  var ddSheet = ss.getSheetByName('ARTICLE_DROPDOWNS');
+  if (ddSheet && ddSheet.getLastRow() >= 4) {
+    var ddRows = ddSheet.getRange(4, 1, ddSheet.getLastRow() - 3, 6).getValues();
+    var genderOpts = [], fitOpts = [], neckOpts = [], sleeveOpts = [], statusOpts = [];
+    for (var d = 0; d < ddRows.length; d++) {
+      if (String(ddRows[d][0]).trim()) genderOpts.push(String(ddRows[d][0]).trim());
+      if (String(ddRows[d][1]).trim()) fitOpts.push(String(ddRows[d][1]).trim());
+      if (String(ddRows[d][2]).trim()) neckOpts.push(String(ddRows[d][2]).trim());
+      if (String(ddRows[d][3]).trim()) sleeveOpts.push(String(ddRows[d][3]).trim());
+      if (String(ddRows[d][4]).trim()) statusOpts.push(String(ddRows[d][4]).trim());
+    }
+    setColumnValidation_(sheet, 11, genderOpts.length ? genderOpts : ['Men', 'Women', 'Kids', 'Unisex']);
+    setColumnValidation_(sheet, 12, fitOpts.length ? fitOpts : ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
+    setColumnValidation_(sheet, 13, neckOpts.length ? neckOpts : ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
+    setColumnValidation_(sheet, 14, sleeveOpts.length ? sleeveOpts : ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
+    setColumnValidation_(sheet, 25, statusOpts.length ? statusOpts : CONFIG.STATUS_LIST);
+  } else {
+    setColumnValidation_(sheet, 11, ['Men', 'Women', 'Kids', 'Unisex']);
+    setColumnValidation_(sheet, 12, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
+    setColumnValidation_(sheet, 13, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
+    setColumnValidation_(sheet, 14, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
+    setColumnValidation_(sheet, 25, CONFIG.STATUS_LIST);
+  }
 }
 
 /* ── 02. RM_MASTER_FABRIC (27 cols) — V9: +2 cols L1/L2 at cols C,D ── */
@@ -219,9 +351,14 @@ function setupRMFabric_(ss) {
   sheet.getRange(4, 3, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
   sheet.getRange(4, 4, 500, 1).setValue('Knit Fabric').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+2 shift from col C onwards)
-  setColumnValidation_(sheet, 5, ['Single Jersey', 'Pique', 'Fleece', 'French Terry', 'Rib',
-    'Interlock', 'Autostriper', 'Waffle Knit', 'Lycra Jersey', 'Textured / Yarn Dyed', 'Other Knit']);
+  // Validations — L3 from ITEM_CATEGORIES grouped by master=RM-FABRIC
+  var fabricCats = getCategoryDropdownsForMaster_(ss, 'RM-FABRIC');
+  if (fabricCats.l3Flat.length > 0) {
+    setColumnValidation_(sheet, 5, fabricCats.l3Flat);
+  } else {
+    setColumnValidation_(sheet, 5, ['Single Jersey', 'Pique', 'Fleece', 'French Terry', 'Rib',
+      'Interlock', 'Autostriper', 'Waffle Knit', 'Lycra Jersey', 'Textured / Yarn Dyed', 'Other Knit']);
+  }
   setColumnValidation_(sheet, 8, ['KORA', 'FINISHED']);
   setColumnValidation_(sheet, 9, ['KORA', 'COLOURED', 'DYED', 'MEL']);
   setColumnValidation_(sheet, 13, CONFIG.UOM_LIST);
@@ -259,9 +396,14 @@ function setupRMYarn_(ss) {
   sheet.getRange(4, 2, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
   sheet.getRange(4, 3, 500, 1).setValue('Yarn').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+3 shift from col B onwards)
-  setColumnValidation_(sheet, 4, ['Cotton Combed', 'Cotton Carded', 'Polyester', 'PC Blend',
-    'Viscose', 'Melange', 'Lycra / Spandex', 'Nylon', 'Other Yarn']);
+  // Validations — L3 from ITEM_CATEGORIES grouped by master=RM-YARN
+  var yarnCats = getCategoryDropdownsForMaster_(ss, 'RM-YARN');
+  if (yarnCats.l3Flat.length > 0) {
+    setColumnValidation_(sheet, 4, yarnCats.l3Flat);
+  } else {
+    setColumnValidation_(sheet, 4, ['Cotton Combed', 'Cotton Carded', 'Polyester', 'PC Blend',
+      'Viscose', 'Melange', 'Lycra / Spandex', 'Nylon', 'Other Yarn']);
+  }
   setColumnValidation_(sheet, 6, ['Raw', 'Dyed', 'Melange']);
   setColumnValidation_(sheet, 17, CONFIG.STATUS_LIST);
 }
@@ -295,9 +437,14 @@ function setupRMWoven_(ss) {
   sheet.getRange(4, 2, 500, 1).setValue('Raw Material').setBackground('#D5E8D4').setFontColor('#2E7D32');
   sheet.getRange(4, 3, 500, 1).setValue('Woven / Interlining').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+2 shift from col B onwards)
-  setColumnValidation_(sheet, 5, ['Fusible Interlining', 'Non-Fusible Interlining',
-    'Woven Fabric', 'Collar Canvas', 'Lining', 'Tape', 'Other']);
+  // Validations — L3 from ITEM_CATEGORIES grouped by master=RM-WOVEN
+  var wovenCats = getCategoryDropdownsForMaster_(ss, 'RM-WOVEN');
+  if (wovenCats.l3Flat.length > 0) {
+    setColumnValidation_(sheet, 5, wovenCats.l3Flat);
+  } else {
+    setColumnValidation_(sheet, 5, ['Fusible Interlining', 'Non-Fusible Interlining',
+      'Woven Fabric', 'Collar Canvas', 'Lining', 'Tape', 'Other']);
+  }
   setColumnValidation_(sheet, 9, CONFIG.UOM_LIST);
   setColumnValidation_(sheet, 16, CONFIG.STATUS_LIST);
 }
@@ -338,8 +485,13 @@ function setupTrimMaster_(ss) {
   // L1 auto-fill (green read-only concept)
   sheet.getRange(4, 4, 500, 1).setValue('Trim').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
-  setColumnValidation_(sheet, 5, CONFIG.TRIM_CATEGORY_LIST);
+  // Validations — L2 from ITEM_CATEGORIES grouped by master=TRIM
+  var trimCats = getCategoryDropdownsForMaster_(ss, 'TRIM');
+  if (trimCats.l2Flat.length > 0) {
+    setColumnValidation_(sheet, 5, trimCats.l2Flat);
+  } else {
+    setColumnValidation_(sheet, 5, CONFIG.TRIM_CATEGORY_LIST);
+  }
   setColumnValidation_(sheet, 10, CONFIG.UOM_LIST);
   setColumnValidation_(sheet, 17, CONFIG.STATUS_LIST);
 }
@@ -425,8 +577,13 @@ function setupConsumableMaster_(ss) {
   // L1 auto-fill (green read-only concept)
   sheet.getRange(4, 4, 500, 1).setValue('Consumable').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
-  setColumnValidation_(sheet, 5, ['Softener', 'Fixer', 'Needle', 'Oil', 'Fuel', 'Cleaning', 'Other']);
+  // Validations — L2 from ITEM_CATEGORIES grouped by master=CONSUMABLE
+  var conCats = getCategoryDropdownsForMaster_(ss, 'CONSUMABLE');
+  if (conCats.l2Flat.length > 0) {
+    setColumnValidation_(sheet, 5, conCats.l2Flat);
+  } else {
+    setColumnValidation_(sheet, 5, ['Softener', 'Fixer', 'Needle', 'Oil', 'Fuel', 'Cleaning', 'Other']);
+  }
   setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
@@ -491,8 +648,13 @@ function setupPackagingMaster_(ss) {
   // L1 auto-fill (green read-only concept)
   sheet.getRange(4, 4, 500, 1).setValue('Packaging').setBackground('#D5E8D4').setFontColor('#2E7D32');
 
-  // Validations — col numbers reflect V9 (+1 shift from col D onwards)
-  setColumnValidation_(sheet, 5, ['Poly Bag', 'Carton', 'Hanger', 'Price Tag', 'Tissue', 'Sticker', 'Other']);
+  // Validations — L2 from ITEM_CATEGORIES grouped by master=PACKAGING
+  var pkgCats = getCategoryDropdownsForMaster_(ss, 'PACKAGING');
+  if (pkgCats.l2Flat.length > 0) {
+    setColumnValidation_(sheet, 5, pkgCats.l2Flat);
+  } else {
+    setColumnValidation_(sheet, 5, ['Poly Bag', 'Carton', 'Hanger', 'Price Tag', 'Tissue', 'Sticker', 'Other']);
+  }
   setColumnValidation_(sheet, 14, CONFIG.STATUS_LIST);
 }
 
@@ -526,63 +688,236 @@ function setupPkgAttrValues_(ss) {
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 }
 
-/* ── 14. ITEM_CATEGORIES ── */
+/* ── 14. ITEM_CATEGORIES — Column-Grouped by Master (V10) ──
+ *  Layout: 7 master groups × 3 columns each = 21 data columns (B-V)
+ *  Col A = Row # (auto)
+ *  B,C,D  = ARTICLE       L1, L2, L3
+ *  E,F,G  = RM-FABRIC     L1, L2, L3
+ *  H,I,J  = RM-YARN       L1, L2, L3
+ *  K,L,M  = RM-WOVEN      L1, L2, L3
+ *  N,O,P  = TRIM          L1, L2, L3
+ *  Q,R,S  = CONSUMABLE    L1, L2, L3
+ *  T,U,V  = PACKAGING     L1, L2, L3
+ *
+ *  Each master's rows are independent — they fill down from row 4
+ *  and do not need to align across masters.
+ */
 function setupItemCategories_(ss) {
   var sheet = getOrCreateSheet_(ss, CONFIG.SHEETS.ITEM_CATEGORIES);
   var headers = [
-    'Category Code', 'L1 Division', 'L2 Type', 'L3 Style',
-    'Item Master Sheet', 'Default HSN', 'Active', 'Remarks', 'L1 Behavior'
+    '#',
+    'Article L1', 'Article L2', 'Article L3',
+    'Fabric L1',  'Fabric L2',  'Fabric L3',
+    'Yarn L1',    'Yarn L2',    'Yarn L3',
+    'Woven L1',   'Woven L2',   'Woven L3',
+    'Trim L1',    'Trim L2',    'Trim L3',
+    'Consumable L1', 'Consumable L2', 'Consumable L3',
+    'Packaging L1',  'Packaging L2',  'Packaging L3'
   ];
   var descriptions = [
-    'AUTO. Format: CAT-001.',
-    'Fixed: Apparel / RM / Trim / Consumable / Packaging',
-    'Product family within L1.',
-    'Most specific level.',
-    'Which master. ARTICLE/RM-FABRIC/RM-YARN/RM-WOVEN/TRIM/CONSUMABLE/PACKAGING',
-    'Default HSN for items in this category.',
-    'Dropdown: Yes / No',
-    '',
-    'FIXED = auto-set per master. SELECTABLE = user picks (Apparel only).'
+    'Row #',
+    'Men\'s/Women\'s/Kids/Unisex Apparel', 'Article L2 Category', 'Article L3 Style',
+    'Fixed: Raw Material', 'Fixed: Knit Fabric', 'Knit Type',
+    'Fixed: Raw Material', 'Fixed: Yarn', 'Yarn Type',
+    'Fixed: Raw Material', 'Fixed: Woven / Interlining', 'Woven Type',
+    'Fixed: Trim', 'Trim Category', 'Trim Sub-type',
+    'Fixed: Consumable', 'Consumable Category', 'Consumable Sub-type',
+    'Fixed: Packaging', 'Packaging Category', 'Packaging Sub-type'
   ];
+
   applyStandardFormat_(sheet,
-    'CC ERP FILE 1A — ITEM_CATEGORIES — 3-Level Category Tree. L1 Division / L2 Type / L3 Style.',
+    'CC ERP FILE 1A — ITEM_CATEGORIES — Column-Grouped by Master (22 cols)',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  // Pre-populate full category seed data (from CC_ERP_Masters_V8_updated.xlsx)
-  var catData = getItemCategorySeedData_();
+  // Pre-populate seed data
+  var catData = getItemCategorySeedData_V10_();
   if (sheet.getLastRow() < 4) {
     sheet.getRange(4, 1, catData.length, catData[0].length).setValues(catData);
   }
 
-  // Data validations
-  var lastRow = Math.max(sheet.getLastRow(), 100);
-  // Active column (G) dropdown
-  var activeRule = SpreadsheetApp.newDataValidation().requireValueInList(['Yes', 'No'], true).build();
-  sheet.getRange(4, 7, lastRow - 3, 1).setDataValidation(activeRule);
-  // Master column (E) dropdown
-  var masterRule = SpreadsheetApp.newDataValidation()
-    .requireValueInList(['ARTICLE', 'RM-FABRIC', 'RM-YARN', 'RM-WOVEN', 'TRIM', 'CONSUMABLE', 'PACKAGING'], true).build();
-  sheet.getRange(4, 5, lastRow - 3, 1).setDataValidation(masterRule);
-  // Behavior column (I) dropdown
-  var behaviorRule = SpreadsheetApp.newDataValidation().requireValueInList(['FIXED', 'SELECTABLE'], true).build();
-  sheet.getRange(4, 9, lastRow - 3, 1).setDataValidation(behaviorRule);
+  // Color-code the FIXED L1/L2 columns (green background, read-only concept)
+  var numRows = Math.max(catData.length, 50);
+  // Fabric L1+L2 (E,F)
+  sheet.getRange(4, 5, numRows, 2).setBackground('#D5E8D4').setFontColor('#2E7D32');
+  // Yarn L1+L2 (H,I)
+  sheet.getRange(4, 8, numRows, 2).setBackground('#D5E8D4').setFontColor('#2E7D32');
+  // Woven L1+L2 (K,L)
+  sheet.getRange(4, 11, numRows, 2).setBackground('#D5E8D4').setFontColor('#2E7D32');
+  // Trim L1 (N)
+  sheet.getRange(4, 14, numRows, 1).setBackground('#D5E8D4').setFontColor('#2E7D32');
+  // Consumable L1 (Q)
+  sheet.getRange(4, 17, numRows, 1).setBackground('#D5E8D4').setFontColor('#2E7D32');
+  // Packaging L1 (T)
+  sheet.getRange(4, 20, numRows, 1).setBackground('#D5E8D4').setFontColor('#2E7D32');
+}
+
+/* ── 15. ARTICLE_DROPDOWNS — Single source for all Article Master dropdowns ── */
+function setupArticleDropdowns_(ss) {
+  var sheet = getOrCreateSheet_(ss, 'ARTICLE_DROPDOWNS');
+  var headers = [
+    'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season'
+  ];
+  var descriptions = [
+    'Men/Women/Kids/Unisex', 'Regular/Slim/Relaxed/Oversized', 'Round Neck/V-Neck/Collar etc.',
+    'Half/Full/Sleeveless etc.', 'Active/Inactive/Development', 'SS25/AW26 examples'
+  ];
+
+  applyStandardFormat_(sheet,
+    'CC ERP FILE 1A — ARTICLE_DROPDOWNS — All Article Master Dropdown Values',
+    headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
+
+  // Pre-populate dropdown values
+  if (sheet.getLastRow() < 4) {
+    var data = [
+      ['Men',    'Regular',   'Round Neck',   'Half Sleeve',  'Active',       'SS2024'],
+      ['Women',  'Slim',      'V-Neck',       'Full Sleeve',  'Inactive',     'AW2024'],
+      ['Kids',   'Relaxed',   'Polo',         'Sleeveless',   'Development',  'SS2025'],
+      ['Unisex', 'Oversized', 'Henley',       'Cap Sleeve',   'Discontinued', 'AW2025'],
+      ['',       'Crop',      'Hood',         '3/4 Sleeve',   '',             'SS2026'],
+      ['',       'Athletic',  'Crew Neck',    'Raglan',       '',             'AW2026'],
+      ['',       '',          'Quarter Zip',  '',             '',             'Year Round'],
+      ['',       '',          'Mock Neck',    '',             '',             ''],
+    ];
+    sheet.getRange(4, 1, data.length, data[0].length).setValues(data);
+  }
 }
 
 /**
- * Returns the full 138-row V9 seed data array for ITEM_CATEGORIES.
- * Columns: Code, L1, L2, L3, Master, HSN, Active, Remarks, Behavior
- * V9 code ranges:
- *   ARTICLE:    CAT-001 to CAT-023
- *   RM-FABRIC:  CAT-100 to CAT-110
- *   RM-YARN:    CAT-120 to CAT-127
- *   RM-WOVEN:   CAT-140 to CAT-143
- *   TRIM:       CAT-200 to CAT-237
- *   CONSUMABLE: CAT-300 to CAT-325
- *   PACKAGING:  CAT-400 to CAT-427
+ * V10 column-grouped seed data for ITEM_CATEGORIES.
+ * Returns rows with 22 columns: [#, ArtL1, ArtL2, ArtL3, FabL1, FabL2, FabL3,
+ *   YarnL1, YarnL2, YarnL3, WovenL1, WovenL2, WovenL3, TrimL1, TrimL2, TrimL3,
+ *   ConL1, ConL2, ConL3, PkgL1, PkgL2, PkgL3]
+ *
+ * Each master fills its own 3-column group independently; other columns are blank.
+ * Rows are padded so each master starts at row 4.
  */
+function getItemCategorySeedData_V10_() {
+  // Per-master data arrays (each entry = [L1, L2, L3])
+  var article = [
+    ["Men's Apparel", "Tops - Polo", "Pique Polo"],
+    ["Men's Apparel", "Tops - Polo", "Autostriper Polo"],
+    ["Men's Apparel", "Tops - Polo", "Jacquard Polo"],
+    ["Men's Apparel", "Tops - Tee", "Round Neck Tee"],
+    ["Men's Apparel", "Tops - Tee", "V-Neck Tee"],
+    ["Men's Apparel", "Tops - Tee", "Henley Tee"],
+    ["Men's Apparel", "Sweatshirt", "Hoodie"],
+    ["Men's Apparel", "Sweatshirt", "Crew Neck Sweatshirt"],
+    ["Men's Apparel", "Sweatshirt", "Quarter Zip"],
+    ["Men's Apparel", "Tracksuit", "Full Tracksuit"],
+    ["Men's Apparel", "Tracksuit", "Track Jacket"],
+    ["Men's Apparel", "Tracksuit", "Track Pant"],
+    ["Men's Apparel", "Bottoms", "Jogger"],
+    ["Men's Apparel", "Bottoms", "Shorts"],
+    ["Women's Apparel", "Tops - Tee", "Round Neck Tee"],
+    ["Women's Apparel", "Tops - Tee", "Crop Top"],
+    ["Women's Apparel", "Sweatshirt", "Hoodie"],
+    ["Women's Apparel", "Bottoms", "Jogger"],
+    ["Kids Apparel", "Tops - Tee", "Round Neck Tee"],
+    ["Kids Apparel", "Sweatshirt", "Hoodie"],
+    ["Unisex Apparel", "Tops - Tee", "Oversized Tee"],
+    ["Unisex Apparel", "Sweatshirt", "Hoodie"],
+    ["Unisex Apparel", "Bottoms", "Jogger"],
+  ];
+  var fabric = [
+    ["Raw Material", "Knit Fabric", "Single Jersey"],
+    ["Raw Material", "Knit Fabric", "Pique"],
+    ["Raw Material", "Knit Fabric", "Fleece"],
+    ["Raw Material", "Knit Fabric", "French Terry"],
+    ["Raw Material", "Knit Fabric", "Rib"],
+    ["Raw Material", "Knit Fabric", "Interlock"],
+    ["Raw Material", "Knit Fabric", "Lycra Jersey"],
+  ];
+  var yarn = [
+    ["Raw Material", "Yarn", "Cotton Combed"],
+    ["Raw Material", "Yarn", "Cotton Carded"],
+    ["Raw Material", "Yarn", "Polyester"],
+    ["Raw Material", "Yarn", "PC Blend"],
+    ["Raw Material", "Yarn", "Viscose"],
+    ["Raw Material", "Yarn", "Melange"],
+  ];
+  var woven = [
+    ["Raw Material", "Woven / Interlining", "Fusible Interlining"],
+    ["Raw Material", "Woven / Interlining", "Non-Fusible Interlining"],
+    ["Raw Material", "Woven / Interlining", "Woven Fabric"],
+  ];
+  var trim = [
+    ["Trim", "Thread", "Sewing Thread"],
+    ["Trim", "Thread", "Overlock Thread"],
+    ["Trim", "Thread", "Embroidery Thread"],
+    ["Trim", "Thread", "Tacking Thread"],
+    ["Trim", "Label", "Main Label"],
+    ["Trim", "Label", "Care Label"],
+    ["Trim", "Label", "Size Label"],
+    ["Trim", "Label", "Hang Tag"],
+    ["Trim", "Label", "Badge"],
+    ["Trim", "Elastic", "Crochet Elastic"],
+    ["Trim", "Elastic", "Knitted Elastic"],
+    ["Trim", "Elastic", "Flat Elastic"],
+    ["Trim", "Zipper", "Dress Zipper"],
+    ["Trim", "Zipper", "Open-End Zipper"],
+    ["Trim", "Zipper", "Invisible Zipper"],
+    ["Trim", "Button", "Flat Button"],
+    ["Trim", "Button", "Snap Button"],
+    ["Trim", "Button", "Shank Button"],
+    ["Trim", "Tape", "Twill Tape"],
+    ["Trim", "Tape", "Herringbone Tape"],
+    ["Trim", "Drawcord", "Flat Drawcord"],
+    ["Trim", "Drawcord", "Round Drawcord"],
+    ["Trim", "Velcro", "Sew-On Velcro"],
+    ["Trim", "Rivet / Eyelet", "Metal Rivet"],
+    ["Trim", "Rivet / Eyelet", "Brass Eyelet"],
+    ["Trim", "Neck / Shoulder Tape", "Neck Tape"],
+    ["Trim", "Other", "Other Trim"],
+  ];
+  var consumable = [
+    ["Consumable", "Dye", "Reactive Dye"],
+    ["Consumable", "Dye", "Disperse Dye"],
+    ["Consumable", "Dye", "Pigment Dye"],
+    ["Consumable", "Chemical", "Softener"],
+    ["Consumable", "Chemical", "Fixing Agent"],
+    ["Consumable", "Chemical", "Levelling Agent"],
+    ["Consumable", "Needle", "Knitting Needle"],
+    ["Consumable", "Needle", "Sewing Needle"],
+    ["Consumable", "Oil", "Machine Oil"],
+    ["Consumable", "Other", "Other Consumable"],
+  ];
+  var packaging = [
+    ["Packaging", "Polybag", "LDPE Polybag"],
+    ["Packaging", "Polybag", "HM Polybag"],
+    ["Packaging", "Carton", "Single Wall Carton"],
+    ["Packaging", "Carton", "Double Wall Carton"],
+    ["Packaging", "Hanger", "Plastic Hanger"],
+    ["Packaging", "Ticket / Tag", "Price Ticket"],
+    ["Packaging", "Ticket / Tag", "Barcode Label"],
+    ["Packaging", "Other", "Tissue Paper"],
+  ];
+
+  // Find the max row count across all masters
+  var masters = [article, fabric, yarn, woven, trim, consumable, packaging];
+  var maxRows = 0;
+  for (var m = 0; m < masters.length; m++) {
+    if (masters[m].length > maxRows) maxRows = masters[m].length;
+  }
+
+  // Build combined rows: [#, ArtL1..L3, FabL1..L3, YarnL1..L3, WovenL1..L3, TrimL1..L3, ConL1..L3, PkgL1..L3]
+  var result = [];
+  for (var r = 0; r < maxRows; r++) {
+    var row = [r + 1]; // Col A = row number
+    for (var m = 0; m < masters.length; m++) {
+      if (r < masters[m].length) {
+        row.push(masters[m][r][0], masters[m][r][1], masters[m][r][2]);
+      } else {
+        row.push('', '', '');
+      }
+    }
+    result.push(row);
+  }
+  return result;
+}
+
+/** Legacy V9 seed data — kept for reference. New installs use getItemCategorySeedData_V10_(). */
 function getItemCategorySeedData_() {
-  // Delegates to V9 data defined in V9_Update.gs (138 rows, CAT-001 to CAT-427)
-  return getV9ItemCategorySeedData_();
+  return getItemCategorySeedData_V10_();
 }
 
 // ── LEGACY STUB — kept for reference; actual data is in getV9ItemCategorySeedData_() ──

@@ -2,22 +2,51 @@
  * Master FK lookup data + dropdown options.
  * Mirrors the data from CC_ERP_MasterDataEntry.jsx for use in the dashboard.
  * At runtime, GAS replaces these via getSheetMeta().
+ *
+ * V10: item_categories split into level-specific FK keys per master
+ *      to prevent mixed L1/L2/L3 data in dropdowns.
  */
 
 // ── FK Lookup Tables ──────────────────────────────────────────────────────────
 export const FK_DATA = {
-  item_categories: [
-    // L1 Divisions (used as dropdown values for L1 Division field)
+  // ─ Article L1/L2/L3 — separate FK keys for each level ─
+  article_l1: [
     { v: "Men's Apparel",   l: "👔 Men's Apparel" },
     { v: "Women's Apparel", l: "👗 Women's Apparel" },
     { v: "Kids Apparel",    l: "🧒 Kids Apparel" },
     { v: "Unisex Apparel",  l: "👕 Unisex Apparel" },
-    // L2 Categories (common Article L2s for quick reference)
+  ],
+  article_l2: [
     { v: "Tops - Polo", l: "Tops - Polo" },
     { v: "Tops - Tee",  l: "Tops - Tee" },
     { v: "Sweatshirt",  l: "Sweatshirt" },
     { v: "Tracksuit",   l: "Tracksuit" },
     { v: "Bottoms",     l: "Bottoms" },
+  ],
+  article_l3: [
+    { v: "Pique Polo",            l: "Pique Polo" },
+    { v: "Autostriper Polo",      l: "Autostriper Polo" },
+    { v: "Jacquard Polo",         l: "Jacquard Polo" },
+    { v: "Round Neck Tee",        l: "Round Neck Tee" },
+    { v: "V-Neck Tee",            l: "V-Neck Tee" },
+    { v: "Henley Tee",            l: "Henley Tee" },
+    { v: "Crop Top",              l: "Crop Top" },
+    { v: "Oversized Tee",         l: "Oversized Tee" },
+    { v: "Hoodie",                l: "Hoodie" },
+    { v: "Crew Neck Sweatshirt",  l: "Crew Neck Sweatshirt" },
+    { v: "Quarter Zip",           l: "Quarter Zip" },
+    { v: "Full Tracksuit",        l: "Full Tracksuit" },
+    { v: "Track Jacket",          l: "Track Jacket" },
+    { v: "Track Pant",            l: "Track Pant" },
+    { v: "Jogger",                l: "Jogger" },
+    { v: "Shorts",                l: "Shorts" },
+  ],
+  // Legacy alias — kept for backwards compat
+  item_categories: [
+    { v: "Men's Apparel",   l: "👔 Men's Apparel" },
+    { v: "Women's Apparel", l: "👗 Women's Apparel" },
+    { v: "Kids Apparel",    l: "🧒 Kids Apparel" },
+    { v: "Unisex Apparel",  l: "👕 Unisex Apparel" },
   ],
   rm_fabric: [
     { v: "RM-FAB-001", l: "RM-FAB-001 — SJ 180GSM Cotton" },
@@ -99,9 +128,9 @@ export const FK_DATA = {
 // ── Dropdown Option Sets ──────────────────────────────────────────────────────
 export const DROPDOWN_OPTS = {
   gender:    [{ v: "Men", l: "Men" }, { v: "Women", l: "Women" }, { v: "Kids", l: "Kids" }, { v: "Unisex", l: "Unisex" }],
-  fit:       [{ v: "Regular", l: "Regular" }, { v: "Slim", l: "Slim" }, { v: "Relaxed", l: "Relaxed" }, { v: "Oversized", l: "Oversized" }, { v: "Athletic", l: "Athletic" }],
-  neckline:  [{ v: "Round", l: "Round Neck" }, { v: "V-Neck", l: "V-Neck" }, { v: "Collar", l: "Collar" }, { v: "Hooded", l: "Hooded" }, { v: "Mock Neck", l: "Mock Neck" }],
-  sleeve:    [{ v: "Half", l: "Half Sleeve" }, { v: "Full", l: "Full Sleeve" }, { v: "Sleeveless", l: "Sleeveless" }, { v: "3/4", l: "3/4 Sleeve" }, { v: "Raglan", l: "Raglan" }],
+  fit:       [{ v: "Regular", l: "Regular" }, { v: "Slim", l: "Slim" }, { v: "Relaxed", l: "Relaxed" }, { v: "Oversized", l: "Oversized" }, { v: "Athletic", l: "Athletic" }, { v: "Crop", l: "Crop" }],
+  neckline:  [{ v: "Round Neck", l: "Round Neck" }, { v: "V-Neck", l: "V-Neck" }, { v: "Polo", l: "Polo" }, { v: "Henley", l: "Henley" }, { v: "Hood", l: "Hood" }, { v: "Crew Neck", l: "Crew Neck" }, { v: "Quarter Zip", l: "Quarter Zip" }, { v: "Mock Neck", l: "Mock Neck" }],
+  sleeve:    [{ v: "Half Sleeve", l: "Half Sleeve" }, { v: "Full Sleeve", l: "Full Sleeve" }, { v: "Sleeveless", l: "Sleeveless" }, { v: "Cap Sleeve", l: "Cap Sleeve" }, { v: "3/4 Sleeve", l: "3/4 Sleeve" }, { v: "Raglan", l: "Raglan" }],
   status:    [{ v: "Active", l: "Active" }, { v: "Inactive", l: "Inactive" }, { v: "Development", l: "Development" }, { v: "Discontinued", l: "Discontinued" }],
   fabricType:[{ v: "KORA", l: "KORA" }, { v: "FINISHED", l: "FINISHED" }],
   fabricColour: [{ v: "KORA", l: "KORA" }, { v: "COLOURED", l: "COLOURED" }, { v: "DYED", l: "DYED" }, { v: "MÉLANGE", l: "MÉLANGE" }],

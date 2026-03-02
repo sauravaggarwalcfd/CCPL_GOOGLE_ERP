@@ -4,6 +4,7 @@
 > **Files:** 4 Google Sheets | 56 Total Sheets | 24 GAS Files (14,407 lines) | React Frontend
 > **Generated:** 2 Mar 2026
 > **V9.1 Fixes:** Article Code manual entry, duplicate check self-match, L1/L2/L3 from ITEM_CATEGORIES
+> **V10 Changes:** ITEM_CATEGORIES restructured to column-grouped layout (22 cols). New ARTICLE_DROPDOWNS sheet. FK_DATA split per level. Auto-description (L1 › L2 › L3).
 
 ---
 
@@ -351,39 +352,61 @@ Identical structure to CONSUMABLE_ATTR_NAMES / ATTR_VALUES. Separate sheets.
 
 ---
 
-### 2.12 ITEM_CATEGORIES (9 columns, 138 rows)
+### 2.12 ITEM_CATEGORIES — Column-Grouped by Master (22 columns, V10)
 
-Central lookup for the L1/L2/L3 hierarchy across all 7 item masters.
+Central lookup for L1/L2/L3 hierarchy. **V10 restructure:** columns grouped by master (3 cols each).
+Each master fills rows independently — they do not need to align across groups.
 
-| Col | Header | Type | Notes |
-|-----|--------|------|-------|
-| A | CAT Code | Text | CAT-001 to CAT-427 |
-| B | L1 Division | Text | Master type: ARTICLE, RM-FABRIC, RM-YARN, TRIM, etc. |
-| C | L1 Value | Text | "Men's Apparel", "Raw Material", "Trim", etc. |
-| D | L2 Category | Text | E.g., "Knit Fabric", "Thread" |
-| E | L2 Value | Text | Code/name for L2 |
-| F | L3 Type | Text | Specific sub-type name |
-| G | L3 Value | Text | Code/name for L3 |
-| H | Sort Order | Number | Display ordering |
-| **I** | **L1 Behavior** | Dropdown | **FIXED** or **SELECTABLE** (V9 NEW) |
+| Col | Header | Master | Level | Notes |
+|-----|--------|--------|-------|-------|
+| A | # | — | — | Row number |
+| **B** | **Article L1** | ARTICLE | L1 | Men's/Women's/Kids/Unisex Apparel (SELECTABLE) |
+| **C** | **Article L2** | ARTICLE | L2 | Tops-Polo, Tops-Tee, Sweatshirt, Tracksuit, Bottoms |
+| **D** | **Article L3** | ARTICLE | L3 | Pique Polo, Round Neck Tee, Hoodie, Jogger, etc. |
+| **E** | **Fabric L1** | RM-FABRIC | L1 | Fixed: "Raw Material" (green bg) |
+| **F** | **Fabric L2** | RM-FABRIC | L2 | Fixed: "Knit Fabric" (green bg) |
+| **G** | **Fabric L3** | RM-FABRIC | L3 | Single Jersey, Pique, Fleece, French Terry, etc. |
+| **H** | **Yarn L1** | RM-YARN | L1 | Fixed: "Raw Material" (green bg) |
+| **I** | **Yarn L2** | RM-YARN | L2 | Fixed: "Yarn" (green bg) |
+| **J** | **Yarn L3** | RM-YARN | L3 | Cotton Combed, Polyester, PC Blend, etc. |
+| **K** | **Woven L1** | RM-WOVEN | L1 | Fixed: "Raw Material" (green bg) |
+| **L** | **Woven L2** | RM-WOVEN | L2 | Fixed: "Woven / Interlining" (green bg) |
+| **M** | **Woven L3** | RM-WOVEN | L3 | Fusible, Non-Fusible, Woven Fabric |
+| **N** | **Trim L1** | TRIM | L1 | Fixed: "Trim" (green bg) |
+| **O** | **Trim L2** | TRIM | L2 | Thread, Label, Elastic, Zipper, Button, etc. |
+| **P** | **Trim L3** | TRIM | L3 | Sewing Thread, Main Label, Crochet Elastic, etc. |
+| **Q** | **Consumable L1** | CONSUMABLE | L1 | Fixed: "Consumable" (green bg) |
+| **R** | **Consumable L2** | CONSUMABLE | L2 | Dye, Chemical, Needle, Oil, Other |
+| **S** | **Consumable L3** | CONSUMABLE | L3 | Reactive Dye, Softener, Knitting Needle, etc. |
+| **T** | **Packaging L1** | PACKAGING | L1 | Fixed: "Packaging" (green bg) |
+| **U** | **Packaging L2** | PACKAGING | L2 | Polybag, Carton, Hanger, Ticket/Tag, Other |
+| **V** | **Packaging L3** | PACKAGING | L3 | LDPE Polybag, Single Wall Carton, etc. |
 
-**V9 Code Ranges:**
+**Row counts per master:** Article=23, Fabric=7, Yarn=6, Woven=3, Trim=27, Consumable=10, Packaging=8
 
-| Range | Master | Count |
-|-------|--------|-------|
-| CAT-001 – CAT-023 | ARTICLE | 23 |
-| CAT-100 – CAT-110 | RM_MASTER_FABRIC | 11 |
-| CAT-120 – CAT-127 | RM_MASTER_YARN | 8 |
-| CAT-140 – CAT-143 | RM_MASTER_WOVEN | 4 |
-| CAT-200 – CAT-237 | TRIM_MASTER | 38 |
-| CAT-300 – CAT-325 | CONSUMABLE_MASTER | 26 |
-| CAT-400 – CAT-427 | PACKAGING_MASTER | 28 |
+**GAS Helper:** `getCategoryDropdownsForMaster_(ss, 'ARTICLE')` reads cols B,C,D; `'TRIM'` reads cols N,O,P; etc.
+Uses `COL_MAP` to map master key → starting column.
 
-**L1 Behavior:**
-- **SELECTABLE:** User picks from dropdown (ARTICLE only — Men's/Women's/Kids/Unisex Apparel)
-- **FIXED:** Auto-set by GAS per master type (all other masters)
+**Frontend:** `ItemCategoryTab.jsx` SEED_DATA still uses row-based objects (logical view).
+`masterLookupData.js` FK_DATA split into `article_l1`, `article_l2`, `article_l3` — separate per level.
 
-**Frontend:** `ItemCategoryTab.jsx` has `CATEGORY_HIERARCHY` object + `SEED_DATA` with all 138 rows hardcoded.
+---
+
+### 2.12b ARTICLE_DROPDOWNS (6 columns, NEW in V10)
+
+Single source of truth for all Article Master dropdown values (for both GAS sheet and webapp).
+
+| Col | Header | Values |
+|-----|--------|--------|
+| A | Gender | Men, Women, Kids, Unisex |
+| B | Fit Type | Regular, Slim, Relaxed, Oversized, Crop, Athletic |
+| C | Neckline | Round Neck, V-Neck, Polo, Henley, Hood, Crew Neck, Quarter Zip, Mock Neck |
+| D | Sleeve Type | Half Sleeve, Full Sleeve, Sleeveless, Cap Sleeve, 3/4 Sleeve, Raglan |
+| E | Status | Active, Inactive, Development, Discontinued |
+| F | Season | SS2024, AW2024, SS2025, AW2025, SS2026, AW2026, Year Round |
+
+**GAS:** `setupArticleDropdowns_(ss)` creates and pre-populates. `setupArticleMaster_()` reads from this sheet for col 11-14, 25 validations.
+**Frontend:** `DROPDOWN_OPTS` in `masterLookupData.js` mirrors these values.
 
 ---
 
@@ -871,6 +894,63 @@ Role stored in USER_MASTER (FILE 1B). Module5_AccessControl.gs hides/protects sh
 **Files:** `masterSchemas.js`, `masterFieldMeta.js`
 **Bug:** SCHEMA_ARTICLE_MASTER was missing the V9 `L3 Style` column (col I). Schema jumped from L2 Category straight to Season, which meant column letters were shifted by 1 for all subsequent columns.
 **Fix:** Added `{ key:"l3Style", header:"L3 Style", label:"Style", w:"110px" }` between L2 Category and Season. Added corresponding FIELD_META entry with FK to item_categories.
+
+---
+
+## V10 Changes (2 Mar 2026)
+
+### Change 1: ITEM_CATEGORIES restructured to column-grouped layout
+
+**File:** `SheetSetup.gs` — `setupItemCategories_()`
+**Before (V9):** Row-based layout with 9 cols (Code, L1, L2, L3, Master, HSN, Active, Remarks, Behavior). Each row = one category. `Master` column (E) used to filter per master type.
+**After (V10):** Column-grouped layout with 22 cols. Each master gets its own 3 columns (L1, L2, L3):
+- B,C,D = Article | E,F,G = Fabric | H,I,J = Yarn | K,L,M = Woven
+- N,O,P = Trim | Q,R,S = Consumable | T,U,V = Packaging
+
+Seed data function changed from `getItemCategorySeedData_()` (delegating to V9 row arrays) to `getItemCategorySeedData_V10_()` which builds a combined row array where each master fills its own column group independently.
+
+**`getCategoryDropdownsForMaster_(ss, masterKey)`** now uses a `COL_MAP` to find the 3-column group for each master instead of filtering by a "Master" column.
+
+### Change 2: New ARTICLE_DROPDOWNS sheet
+
+**File:** `SheetSetup.gs` — `setupArticleDropdowns_()`
+6-column sheet: Gender, Fit Type, Neckline, Sleeve Type, Status, Season.
+Single source of truth for both GAS dropdown validations and webapp dropdowns.
+`setupArticleMaster_()` reads from this sheet for cols 11-14, 25 (with hardcoded fallbacks).
+
+### Change 3: Auto-description (L1 › L2 › L3)
+
+**GAS:** `Code.gs` onEdit handler — when Article Master cols G/H/I change, col B auto-fills as "L1 › L2 › L3".
+**Frontend:** `ArticleMasterTab.jsx` — `buildDesc()` joins selected levels. Description field is readonly.
+
+### Change 4: FK_DATA split per level (fixes mixed dropdown bug)
+
+**Bug:** `FK_DATA.item_categories` was a flat list mixing L1 divisions AND L2 categories. All fields with `fk: "item_categories"` showed the same combined dropdown.
+**Fix:**
+- `masterLookupData.js`: Split into `article_l1` (4 divisions), `article_l2` (5 categories), `article_l3` (16 styles)
+- `masterFieldMeta.js`: l1Division → `fk: "article_l1"`, l2Category → `fk: "article_l2"`, l3Style → `fk: "article_l3"`
+- Legacy `item_categories` key kept for backwards compatibility (points to L1 only)
+
+### Change 5: L3 Style dropdown added to Article form
+
+**File:** `ArticleMasterTab.jsx`
+- Added `L3_BY_L2` map built from SEED_DATA (L2 → array of L3 values)
+- Added `l3Style` to `emptyForm`, `handleEdit`, save handlers
+- L3 dropdown cascades from L2 selection, resets on L1/L2 change
+- Preview shows full L1 › L2 › L3 chain
+
+### GAS: What to run in Google Sheets
+
+To apply the V10 ITEM_CATEGORIES restructure and create ARTICLE_DROPDOWNS on your live sheet, you need to run the setup functions from the GAS Script Editor:
+
+1. Open **FILE 1A** in Google Sheets
+2. Go to **Extensions > Apps Script**
+3. Run these functions (in order):
+   - `setupArticleDropdowns_` — creates the new ARTICLE_DROPDOWNS sheet
+   - `setupItemCategories_` — rebuilds ITEM_CATEGORIES in column-grouped format
+   - `setupArticleMaster_` — re-applies dropdown validations from the new sources
+
+**Note:** `setupItemCategories_` only writes seed data if the sheet has no data below row 3. If the sheet already has data, you may need to clear rows 4+ first, or manually restructure. The old `ITEM_CATEGORIES` format (9-column row-based) is no longer used.
 
 ---
 
