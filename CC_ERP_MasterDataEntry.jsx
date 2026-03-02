@@ -582,51 +582,221 @@ function SpecTable({master,M,A,fz,pyV,tblStyle}){
 // ═══════════════════════════════════════════════════════════════════════
 //  RECORDS TABLE  (Records tab)
 // ═══════════════════════════════════════════════════════════════════════
-function RecordsTab({master,M,A,fz,pyV,onLoad}){
-  const [search,setSearch]=useState("");
+function RecordsTab({master,M,A,fz,pyV,onLoad,visibleCols}){
+  const [search,setSearch]        = useState("");
+  const [sortCol,setSortCol]      = useState(null);
+  const [sortDir,setSortDir]      = useState("asc");
+  const [selectedRows,setSelected]= useState(new Set());
+
+  const fields = (visibleCols||[]).length>0
+    ? visibleCols.map(c=>master.fields.find(f=>f.col===c)).filter(Boolean)
+    : master.fields.filter(f=>!f.auto&&f.type!=="calc").slice(0,12);
+
+  const TYPE_BADGE={
+    manual:  {bg:"#e0f2fe",tx:"#0369a1",label:"Manual"},
+    autocode:{bg:"#fff7ed",tx:"#c2410c",label:"Code"},
+    text:    {bg:"#f1f5f9",tx:"#475569",label:"Text"},
+    textarea:{bg:"#f1f5f9",tx:"#475569",label:"Text"},
+    url:     {bg:"#dcfce7",tx:"#15803d",label:"URL"},
+    auto:    {bg:"#fff7ed",tx:"#c2410c",label:"Auto"},
+    calc:    {bg:"#faf5ff",tx:"#7c3aed",label:"∑ Calc"},
+    fk:      {bg:"#eff6ff",tx:"#2563eb",label:"FK"},
+    multifk: {bg:"#f5f3ff",tx:"#6d28d9",label:"Multi-FK"},
+    dropdown:{bg:"#f0fdf4",tx:"#15803d",label:"Select"},
+    number:  {bg:"#f8fafc",tx:"#475569",label:"Num"},
+    currency:{bg:"#fefce8",tx:"#a16207",label:"₹"},
+  };
+
+  const ALPHA="ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const records=master.mockRecords||[];
-  const previewFields=master.fields.filter(f=>!f.auto&&f.type!=="calc"&&f.type!=="autocode").slice(0,6);
   const filtered=records.filter(r=>!search||Object.values(r).join(" ").toLowerCase().includes(search.toLowerCase()));
-  const statusCol=master.fields.find(f=>f.h==="Status")?.col;
-  const SC={"Active":{bg:"#dcfce7",tx:"#15803d"},"Development":{bg:"#fef3c7",tx:"#d97706"},"Inactive":{bg:"#f1f5f9",tx:"#64748b"},"Discontinued":{bg:"#fef2f2",tx:"#991b1b"}};
+  const sorted=[...filtered].sort((a,b)=>{
+    if(!sortCol)return 0;
+    const av=String(a[sortCol]||""),bv=String(b[sortCol]||"");
+    return sortDir==="asc"?av.localeCompare(bv):bv.localeCompare(av);
+  });
+
+  const toggleRow=(id)=>setSelected(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;});
+  const toggleAll=()=>setSelected(selectedRows.size===sorted.length&&sorted.length>0?new Set():new Set(sorted.map((_,i)=>i)));
+
   return(
     <div style={{display:"flex",flexDirection:"column",height:"100%"}}>
-      <div style={{padding:"8px 14px",borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",gap:8,background:M.surfMid,flexShrink:0}}>
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search records…" style={{border:`1px solid ${M.inputBd}`,borderRadius:4,background:M.inputBg,color:M.textA,fontSize:fz-1,padding:"5px 10px",outline:"none",width:220}}/>
-        <span style={{fontSize:10,color:M.textC}}>{filtered.length} records (mock — GAS loads live)</span>
-        <button style={{marginLeft:"auto",padding:"5px 14px",background:A.a,border:"none",borderRadius:4,color:"#fff",fontSize:10,fontWeight:900,cursor:"pointer"}}>+ New Record</button>
+
+      {/* ── Toolbar ── */}
+      <div style={{padding:"8px 14px",borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",gap:8,background:M.surfMid,flexShrink:0,flexWrap:"wrap"}}>
+        <div style={{display:"flex",alignItems:"center",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,overflow:"hidden"}}>
+          <span style={{padding:"0 8px",fontSize:12,color:M.textD}}>🔍</span>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search records…"
+            style={{border:"none",background:"transparent",color:M.textA,fontSize:fz-1,padding:"5px 8px 5px 0",outline:"none",width:200}}/>
+        </div>
+        <div style={{width:1,height:20,background:M.divider}}/>
+        <span style={{fontSize:9,color:M.textD,fontFamily:"'IBM Plex Mono',monospace",whiteSpace:"nowrap",fontWeight:700}}>
+          {filtered.length} of {records.length} records
+        </span>
+        <div style={{width:1,height:20,background:M.divider}}/>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          🔍 Filter
+        </button>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          ↕ Sort
+        </button>
+        <div style={{display:"flex",alignItems:"center",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,overflow:"hidden"}}>
+          <select style={{padding:"5px 26px 5px 10px",background:"transparent",border:"none",color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer",outline:"none",appearance:"none",WebkitAppearance:"none"}}>
+            <option value="">Group by...</option>
+            {fields.filter(f=>["fk","dropdown"].includes(f.type)).map(f=>(
+              <option key={f.col} value={f.col}>{f.h}</option>
+            ))}
+          </select>
+          <span style={{marginLeft:-22,pointerEvents:"none",fontSize:9,color:M.textD,paddingRight:8}}>▾</span>
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:5,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          ⊞ Columns
+        </button>
+        <div style={{flex:1}}/>
+        <button style={{display:"flex",alignItems:"center",gap:4,padding:"5px 12px",background:M.inputBg,border:`1px solid ${M.inputBd}`,borderRadius:5,color:M.textB,fontSize:10,fontWeight:700,cursor:"pointer"}}>
+          ↓ Export <span style={{fontSize:8,color:M.textD,marginLeft:2}}>▾</span>
+        </button>
       </div>
-      {filtered.length===0?<div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8}}><div style={{fontSize:32}}>📭</div><div style={{fontSize:12,color:M.textC}}>No records found</div></div>:(
-        <div style={{flex:1,overflowY:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse"}}>
+
+      {/* ── Views bar ── */}
+      <div style={{padding:"5px 14px",borderBottom:`1px solid ${M.divider}`,display:"flex",alignItems:"center",gap:8,background:M.surfHigh,flexShrink:0}}>
+        <span style={{fontSize:9,fontWeight:900,color:M.textD,letterSpacing:.8,textTransform:"uppercase"}}>VIEWS:</span>
+        <div style={{display:"flex",alignItems:"center",gap:0,background:"#fef2f2",border:"1px solid #fca5a5",borderRadius:4,overflow:"hidden"}}>
+          <span style={{padding:"3px 10px",fontSize:9.5,fontWeight:900,color:"#dc2626",display:"flex",alignItems:"center",gap:5}}>
+            <span style={{width:8,height:8,borderRadius:"50%",background:"#dc2626",display:"inline-block",flexShrink:0}}/>
+            Default
+          </span>
+          <span style={{padding:"2px 8px",background:"#dc2626",color:"#fff",fontSize:7.5,fontWeight:900,letterSpacing:.8,lineHeight:"20px"}}>LOCKED</span>
+        </div>
+        <button style={{display:"flex",alignItems:"center",gap:4,padding:"3px 10px",background:M.inputBg,border:`1px dashed ${M.inputBd}`,borderRadius:4,color:M.textB,fontSize:9.5,fontWeight:700,cursor:"pointer"}}>
+          + Save View
+        </button>
+      </div>
+
+      {/* ── Spreadsheet Grid ── */}
+      <div style={{flex:1,overflow:"auto"}}>
+        {sorted.length===0?(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:8,minHeight:200}}>
+            <div style={{fontSize:32}}>📭</div>
+            <div style={{fontSize:12,color:M.textC}}>No records found</div>
+          </div>
+        ):(
+          <table style={{borderCollapse:"collapse",tableLayout:"fixed",minWidth:"100%"}}>
+            <colgroup>
+              <col style={{width:32}}/>
+              <col style={{width:36}}/>
+              {fields.map(f=>(
+                <col key={f.col} style={{width:
+                  f.type==="url"||f.type==="multifk" ? 160 :
+                  f.type==="textarea" ? 200 :
+                  f.type==="manual"||f.type==="autocode" ? 120 :
+                  f.type==="text"&&f.h.length>15 ? 180 :
+                  150
+                }}/>
+              ))}
+              <col style={{width:72}}/>
+            </colgroup>
+
+            {/* ── Column Headers ── */}
             <thead style={{position:"sticky",top:0,zIndex:10}}>
               <tr style={{background:M.tblHead}}>
-                <th style={{padding:`${pyV}px 10px`,fontSize:9,fontWeight:900,color:M.textD,borderBottom:`1px solid ${M.divider}`,letterSpacing:.6}}>#</th>
-                {previewFields.map(f=><th key={f.col} style={{padding:`${pyV}px 10px`,fontSize:9,fontWeight:900,color:M.textD,borderBottom:`1px solid ${M.divider}`,textAlign:"left",letterSpacing:.6,whiteSpace:"nowrap"}}>{f.h}</th>)}
-                <th style={{padding:`${pyV}px 10px`,fontSize:9,fontWeight:900,color:M.textD,borderBottom:`1px solid ${M.divider}`,letterSpacing:.6}}>STATUS</th>
-                <th style={{padding:`${pyV}px 10px`,borderBottom:`1px solid ${M.divider}`}}/>
+                {/* Checkbox */}
+                <th style={{padding:`${pyV}px 8px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                  <div onClick={toggleAll} style={{width:15,height:15,borderRadius:3,border:`2px solid ${selectedRows.size===sorted.length&&sorted.length>0?A.a:M.inputBd}`,background:selectedRows.size===sorted.length&&sorted.length>0?A.a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .1s"}}>
+                    {selectedRows.size===sorted.length&&sorted.length>0&&<span style={{color:"#fff",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
+                  </div>
+                </th>
+                {/* # */}
+                <th style={{padding:`${pyV}px 6px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,fontSize:9,fontWeight:900,color:M.textD,textAlign:"center"}}>#</th>
+                {/* Field headers */}
+                {fields.map((f,fi)=>{
+                  const tb=TYPE_BADGE[f.type]||TYPE_BADGE.text;
+                  const isSort=sortCol===f.col;
+                  const isFirst=fi===0;
+                  const letter=ALPHA[fi]||String(fi+1);
+                  return(
+                    <th key={f.col}
+                      onClick={()=>{setSortCol(f.col);setSortDir(p=>isSort&&p==="asc"?"desc":"asc");}}
+                      style={{padding:`${pyV}px 8px`,borderBottom:`2px solid ${M.divider}`,borderRight:`1px solid ${M.divider}`,textAlign:"left",cursor:"pointer",userSelect:"none",background:M.tblHead,whiteSpace:"nowrap"}}
+                      onMouseEnter={e=>e.currentTarget.style.background=M.hoverBg}
+                      onMouseLeave={e=>e.currentTarget.style.background=M.tblHead}>
+                      <div style={{display:"flex",flexDirection:"column",gap:1}}>
+                        <span style={{fontSize:7,fontWeight:900,color:M.textD,letterSpacing:.6}}>{letter}</span>
+                        <div style={{display:"flex",alignItems:"center",gap:4}}>
+                          {f.req&&<span style={{color:"#ef4444",fontSize:8,fontWeight:900,flexShrink:0}}>⚠</span>}
+                          <span style={{fontSize:fz-2,fontWeight:700,color:isFirst?A.a:M.textA,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",maxWidth:110}}>{f.h}</span>
+                          <span style={{background:tb.bg,color:tb.tx,borderRadius:3,padding:"1px 5px",fontSize:7,fontWeight:900,whiteSpace:"nowrap",flexShrink:0,letterSpacing:.3}}>{tb.label}</span>
+                          <span style={{fontSize:9,color:isSort?A.a:M.textD,flexShrink:0}}>{isSort?(sortDir==="asc"?"↑":"↓"):"↕"}</span>
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
+                <th style={{padding:`${pyV}px 8px`,borderBottom:`2px solid ${M.divider}`,fontSize:9,fontWeight:900,color:M.textD,textAlign:"center",whiteSpace:"nowrap"}}>EDIT</th>
               </tr>
             </thead>
+
+            {/* ── Rows ── */}
             <tbody>
-              {filtered.map((r,i)=>{
-                const sv=statusCol?r[statusCol]:"";const sc=SC[sv]||{bg:M.badgeBg,tx:M.badgeTx};
+              {sorted.map((row,i)=>{
+                const rowId=row._id??i;
                 return(
-                  <tr key={i} style={{background:i%2===0?M.tblEven:M.tblOdd,borderBottom:`1px solid ${M.divider}`,cursor:"pointer"}} onMouseEnter={e=>e.currentTarget.style.background=M.hoverBg} onMouseLeave={e=>e.currentTarget.style.background=i%2===0?M.tblEven:M.tblOdd}>
-                    <td style={{padding:`${pyV}px 10px`,fontFamily:"'IBM Plex Mono',monospace",fontSize:9,color:M.textD}}>{String(i+1).padStart(2,"0")}</td>
-                    {previewFields.map(f=>(
-                      <td key={f.col} style={{padding:`${pyV}px 10px`,fontSize:fz-2,color:f.col===previewFields[0].col?A.a:M.textA,fontWeight:f.col===previewFields[0].col?700:400,fontFamily:["manual","autocode"].includes(f.type)?"'IBM Plex Mono',monospace":"inherit",maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                        {r[f.col]||<span style={{color:M.textD,fontStyle:"italic"}}>—</span>}
-                      </td>
-                    ))}
-                    <td style={{padding:`${pyV}px 10px`}}>{sv&&<span style={{background:sc.bg,color:sc.tx,borderRadius:3,padding:"2px 8px",fontSize:9,fontWeight:800}}>{sv}</span>}</td>
-                    <td style={{padding:`${pyV}px 10px`}}><button onClick={()=>onLoad&&onLoad(r)} style={{padding:"3px 10px",background:M.surfLow,border:`1px solid ${M.inputBd}`,borderRadius:3,color:M.textB,fontSize:9,fontWeight:800,cursor:"pointer"}}>✏️ Edit</button></td>
+                  <tr key={rowId}
+                    style={{background:selectedRows.has(rowId)?A.al:i%2===0?M.tblEven:M.tblOdd,borderBottom:`1px solid ${M.divider}`}}
+                    onMouseEnter={e=>{if(!selectedRows.has(rowId))e.currentTarget.style.background=M.hoverBg;}}
+                    onMouseLeave={e=>{if(!selectedRows.has(rowId))e.currentTarget.style.background=i%2===0?M.tblEven:M.tblOdd;}}>
+                    {/* Checkbox */}
+                    <td style={{padding:`${pyV}px 8px`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                      <div onClick={()=>toggleRow(rowId)} style={{width:15,height:15,borderRadius:3,border:`2px solid ${selectedRows.has(rowId)?A.a:M.inputBd}`,background:selectedRows.has(rowId)?A.a:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto",transition:"all .1s"}}>
+                        {selectedRows.has(rowId)&&<span style={{color:"#fff",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
+                      </div>
+                    </td>
+                    {/* Row # */}
+                    <td style={{padding:`${pyV}px 6px`,borderRight:`1px solid ${M.divider}`,fontFamily:"'IBM Plex Mono',monospace",fontSize:9,color:M.textD,textAlign:"center"}}>{String(i+1).padStart(2,"0")}</td>
+                    {/* Data cells */}
+                    {fields.map((f,fi)=>{
+                      const isAuto=f.auto||["calc","autocode"].includes(f.type);
+                      const val=row[f.col];
+                      const isFirst=fi===0;
+                      return(
+                        <td key={f.col} style={{padding:`${pyV-1}px 8px`,borderRight:`1px solid ${M.divider}`,maxWidth:200,overflow:"hidden"}}>
+                          {isAuto?(
+                            <span style={{display:"inline-block",background:A.al,color:A.a,borderRadius:3,padding:"2px 8px",fontSize:fz-3,fontWeight:700,fontFamily:"'IBM Plex Mono',monospace"}}>{val||"auto"}</span>
+                          ):val?(
+                            <span style={{fontSize:fz-2,color:isFirst?A.a:M.textA,fontWeight:isFirst?700:400,fontFamily:["manual","autocode"].includes(f.type)?"'IBM Plex Mono',monospace":"inherit",display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{val}</span>
+                          ):(
+                            <span style={{fontSize:fz-3,color:M.textD,fontStyle:"italic"}}>—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                    {/* Edit button */}
+                    <td style={{padding:`${pyV}px 8px`,textAlign:"center",borderRight:"none"}}>
+                      <button onClick={()=>onLoad&&onLoad(row)} style={{padding:"3px 10px",background:M.surfLow,border:`1px solid ${M.inputBd}`,borderRadius:3,color:M.textB,fontSize:9,fontWeight:800,cursor:"pointer"}}>✏️ Edit</button>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
+
+            {/* ── AGG Footer ── */}
+            <tfoot>
+              <tr style={{background:M.surfMid,borderTop:`2px solid ${M.divider}`}}>
+                <td style={{padding:`${pyV}px 8px`,borderRight:`1px solid ${M.divider}`,textAlign:"center"}}>
+                  <span style={{fontSize:10,fontWeight:900,color:M.textD}}>Σ</span>
+                </td>
+                <td style={{padding:`${pyV}px 6px`,borderRight:`1px solid ${M.divider}`,fontSize:8,fontWeight:900,color:M.textD,textAlign:"center",whiteSpace:"nowrap"}}>AGG</td>
+                {fields.map(f=>(
+                  <td key={f.col} style={{padding:`${pyV-1}px 4px`,borderRight:`1px solid ${M.divider}`}}>
+                    <button style={{fontSize:8.5,color:M.textD,background:"transparent",border:`1px dashed ${M.inputBd}`,borderRadius:3,padding:"2px 8px",cursor:"pointer",fontWeight:700,whiteSpace:"nowrap"}}>+ Calculate</button>
+                  </td>
+                ))}
+                <td style={{padding:`${pyV}px 8px`}}/>
+              </tr>
+            </tfoot>
           </table>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
@@ -1412,7 +1582,7 @@ export default function App(){
               </>
             )}
             {mainTab==="specs"&&<SpecTable master={master} M={M} A={A} fz={fz} pyV={pyV} tblStyle={cfg.tblStyle}/>}
-            {mainTab==="records"&&<RecordsTab master={master} M={M} A={A} fz={fz} pyV={pyV} onLoad={loadRecord}/>}
+            {mainTab==="records"&&<RecordsTab master={master} M={M} A={A} fz={fz} pyV={pyV} onLoad={loadRecord} visibleCols={visibleCols}/>}
             {mainTab==="bulk"&&<BulkMasterEntry master={master} M={M} A={A} fz={fz} pyV={pyV} visibleCols={visibleCols}/>}
           </div>
 

@@ -58,20 +58,25 @@ var MAX_ATTR_PAIRS = 6;
  * Attribute column layout per master sheet.
  * firstNameCol: 1-based column number of the first Attr Name column.
  * Each subsequent pair is +2 from the previous.
- * categoryCols: 1-based column(s) where Category code lives.
+ * categoryCol: 1-based column where the L2 Category code lives.
+ *
+ * V9 update: L1 Division inserted at col D (col 4) for all three masters.
+ * - TRIM_MASTER:       30 cols; L2 Category at col 5; Attr 1 Name at col 18
+ * - CONSUMABLE_MASTER: 23 cols; L2 Category at col 5; Attr 1 Name at col 15
+ * - PACKAGING_MASTER:  23 cols; L2 Category at col 5; Attr 1 Name at col 15
  */
 var ATTR_COLUMN_MAP = {
   TRIM_MASTER: {
-    firstNameCol: 17,
-    categoryCol: 4
+    firstNameCol: 18, // V9: shifted +1 (was 17); Attr cols now 18,19,20,21,22,23,24,25,26,27,28,29
+    categoryCol:  5   // V9: L1 Division at col 4; L2 Category shifted to col 5
   },
   CONSUMABLE_MASTER: {
-    firstNameCol: 17,
-    categoryCol: 4
+    firstNameCol: 15, // V9: 23-col layout; Status at col 14; Attr 1 Name at col 15
+    categoryCol:  5   // V9: L1 Division at col 4; L2 Category shifted to col 5
   },
   PACKAGING_MASTER: {
-    firstNameCol: 17,
-    categoryCol: 4
+    firstNameCol: 15, // V9: 23-col layout; Status at col 14; Attr 1 Name at col 15
+    categoryCol:  5   // V9: L1 Division at col 4; L2 Category shifted to col 5
   }
 };
 
@@ -154,8 +159,8 @@ function getAttrSheetNames(masterSheetName) {
  * Direction 1: Auto-fills attr name columns when category changes.
  *
  * Reads ATTR_NAMES for the given category, writes the attribute names into
- * the Name columns (17, 19, 21, 23, 25, 27) of the specified row, and
- * clears the corresponding Value columns (18, 20, 22, 24, 26, 28).
+ * the Name columns for the given master (e.g. TRIM: 18,20,22,24,26,28;
+ * CONSUMABLE/PACKAGING: 15,17,19,21) and clears the corresponding Value columns.
  *
  * Unused attr slots (beyond the category's count) are also cleared.
  *

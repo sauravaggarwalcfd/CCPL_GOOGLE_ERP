@@ -386,11 +386,11 @@ function setupAllTriggers() {
 function getCategoryColumn_(sheetName) {
   switch (sheetName) {
     case CONFIG.SHEETS.TRIM_MASTER:
-      return 4; // Trim Category
+      return 5; // V9: L2 Trim Category (L1 Division inserted at col 4; category shifted to col 5)
     case CONFIG.SHEETS.CONSUMABLE_MASTER:
-      return 4; // Consumable Category
+      return 5; // V9: L2 Category (L1 Division inserted at col 4; category shifted to col 5)
     case CONFIG.SHEETS.PACKAGING_MASTER:
-      return 4; // Packaging Category
+      return 5; // V9: L2 Category (L1 Division inserted at col 4; category shifted to col 5)
     default:
       return null; // No category column (simple sequential)
   }

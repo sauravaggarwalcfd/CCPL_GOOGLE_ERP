@@ -1366,7 +1366,9 @@ function _rowMatchesFilter(row, filters) {
 function _generateCodeForSheet(sheetName, formData) {
   // Try Module 1 function if available
   if (typeof generateItemCode === 'function') {
-    var category = formData['Trim Category'] || formData['Category'] || '';
+    // V9: headers renamed; check both old (V8) and new (V9) key names for compatibility
+    var category = formData['L2 Trim Category'] || formData['L2 Category'] ||
+                   formData['Trim Category']    || formData['Category'] || '';
     return generateItemCode(sheetName, category);
   }
 
@@ -1407,9 +1409,11 @@ function _generateCodeForSheet(sheetName, formData) {
   var prefix = codeFormat.prefix;
 
   // For per-category codes (TRIM, CONSUMABLE, PACKAGING), insert category
+  // V9: headers renamed; check both new (V9) and old (V8) key names for compatibility
   if (codeFormat.perCategory) {
-    var cat = formData['Trim Category'] || formData['Category'] || formData['Consumable Category'] ||
-              formData['Packaging Category'] || '';
+    var cat = formData['L2 Trim Category'] || formData['L2 Category']      ||
+              formData['Trim Category']    || formData['Category']          ||
+              formData['Consumable Category'] || formData['Packaging Category'] || '';
     if (cat) {
       prefix = codeFormat.prefix + cat + '-';
     } else {
