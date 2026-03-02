@@ -147,7 +147,12 @@ var API_ROUTES = {
   // -------------------------------------------------------------------------
   'getAllCategories':      handleGetAllCategories,
   'createCategory':       handleCreateCategory,
-  'updateCategory':       handleUpdateCategory
+  'updateCategory':       handleUpdateCategory,
+
+  // -------------------------------------------------------------------------
+  // V10 — Article Dropdowns + Live Dropdown Data
+  // -------------------------------------------------------------------------
+  'getArticleDropdowns':  handleGetArticleDropdowns
 };
 
 
@@ -1693,6 +1698,13 @@ function headerToKey_(header) {
  * GET all categories from ITEM_CATEGORIES sheet.
  * Params: { includeInactive: true|false }
  */
+/**
+ * GET all categories from ITEM_CATEGORIES sheet (V10 column-grouped layout).
+ * Reads 22 cols: A=#, B-D=Article, E-G=Fabric, H-J=Yarn, K-M=Woven,
+ *                N-P=Trim, Q-S=Consumable, T-V=Packaging
+ * Returns flat array of { l1, l2, l3, master, active:"Yes" } objects
+ * so the frontend can build cascading dropdowns per master.
+ */
 function handleGetAllCategories(params) {
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
   var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
@@ -1701,81 +1713,114 @@ function handleGetAllCategories(params) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 4) return [];
 
-  var data = sheet.getRange(4, 1, lastRow - 3, 9).getValues();
-  var includeInactive = params && params.includeInactive;
+  var data = sheet.getRange(4, 1, lastRow - 3, 22).getValues();
+
+  // Master definitions: [masterKey, startColIndex (0-based in data), l1Behavior]
+  var masters = [
+    ['ARTICLE',    1, 'SELECTABLE'],
+    ['RM-FABRIC',  4, 'FIXED'],
+    ['RM-YARN',    7, 'FIXED'],
+    ['RM-WOVEN',  10, 'FIXED'],
+    ['TRIM',      13, 'FIXED'],
+    ['CONSUMABLE',16, 'FIXED'],
+    ['PACKAGING', 19, 'FIXED']
+  ];
 
   var result = [];
-  for (var i = 0; i < data.length; i++) {
-    var row = data[i];
-    if (!row[0]) continue; // skip empty rows
-    var active = String(row[6]).trim();
-    if (!includeInactive && active !== 'Yes') continue;
-    result.push({
-      code:     String(row[0]).trim(),
-      l1:       String(row[1]).trim(),
-      l2:       String(row[2]).trim(),
-      l3:       String(row[3]).trim(),
-      master:   String(row[4]).trim(),
-      hsn:      String(row[5]).trim(),
-      active:   active,
-      remarks:  String(row[7]).trim(),
-      behavior: String(row[8]).trim()
-    });
+  for (var m = 0; m < masters.length; m++) {
+    var masterKey = masters[m][0];
+    var colIdx    = masters[m][1];
+    var behavior  = masters[m][2];
+
+    for (var i = 0; i < data.length; i++) {
+      var l1 = String(data[i][colIdx]     || '').trim();
+      var l2 = String(data[i][colIdx + 1] || '').trim();
+      var l3 = String(data[i][colIdx + 2] || '').trim();
+      if (!l1 && !l2 && !l3) continue; // empty row for this master
+
+      result.push({
+        l1:       l1,
+        l2:       l2,
+        l3:       l3,
+        master:   masterKey,
+        active:   'Yes',
+        behavior: behavior
+      });
+    }
   }
   return result;
 }
 
 /**
- * CREATE a new category row in ITEM_CATEGORIES.
- * Params: { code, l1, l2, l3, master, hsn, active, remarks, behavior }
+ * CREATE a new category in ITEM_CATEGORIES (V10 column-grouped layout).
+ * Params: { master, l1, l2, l3 }
+ * Finds the master's column group and appends L1/L2/L3 in the next empty row.
  */
 function handleCreateCategory(params) {
+  var master = params.master;
+  var l1 = params.l1 || '';
+  var l2 = params.l2 || '';
+  var l3 = params.l3 || '';
+
+  if (!master) throw new Error('master is required');
+  if (!l1 && !l2 && !l3) throw new Error('At least one of l1/l2/l3 is required');
+
+  var COL_MAP = {
+    'ARTICLE': 2, 'RM-FABRIC': 5, 'RM-YARN': 8, 'RM-WOVEN': 11,
+    'TRIM': 14, 'CONSUMABLE': 17, 'PACKAGING': 20
+  };
+  var startCol = COL_MAP[master];
+  if (!startCol) throw new Error('Unknown master: ' + master);
+
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
   var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
   if (!sheet) throw new Error('ITEM_CATEGORIES sheet not found');
 
-  // Auto-generate code if not provided
-  var code = params.code;
-  if (!code) {
-    var lastRow = sheet.getLastRow();
-    var maxNum = 0;
-    if (lastRow >= 4) {
-      var codes = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
-      for (var i = 0; i < codes.length; i++) {
-        var num = parseInt(String(codes[i][0]).replace('CAT-', ''), 10);
-        if (!isNaN(num) && num > maxNum) maxNum = num;
+  var lastRow = Math.max(sheet.getLastRow(), 3);
+  var targetRow = 4; // data starts at row 4
+
+  if (lastRow >= 4) {
+    var colData = sheet.getRange(4, startCol, lastRow - 3, 3).getValues();
+    for (var i = 0; i < colData.length; i++) {
+      if (String(colData[i][0]).trim() || String(colData[i][1]).trim() || String(colData[i][2]).trim()) {
+        targetRow = i + 5; // next row after this occupied row
       }
     }
-    code = 'CAT-' + ('000' + (maxNum + 1)).slice(-3);
   }
 
-  var newRow = [
-    code,
-    params.l1 || '',
-    params.l2 || '',
-    params.l3 || '',
-    params.master || '',
-    params.hsn || '',
-    params.active || 'Yes',
-    params.remarks || '',
-    params.behavior || ''
-  ];
-
-  sheet.appendRow(newRow);
+  // Write the data
+  sheet.getRange(targetRow, startCol, 1, 3).setValues([[l1, l2, l3]]);
+  // Update row number in column A
+  sheet.getRange(targetRow, 1).setValue(targetRow - 3);
 
   // Invalidate cache
   try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
 
-  return { saved: true, code: code, action: 'created' };
+  return { saved: true, master: master, l1: l1, l2: l2, l3: l3, action: 'created' };
 }
 
 /**
- * UPDATE an existing category row by catCode.
- * Params: { catCode, l1, l2, l3, master, hsn, active, remarks, behavior }
+ * UPDATE an existing category in ITEM_CATEGORIES (V10 column-grouped layout).
+ * Params: { master, oldL1, oldL2, oldL3, l1, l2, l3 }
+ * Finds the row by matching old L1/L2/L3 in the master's column group.
  */
 function handleUpdateCategory(params) {
-  var catCode = params.catCode;
-  if (!catCode) throw new Error('catCode is required');
+  var master = params.master;
+  if (!master) throw new Error('master is required');
+
+  var COL_MAP = {
+    'ARTICLE': 2, 'RM-FABRIC': 5, 'RM-YARN': 8, 'RM-WOVEN': 11,
+    'TRIM': 14, 'CONSUMABLE': 17, 'PACKAGING': 20
+  };
+  var startCol = COL_MAP[master];
+  if (!startCol) throw new Error('Unknown master: ' + master);
+
+  var oldL1 = String(params.oldL1 || '').trim();
+  var oldL2 = String(params.oldL2 || '').trim();
+  var oldL3 = String(params.oldL3 || '').trim();
+  var l1 = params.l1 || '';
+  var l2 = params.l2 || '';
+  var l3 = params.l3 || '';
 
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
   var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
@@ -1784,28 +1829,56 @@ function handleUpdateCategory(params) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 4) throw new Error('No data in sheet');
 
-  var codes = sheet.getRange(4, 1, lastRow - 3, 1).getValues();
+  var colData = sheet.getRange(4, startCol, lastRow - 3, 3).getValues();
   var rowIndex = -1;
-  for (var i = 0; i < codes.length; i++) {
-    if (String(codes[i][0]).trim() === catCode) { rowIndex = i + 4; break; }
+  for (var i = 0; i < colData.length; i++) {
+    if (String(colData[i][0]).trim() === oldL1 &&
+        String(colData[i][1]).trim() === oldL2 &&
+        String(colData[i][2]).trim() === oldL3) {
+      rowIndex = i + 4;
+      break;
+    }
   }
-  if (rowIndex === -1) throw new Error('Category not found: ' + catCode);
+  if (rowIndex === -1) throw new Error('Category not found: ' + oldL1 + ' / ' + oldL2 + ' / ' + oldL3);
 
-  // Update fields (skip code in col 1)
-  var updates = [
-    params.l1 || '',
-    params.l2 || '',
-    params.l3 || '',
-    params.master || '',
-    params.hsn || '',
-    params.active || 'Yes',
-    params.remarks || '',
-    params.behavior || ''
-  ];
-  sheet.getRange(rowIndex, 2, 1, 8).setValues([updates]);
+  sheet.getRange(rowIndex, startCol, 1, 3).setValues([[l1, l2, l3]]);
 
   // Invalidate cache
   try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
 
-  return { saved: true, code: catCode, action: 'updated' };
+  return { saved: true, master: master, l1: l1, l2: l2, l3: l3, action: 'updated' };
+}
+
+
+// =============================================================================
+// ARTICLE DROPDOWNS — Read from ARTICLE_DROPDOWNS sheet
+// =============================================================================
+
+/**
+ * GET all dropdown values from the ARTICLE_DROPDOWNS sheet.
+ * Columns: A=Gender, B=Fit Type, C=Neckline, D=Sleeve Type, E=Status, F=Season
+ * Returns: { gender:[], fit:[], neckline:[], sleeve:[], status:[], season:[] }
+ */
+function handleGetArticleDropdowns(params) {
+  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
+  var sheet = ss.getSheetByName('ARTICLE_DROPDOWNS');
+  if (!sheet) return { gender: [], fit: [], neckline: [], sleeve: [], status: [], season: [] };
+
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { gender: [], fit: [], neckline: [], sleeve: [], status: [], season: [] };
+
+  var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var keys = ['gender', 'fit', 'neckline', 'sleeve', 'status', 'season'];
+  var result = {};
+  for (var k = 0; k < keys.length; k++) result[keys[k]] = [];
+
+  for (var i = 0; i < data.length; i++) {
+    for (var c = 0; c < 6; c++) {
+      var val = String(data[i][c] || '').trim();
+      if (val && result[keys[c]].indexOf(val) === -1) {
+        result[keys[c]].push(val);
+      }
+    }
+  }
+  return result;
 }

@@ -29,27 +29,27 @@ const DIVISION_META = {
 };
 
 // ─── Derive DIVISIONS, L2_BY_DIV, L2_HSN from ITEM_CATEGORIES seed data ───
-import { SEED_DATA as CAT_SEED } from './ItemCategoryTab';
+// These serve as FALLBACK defaults — live data is fetched from GAS API on mount
+import { SEED_DATA as CAT_SEED, CATEGORY_HIERARCHY } from './ItemCategoryTab';
 
-// Build from ARTICLE categories in SEED_DATA (single source of truth = ITEM_CATEGORIES sheet)
 const _articleCats = CAT_SEED.filter(c => c.master === "ARTICLE" && c.active === "Yes");
-const DIVISIONS = [...new Set(_articleCats.map(c => c.l1))];
-const L2_BY_DIV = {};
-const L3_BY_L2 = {};
-const L2_HSN = {};
+const INIT_DIVISIONS = [...new Set(_articleCats.map(c => c.l1))];
+const INIT_L2_BY_DIV = {};
+const INIT_L3_BY_L2 = {};
+const INIT_L2_HSN = {};
 for (const c of _articleCats) {
-  if (!L2_BY_DIV[c.l1]) L2_BY_DIV[c.l1] = [];
-  if (!L2_BY_DIV[c.l1].includes(c.l2)) L2_BY_DIV[c.l1].push(c.l2);
-  if (!L3_BY_L2[c.l2]) L3_BY_L2[c.l2] = [];
-  if (c.l3 && !L3_BY_L2[c.l2].includes(c.l3)) L3_BY_L2[c.l2].push(c.l3);
-  if (c.hsn && !L2_HSN[c.l2]) L2_HSN[c.l2] = c.hsn;
+  if (!INIT_L2_BY_DIV[c.l1]) INIT_L2_BY_DIV[c.l1] = [];
+  if (!INIT_L2_BY_DIV[c.l1].includes(c.l2)) INIT_L2_BY_DIV[c.l1].push(c.l2);
+  if (!INIT_L3_BY_L2[c.l2]) INIT_L3_BY_L2[c.l2] = [];
+  if (c.l3 && !INIT_L3_BY_L2[c.l2].includes(c.l3)) INIT_L3_BY_L2[c.l2].push(c.l3);
+  if (c.hsn && !INIT_L2_HSN[c.l2]) INIT_L2_HSN[c.l2] = c.hsn;
 }
 
-const FIT_OPTS     = ["Regular", "Slim", "Relaxed", "Oversized", "Crop"];
-const NECK_OPTS    = ["Round Neck", "V-Neck", "Polo", "Henley", "Hood", "Crew Neck", "Quarter Zip"];
-const SLEEVE_OPTS  = ["Half Sleeve", "Full Sleeve", "Sleeveless", "Cap Sleeve"];
-const GENDER_OPTS  = ["Men", "Women", "Unisex", "Kids"];
-const STATUS_OPTS  = ["Active", "Development", "Inactive"];
+const INIT_FIT_OPTS     = ["Regular", "Slim", "Relaxed", "Oversized", "Crop"];
+const INIT_NECK_OPTS    = ["Round Neck", "V-Neck", "Polo", "Henley", "Hood", "Crew Neck", "Quarter Zip"];
+const INIT_SLEEVE_OPTS  = ["Half Sleeve", "Full Sleeve", "Sleeveless", "Cap Sleeve"];
+const INIT_GENDER_OPTS  = ["Men", "Women", "Unisex", "Kids"];
+const INIT_STATUS_OPTS  = ["Active", "Development", "Inactive"];
 
 // ── Seed data — 23 sample Article Master records ──
 const AM_SEED_DATA = [
@@ -418,6 +418,64 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   const [editItem,    setEditItem]   = useState(null);
   const [selectedArt, setSelectedArt] = useState(null);
 
+  // ─── LIVE DROPDOWN STATE (initialized with fallback seed data) ───
+  const [divisions, setDivisions]     = useState(INIT_DIVISIONS);
+  const [l2ByDiv, setL2ByDiv]         = useState(INIT_L2_BY_DIV);
+  const [l3ByL2, setL3ByL2]           = useState(INIT_L3_BY_L2);
+  const [l2Hsn, setL2Hsn]             = useState(INIT_L2_HSN);
+  const [genderOpts, setGenderOpts]   = useState(INIT_GENDER_OPTS);
+  const [fitOpts, setFitOpts]         = useState(INIT_FIT_OPTS);
+  const [neckOpts, setNeckOpts]       = useState(INIT_NECK_OPTS);
+  const [sleeveOpts, setSleeveOpts]   = useState(INIT_SLEEVE_OPTS);
+  const [statusOpts, setStatusOpts]   = useState(INIT_STATUS_OPTS);
+
+  // ─── FETCH LIVE DATA from GAS on mount ───
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchLiveData() {
+      // 1. Fetch categories for L1/L2/L3 hierarchy
+      try {
+        const cats = await api.getItemCategories();
+        if (!cancelled && Array.isArray(cats) && cats.length > 0) {
+          const artCats = cats.filter(c => c.master === 'ARTICLE');
+          if (artCats.length > 0) {
+            const newDiv = [...new Set(artCats.map(c => c.l1))];
+            const newL2 = {}, newL3 = {}, newHsn = {};
+            for (const c of artCats) {
+              if (!newL2[c.l1]) newL2[c.l1] = [];
+              if (!newL2[c.l1].includes(c.l2)) newL2[c.l1].push(c.l2);
+              if (!newL3[c.l2]) newL3[c.l2] = [];
+              if (c.l3 && !newL3[c.l2].includes(c.l3)) newL3[c.l2].push(c.l3);
+            }
+            const h = CATEGORY_HIERARCHY['ARTICLE'];
+            if (h && h.defaultHSN) Object.assign(newHsn, h.defaultHSN);
+            setDivisions(newDiv);
+            setL2ByDiv(newL2);
+            setL3ByL2(newL3);
+            setL2Hsn(newHsn);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch categories from GAS:', err);
+      }
+      // 2. Fetch article dropdowns (Gender, Fit, Neckline, Sleeve, Status, Season)
+      try {
+        const dd = await api.getArticleDropdowns();
+        if (!cancelled && dd) {
+          if (dd.gender?.length)   setGenderOpts(dd.gender);
+          if (dd.fit?.length)      setFitOpts(dd.fit);
+          if (dd.neckline?.length) setNeckOpts(dd.neckline);
+          if (dd.sleeve?.length)   setSleeveOpts(dd.sleeve);
+          if (dd.status?.length)   setStatusOpts(dd.status);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch article dropdowns from GAS:', err);
+      }
+    }
+    fetchLiveData();
+    return () => { cancelled = true; };
+  }, []);
+
   // ─── ORG HIERARCHY (l1Division → l2Category → articles) ───
   const orgHierarchy = useMemo(() => {
     const h = {};
@@ -429,9 +487,9 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       if (!h[l1].l2s[r.l2Category]) h[l1].l2s[r.l2Category] = [];
       h[l1].l2s[r.l2Category].push(r);
     });
-    // Preserve DIVISIONS order
-    return DIVISIONS.map(d => h[d]).filter(Boolean);
-  }, [data]);
+    // Preserve divisions order
+    return divisions.map(d => h[d]).filter(Boolean);
+  }, [data, divisions]);
 
   // ─── AUDIT LOG ───
   const [auditLog, setAuditLog] = useState([
@@ -457,7 +515,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     setFormErrors({});
   };
   const setL2Category = (v) => {
-    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: L2_HSN[v] || "", desc: buildDesc(f.l1Division, v, "") }));
+    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: l2Hsn[v] || "", desc: buildDesc(f.l1Division, v, "") }));
     setFormErrors({});
   };
   const setL3Style = (v) => {
@@ -465,8 +523,8 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     setFormErrors({});
   };
 
-  const l2Opts = form.l1Division ? (L2_BY_DIV[form.l1Division] || []) : [];
-  const l3Opts = form.l2Category ? (L3_BY_L2[form.l2Category] || []) : [];
+  const l2Opts = form.l1Division ? (l2ByDiv[form.l1Division] || []) : [];
+  const l3Opts = form.l2Category ? (l3ByL2[form.l2Category] || []) : [];
 
   // ─── Article code validation (4-5 digits + 2 CAPS, e.g. 5249HP) ───
   const ARTICLE_CODE_REGEX = /^[0-9]{4,5}[A-Z]{2}$/;
@@ -610,7 +668,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 <select value={form.l1Division} onChange={e => setL1Division(e.target.value)}
                   style={{ ...inp, borderColor: formErrors.l1Division ? '#ef4444' : M.inBd }}>
                   <option value="">Select Division…</option>
-                  {DIVISIONS.map(d => <option key={d} value={d}>{divIcon(d)} {d}</option>)}
+                  {divisions.map(d => <option key={d} value={d}>{divIcon(d)} {d}</option>)}
                 </select>
                 {formErrors.l1Division && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.l1Division}</div>}
               </div>
@@ -662,28 +720,28 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 <label style={lbl}>Gender</label>
                 <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} style={inp}>
                   <option value="">—</option>
-                  {GENDER_OPTS.map(g => <option key={g} value={g}>{g}</option>)}
+                  {genderOpts.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Fit Type</label>
                 <select value={form.fitType} onChange={e => setForm(f => ({ ...f, fitType: e.target.value }))} style={inp}>
                   <option value="">—</option>
-                  {FIT_OPTS.map(x => <option key={x} value={x}>{x}</option>)}
+                  {fitOpts.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Neckline</label>
                 <select value={form.neckline} onChange={e => setForm(f => ({ ...f, neckline: e.target.value }))} style={inp}>
                   <option value="">—</option>
-                  {NECK_OPTS.map(x => <option key={x} value={x}>{x}</option>)}
+                  {neckOpts.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
               <div>
                 <label style={lbl}>Sleeve Type</label>
                 <select value={form.sleeveType} onChange={e => setForm(f => ({ ...f, sleeveType: e.target.value }))} style={inp}>
                   <option value="">—</option>
-                  {SLEEVE_OPTS.map(x => <option key={x} value={x}>{x}</option>)}
+                  {sleeveOpts.map(x => <option key={x} value={x}>{x}</option>)}
                 </select>
               </div>
             </div>
@@ -708,7 +766,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
               <div>
                 <label style={lbl}>Status</label>
                 <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inp}>
-                  {STATUS_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
             </div>
@@ -922,12 +980,12 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
         <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)}
           style={{ padding: '4px 7px', border: `1px solid ${filterDiv !== 'ALL' ? A.a : M.inBd}`, borderRadius: 6, background: M.inBg, color: filterDiv !== 'ALL' ? A.a : M.tB, fontSize: fz - 3, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
           <option value="ALL">All Divisions</option>
-          {DIVISIONS.map(d => <option key={d} value={d}>{d}</option>)}
+          {divisions.map(d => <option key={d} value={d}>{d}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{ padding: '4px 7px', border: `1px solid ${filterStatus !== 'ALL' ? A.a : M.inBd}`, borderRadius: 6, background: M.inBg, color: filterStatus !== 'ALL' ? A.a : M.tB, fontSize: fz - 3, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
           <option value="ALL">All Status</option>
-          {STATUS_OPTS.map(s => <option key={s} value={s}>{s}</option>)}
+          {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <button onClick={() => showToast('Use "➕ Create Article" tab to add a new article', 'info')}
           style={{ padding: '5px 13px', background: CC_RED, border: 'none', borderRadius: 6, fontSize: fz - 2, fontWeight: 900, color: '#fff', cursor: 'pointer', fontFamily: uff, flexShrink: 0 }}>
@@ -2454,7 +2512,7 @@ export function ArticleMasterLayoutPanel({ M: rawM, A, uff, dff, canEdit = true,
       if (!h[l1val].l2s[l2val]) h[l1val].l2s[l2val] = [];
       h[l1val].l2s[l2val].push(r);
     });
-    if (groupByL1 === "l1Division") return DIVISIONS.map(d => h[d]).filter(Boolean);
+    if (groupByL1 === "l1Division") return divisions.map(d => h[d]).filter(Boolean);
     return Object.keys(h).sort().map(k => h[k]);
   }, [processedData, groupByL1, groupByL2]);
 

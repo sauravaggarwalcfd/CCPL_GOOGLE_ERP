@@ -70,10 +70,13 @@ const api = {
   saveMasterRecord: (sheet, file, record, isEdit) => request('saveMasterRecord', { sheet, file, record, isEdit }),
   deleteMasterRecord: (sheet, file, code) => request('deleteMasterRecord', { sheet, file, code }),
 
-  // Item Categories
+  // Item Categories (V10 column-grouped layout)
   getItemCategories: (includeInactive) => request('getAllCategories', { includeInactive }),
   createCategory: (data) => request('createCategory', data),
-  updateCategory: (catCode, updates) => request('updateCategory', { catCode, ...updates }),
+  updateCategory: (updates) => request('updateCategory', updates),
+
+  // Article Dropdowns (from ARTICLE_DROPDOWNS sheet)
+  getArticleDropdowns: () => request('getArticleDropdowns'),
 
   // Procurement — PO detail
   getPODetail: (poCode) => request('getPODetail', { poCode }),

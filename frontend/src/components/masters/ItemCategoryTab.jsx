@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import api from '../../services/api';
 import SortPanel    from './SortPanel';
 import ColumnPanel  from './ColumnPanel';
@@ -402,6 +402,61 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
     addToast(msg, TOAST_COLORS[colorKey] || colorKey || TOAST_COLORS.success);
 
   const [data, setData] = useState(SEED_DATA);
+  const [loading, setLoading] = useState(true);
+
+  // ─── FETCH LIVE DATA from GAS on mount ───
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchCategories() {
+      try {
+        const apiData = await api.getItemCategories();
+        if (!cancelled && Array.isArray(apiData) && apiData.length > 0) {
+          const rows = apiData.map((row, idx) => {
+            const h = CATEGORY_HIERARCHY[row.master];
+            const hsn = (h && h.defaultHSN && h.defaultHSN[row.l2]) || '';
+            return {
+              code: `CAT-${String(idx + 1).padStart(3, '0')}`,
+              l1: row.l1 || '', l2: row.l2 || '', l3: row.l3 || '',
+              master: row.master || '', hsn,
+              active: row.active || 'Yes', remarks: '',
+              behavior: row.behavior || '',
+            };
+          });
+          setData(rows);
+          // Rebuild CATEGORY_HIERARCHY from live data
+          for (const masterKey of Object.keys(CATEGORY_HIERARCHY)) {
+            const h = CATEGORY_HIERARCHY[masterKey];
+            const cats = rows.filter(c => c.master === masterKey && c.active === 'Yes');
+            if (!cats.length) continue;
+            if (h.l1Behavior === 'SELECTABLE') h.l1Options = [...new Set(cats.map(c => c.l1))];
+            const l2Map = {};
+            for (const c of cats) {
+              const l1Key = h.l1Behavior === 'FIXED' ? h.l1Fixed : c.l1;
+              if (!l2Map[l1Key]) l2Map[l1Key] = [];
+              if (!l2Map[l1Key].includes(c.l2)) l2Map[l1Key].push(c.l2);
+            }
+            h.l2Options = l2Map;
+            const l3Map = {};
+            for (const c of cats) {
+              if (!l3Map[c.l2]) l3Map[c.l2] = [];
+              if (c.l3 && !l3Map[c.l2].includes(c.l3)) l3Map[c.l2].push(c.l3);
+            }
+            h.l3Options = l3Map;
+            const hsnMap = {};
+            for (const c of cats) { if (c.hsn && !hsnMap[c.l2]) hsnMap[c.l2] = c.hsn; }
+            h.defaultHSN = hsnMap;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to fetch categories from GAS, using fallback seed data:', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchCategories();
+    return () => { cancelled = true; };
+  }, []);
+
   const [tab, setTab] = useState("layout");
   const [layoutTab, setLayoutTab] = useState("classic");
 
@@ -525,15 +580,15 @@ export default function ItemCategoryTab({ M: rawM, A, uff, dff }) {
       setData(prev => prev.map(d => d.code === editItem.code ? { ...d, ...form, behavior: hierarchy.l1Behavior } : d));
       showToast(`✓ Updated ${editItem.code}`, 'success');
       addLog('EDIT', `Updated ${editItem.code} — ${form.l3}`, { before, after });
-      // API call
-      try { await api.updateCategory(editItem.code, { ...form, behavior: hierarchy.l1Behavior }); } catch {}
+      // API call (V10: identify by master + old L1/L2/L3)
+      try { await api.updateCategory({ master: form.master, oldL1: editItem.l1, oldL2: editItem.l2, oldL3: editItem.l3, l1: form.l1, l2: form.l2, l3: form.l3 }); } catch {}
       setEditItem(null);
     } else {
       const newItem = { code: nextCode, ...form, behavior: hierarchy.l1Behavior };
       setData(prev => [...prev, newItem]);
       showToast(`✓ Created ${nextCode}`, 'success');
       addLog('ADD', `Added ${nextCode} — ${form.l3} in ${form.l1} › ${form.l2}`, null);
-      try { await api.createCategory(newItem); } catch {}
+      try { await api.createCategory({ master: form.master, l1: form.l1, l2: form.l2, l3: form.l3 }); } catch {}
     }
     setForm({ master: "", l1: "", l2: "", l3: "", hsn: "", active: "Yes", remarks: "" });
     setFormErrors({});
