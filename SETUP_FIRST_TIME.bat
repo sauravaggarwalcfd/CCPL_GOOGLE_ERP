@@ -46,9 +46,25 @@ call pm2-startup install
 echo      Done.
 echo.
 
+:: ── Auto-detect location ──
+set "BATDIR=%~dp0"
+if "%BATDIR:~-1%"=="\" set "BATDIR=%BATDIR:~0,-1%"
+
+:: Check if inside repo or standalone
+if exist "%BATDIR%\frontend\package.json" (
+    set "FRONTEND=%BATDIR%\frontend"
+) else if exist "%BATDIR%\CCPL_GOOGLE_ERP\frontend\package.json" (
+    set "FRONTEND=%BATDIR%\CCPL_GOOGLE_ERP\frontend"
+) else (
+    echo [INFO] No project found yet. Run START.bat to clone and start.
+    echo.
+    pause
+    exit /b 0
+)
+
 :: ── Install frontend dependencies ──
 echo Installing frontend dependencies...
-cd /d C:\CCPL_GOOGLE_ERP\frontend
+cd /d "%FRONTEND%"
 call npm install
 echo      Done.
 echo.
