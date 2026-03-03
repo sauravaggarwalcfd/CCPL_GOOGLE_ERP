@@ -507,7 +507,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   // ── Summary labels ──
   const sortLabel = sorts.length > 0 ? `⇅ ${sorts.length} sort${sorts.length > 1 ? 's' : ''}` : '⇅ Sort';
   const colLabel  = hiddenC.length > 0 ? `⫿ ${hiddenC.length} hidden` : '⫿ Columns';
-  const grpLabel  = groupBy ? `⊞ ${allFields.find(f => f.key === groupBy)?.label || groupBy}` : '⊞ Group';
+  const grpLabel  = groupBy ? `⊞ ${allFields.find(f => f.key === groupBy)?.header || groupBy}` : '⊞ Group';
 
   // ── Group by toggle (cycle: none → first groupable col → next → clear) ──
   const handleGroupToggle = () => {
@@ -669,7 +669,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           const hasVal = val !== undefined && val !== null && val !== '';
           return (
             <td key={f.key}
-              onClick={() => setDetailRow(row)}
+              onClick={() => openEdit(row)}
               style={{ padding: `${pyV - 1}px 8px`, borderRight: `1px solid ${M.divider}`, maxWidth: 240, overflow: 'hidden', cursor: 'pointer' }}
             >
               {f.badge ? (
@@ -761,7 +761,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         <select value={groupBy || ''} onChange={e => { setGroupBy(e.target.value || null); setSubGroupBy(null); }}
           style={{ padding: '4px 7px', border: `1px solid ${groupBy ? '#f59e0b' : M.inputBd}`, borderRadius: 6, background: groupBy ? 'rgba(245,158,11,.1)' : M.inputBg, color: groupBy ? '#f59e0b' : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
           <option value="">⊞ Group by…</option>
-          {allFields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+          {allFields.map(f => <option key={f.key} value={f.key}>{f.header}</option>)}
         </select>
 
         {/* Sub-group select */}
@@ -769,7 +769,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           <select value={subGroupBy || ''} onChange={e => setSubGroupBy(e.target.value || null)}
             style={{ padding: '4px 7px', border: `1px solid ${subGroupBy ? '#f59e0b' : M.inputBd}`, borderRadius: 6, background: subGroupBy ? 'rgba(245,158,11,.1)' : M.inputBg, color: subGroupBy ? '#f59e0b' : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
             <option value="">↳ Sub-group…</option>
-            {allFields.filter(f => f.key !== groupBy).map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            {allFields.filter(f => f.key !== groupBy).map(f => <option key={f.key} value={f.key}>{f.header}</option>)}
           </select>
         )}
 
@@ -945,7 +945,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
             const f = allFields.find(fl => fl.key === s.col);
             return (
               <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: M.surfHigh, border: '1px solid rgba(124,58,237,.3)', borderRadius: 20, padding: '2px 8px', fontSize: 9, fontWeight: 800, color: '#7C3AED', fontFamily: uff }}>
-                {f?.label || s.col} {s.dir === 'asc' ? '↑' : '↓'}
+                {f?.header || s.col} {s.dir === 'asc' ? '↑' : '↓'}
                 <span onClick={() => setSorts(prev => prev.filter((_, j) => j !== i))} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1 }}>×</span>
               </span>
             );
@@ -958,11 +958,11 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
       {groupBy && (
         <div style={{ background: 'rgba(245,158,11,.06)', borderBottom: '1px solid rgba(245,158,11,.2)', padding: '4px 16px', display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           <span style={{ fontSize: 9, fontWeight: 900, color: '#f59e0b', fontFamily: uff }}>GROUPED BY:</span>
-          <span style={{ fontSize: 9, fontWeight: 800, color: M.textA, fontFamily: uff }}>{allFields.find(f => f.key === groupBy)?.label || groupBy}</span>
+          <span style={{ fontSize: 9, fontWeight: 800, color: M.textA, fontFamily: uff }}>{allFields.find(f => f.key === groupBy)?.header || groupBy}</span>
           {subGroupBy && (
             <>
               <span style={{ fontSize: 9, color: M.textD, fontFamily: uff }}>then by</span>
-              <span style={{ fontSize: 9, fontWeight: 800, color: M.textA, fontFamily: uff }}>{allFields.find(f => f.key === subGroupBy)?.label || subGroupBy}</span>
+              <span style={{ fontSize: 9, fontWeight: 800, color: M.textA, fontFamily: uff }}>{allFields.find(f => f.key === subGroupBy)?.header || subGroupBy}</span>
             </>
           )}
           <button onClick={() => { setGroupBy(null); setSubGroupBy(null); }} style={{ fontSize: 9, color: '#f59e0b', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: uff, marginLeft: 4 }}>× Clear</button>
@@ -975,7 +975,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           <span style={{ fontSize: 9, fontWeight: 900, color: '#7C3AED', fontFamily: uff, marginRight: 4, paddingBottom: 2 }}>🔍 FILTERS:</span>
           {visCols.map(f => (
             <div key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <span style={{ fontSize: 7.5, fontWeight: 900, color: M.textD, fontFamily: uff, textTransform: 'uppercase', letterSpacing: 0.4 }}>{f.label}</span>
+              <span style={{ fontSize: 7.5, fontWeight: 900, color: M.textD, fontFamily: uff, textTransform: 'uppercase', letterSpacing: 0.4 }}>{f.header}</span>
               <input
                 value={filters[f.key] || ''}
                 onChange={e => setFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
@@ -1006,7 +1006,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                   <span style={{ fontSize: 9, color: M.textD, minWidth: 34, textAlign: 'right', fontWeight: 600, fontFamily: uff }}>{fi === 0 ? 'Where' : 'And'}</span>
                   <select value={fil.field} onChange={e => updateAdvFilter(fil.id, { field: e.target.value })}
                     style={{ ...ctrlSel, fontWeight: 700, color: '#0e7490', borderColor: '#0891B270', background: '#f0fdfa' }}>
-                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.header}</option>)}
                   </select>
                   <select value={fil.op} onChange={e => updateAdvFilter(fil.id, { op: e.target.value })} style={ctrlSel}>
                     {ops.map(op => <option key={op} value={op}>{op}</option>)}
@@ -1051,7 +1051,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                   <span style={{ fontSize: 9, color: M.textD, minWidth: 34, textAlign: 'right', fontWeight: 600, fontFamily: uff }}>{si === 0 ? 'Sort' : 'Then'}</span>
                   <select value={srt.field} onChange={e => updateAdvSort(srt.id, { field: e.target.value, value: '' })}
                     style={{ ...ctrlSel, fontWeight: 700, color: '#6d28d9', borderColor: '#7c3aed70', background: '#7c3aed10' }}>
-                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.label}</option>)}
+                    {allFields.map(fd => <option key={fd.key} value={fd.key}>{fd.header}</option>)}
                   </select>
                   <select value={srt.mode} onChange={e => updateAdvSort(srt.id, { mode: e.target.value, value: '' })} style={ctrlSel}>
                     {REC_SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
@@ -1091,7 +1091,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
               <button key={f.key}
                 onClick={() => setHiddenC(prev => isHidden ? prev.filter(k => k !== f.key) : [...prev, f.key])}
                 style={{ padding: '2px 9px', border: `1px solid ${isHidden ? M.inputBd : A.a}`, borderRadius: 12, background: isHidden ? M.surfMid : A.al, color: isHidden ? M.textD : A.a, fontSize: 9, fontWeight: isHidden ? 400 : 700, cursor: 'pointer', fontFamily: uff }}>
-                {isHidden ? '○ ' : '● '}{f.label}
+                {isHidden ? '○ ' : '● '}{f.header}
               </button>
             );
           })}
@@ -1116,7 +1116,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                   const fd = allFields.find(x => x.key === key);
                   return (
                     <span key={'col_' + key} style={chipF}>
-                      {fd?.label || key} <span style={{ fontWeight: 400, color: '#0891B2' }}>contains</span> <strong>{val}</strong>
+                      {fd?.header || key} <span style={{ fontWeight: 400, color: '#0891B2' }}>contains</span> <strong>{val}</strong>
                       <span onClick={() => setFilters(p => { const n = { ...p }; delete n[key]; return n; })} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
                     </span>
                   );
@@ -1126,7 +1126,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                   const fd = allFields.find(x => x.key === fil.field);
                   return (
                     <span key={fil.id} style={chipF}>
-                      {fd?.label || fil.field} <span style={{ fontWeight: 400, color: '#0891B2' }}>{fil.op}</span> <strong>{fil.value}</strong>
+                      {fd?.header || fil.field} <span style={{ fontWeight: 400, color: '#0891B2' }}>{fil.op}</span> <strong>{fil.value}</strong>
                       <span onClick={() => removeAdvFilter(fil.id)} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>
                     </span>
                   );
@@ -1144,7 +1144,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                   const mLabel = REC_SORT_MODES.find(m => m.value === srt.mode)?.label || srt.mode;
                   return (
                     <span key={srt.id} style={chipS}>
-                      {fd?.label || srt.field} <span style={{ fontWeight: 400, color: '#9333ea' }}>{mLabel}</span>{srt.value ? <> <strong>{srt.value}</strong></> : null}
+                      {fd?.header || srt.field} <span style={{ fontWeight: 400, color: '#9333ea' }}>{mLabel}</span>{srt.value ? <> <strong>{srt.value}</strong></> : null}
                       {advSorts.length > 1 && <span onClick={() => removeAdvSort(srt.id)} style={{ cursor: 'pointer', color: M.textD, fontSize: 11, lineHeight: 1, marginLeft: 1 }}>×</span>}
                     </span>
                   );
@@ -1216,7 +1216,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                           {f.required && <span style={{ color: '#ef4444', fontSize: 8, fontWeight: 900 }}>⚠</span>}
-                          <span style={{ fontSize: fz - 2, fontWeight: 700, color: fi === 0 ? A.a : activeSort ? '#7C3AED' : M.textA, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: colW(f) - 30 }}>{f.label}</span>
+                          <span style={{ fontSize: fz - 2, fontWeight: 700, color: fi === 0 ? A.a : activeSort ? '#7C3AED' : M.textA, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: colW(f) - 30 }}>{f.header}</span>
                           <span style={{ fontSize: 9, color: activeSort ? '#7C3AED' : M.textD, flexShrink: 0 }}>
                             {activeSort ? (activeSort.dir === 'asc' ? '↑' : '↓') : '↕'}
                           </span>
@@ -1242,7 +1242,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                     return (
                       <tr key={item.key} style={{ background: '#1e293b' }}>
                         <td colSpan={visCols.length + 3} style={{ padding: `${pyV}px 12px`, fontWeight: 900, fontSize: fz - 2, color: '#e2e8f0', fontFamily: uff }}>
-                          <span style={{ marginRight: 6 }}>{allFields.find(f => f.key === groupBy)?.label}:</span>
+                          <span style={{ marginRight: 6 }}>{allFields.find(f => f.key === groupBy)?.header}:</span>
                           <span style={{ color: '#cbd5e1' }}>{item.value}</span>
                           <span style={{
                             marginLeft: 10, fontSize: 8.5, fontWeight: 900,
@@ -1258,7 +1258,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                       <tr key={item.key} style={{ background: '#334155' }}>
                         <td colSpan={visCols.length + 3} style={{ padding: `${pyV}px 12px`, paddingLeft: 28, fontWeight: 700, fontSize: fz - 3, color: '#cbd5e1', fontFamily: uff }}>
                           <span style={{ marginRight: 5, color: '#94a3b8' }}>↳</span>
-                          <span style={{ marginRight: 6 }}>{allFields.find(f => f.key === subGroupBy)?.label}:</span>
+                          <span style={{ marginRight: 6 }}>{allFields.find(f => f.key === subGroupBy)?.header}:</span>
                           <span style={{ color: '#94a3b8' }}>{item.value}</span>
                           <span style={{
                             marginLeft: 8, fontSize: 8.5, fontWeight: 900,
@@ -1342,18 +1342,18 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                     </select>
                   );
                 } else if (f.type === 'textarea') {
-                  input = <textarea rows={3} disabled={isAuto} placeholder={f.header || `Enter ${f.label}…`} value={formData[f.key] || ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={{ ...baseStyle, resize: 'vertical', minHeight: 60 }} />;
+                  input = <textarea rows={3} disabled={isAuto} placeholder={`Enter ${f.header}…`} value={formData[f.key] || ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={{ ...baseStyle, resize: 'vertical', minHeight: 60 }} />;
                 } else if (f.type === 'date') {
                   input = <input type="date" disabled={isAuto} value={formData[f.key] || ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={baseStyle} />;
                 } else if (f.type === 'number') {
-                  input = <input type="number" disabled={isAuto} placeholder={f.header || `Enter ${f.label}…`} value={formData[f.key] ?? ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={baseStyle} />;
+                  input = <input type="number" disabled={isAuto} placeholder={`Enter ${f.header}…`} value={formData[f.key] ?? ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={baseStyle} />;
                 } else {
-                  input = <input type="text" disabled={isAuto} placeholder={f.header || `Enter ${f.label}…`} value={formData[f.key] || ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={baseStyle} />;
+                  input = <input type="text" disabled={isAuto} placeholder={`Enter ${f.header}…`} value={formData[f.key] || ''} onChange={e => setFormData(prev => ({ ...prev, [f.key]: e.target.value }))} style={baseStyle} />;
                 }
                 return (
                   <div key={f.key} style={{ marginBottom: 14 }}>
                     <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, fontWeight: 900, color: M.textC, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, fontFamily: uff }}>
-                      {f.label}
+                      {f.header}
                       {f.required && <span style={{ color: '#ef4444', fontSize: 11, lineHeight: 1 }}>*</span>}
                       {f.auto && <span style={{ color: M.textD, fontWeight: 600, textTransform: 'none', letterSpacing: 0, fontSize: 8 }}>(auto)</span>}
                     </label>
@@ -1414,7 +1414,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
             {/* Dark header */}
             <div style={{ background: '#1e293b', padding: '7px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 9, fontWeight: 900, color: '#e2e8f0', fontFamily: uff, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                {allFields.find(f => f.key === aggAnchor.col)?.label || aggAnchor.col}
+                {allFields.find(f => f.key === aggAnchor.col)?.header || aggAnchor.col}
               </span>
               <span onClick={() => setAggAnchor(null)} style={{ cursor: 'pointer', color: '#94a3b8', fontSize: 12, lineHeight: 1 }}>×</span>
             </div>

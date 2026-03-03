@@ -33,7 +33,9 @@
       "Bash(lsof:*)",
       "Bash(kill 146441:*)",
       "Bash(mkdir:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(ls:*)",
+      "Bash(npx react-scripts:*)"
     ]
   }
 }

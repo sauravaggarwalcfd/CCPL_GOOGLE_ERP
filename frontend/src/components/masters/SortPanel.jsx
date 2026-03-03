@@ -143,7 +143,7 @@ export default function SortPanel({ fields, sorts, onSorts, onClose, M, A, uff, 
                   <span style={{ fontSize: 9, fontWeight: 900, color: '#7C3AED', fontFamily: "'IBM Plex Mono',monospace", minWidth: 20 }}>#{idx + 1}</span>
                   {idx > 0 && <span style={{ fontSize: 9, color: M.textD, fontFamily: uff }}>then by</span>}
                   <select value={s.col} onChange={e => updateSort(idx, { col: e.target.value })} style={{ flex: 1, padding: '4px 6px', border: `1px solid ${M.inputBd}`, borderRadius: 4, background: M.inputBg, color: M.textA, fontSize: fz - 2, fontFamily: uff, outline: 'none', cursor: 'pointer' }}>
-                    {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                    {fields.map(f => <option key={f.key} value={f.key}>{f.header || f.label}</option>)}
                   </select>
                   <button
                     onClick={() => updateSort(idx, { dir: s.dir === 'asc' ? 'desc' : 'asc' })}
@@ -181,7 +181,7 @@ export default function SortPanel({ fields, sorts, onSorts, onClose, M, A, uff, 
               const f = fields.find(fl => fl.key === s.col);
               return (
                 <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(124,58,237,.1)', border: '1px solid rgba(124,58,237,.3)', borderRadius: 10, padding: '2px 7px', fontSize: 8.5, fontWeight: 800, color: '#7C3AED', fontFamily: uff }}>
-                  {i + 1} {f?.label || s.col} {s.dir === 'asc' ? '↑' : '↓'} {s.nulls === 'first' ? '∅↑' : ''}
+                  {i + 1} {f?.header || f?.label || s.col} {s.dir === 'asc' ? '↑' : '↓'} {s.nulls === 'first' ? '∅↑' : ''}
                 </span>
               );
             })}

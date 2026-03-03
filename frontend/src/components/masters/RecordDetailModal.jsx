@@ -87,7 +87,7 @@ function CardLayout({ visFields, record, codeKey, M, A, uff, dff, fz }) {
           return (
             <div key={f.key} style={{ gridColumn: f.type === 'textarea' ? '1 / -1' : undefined }}>
               <div style={{ fontSize: 8.5, fontWeight: 900, color: M.textD, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: uff }}>
-                {f.label}{f.required && <span style={{ color: '#ef4444', marginLeft: 3 }}>*</span>}
+                {f.header}{f.required && <span style={{ color: '#ef4444', marginLeft: 3 }}>*</span>}
               </div>
               <div style={{
                 fontSize: fz, fontWeight: f.key === codeKey ? 800 : f.badge ? 700 : 400,
@@ -129,7 +129,7 @@ function TableLayout({ visFields, record, codeKey, M, A, uff, dff, fz }) {
           return (
             <tr key={f.key} style={{ background: i % 2 === 0 ? M.tblEven : M.tblOdd, borderBottom: `1px solid ${M.divider}` }}>
               <td style={{ padding: '7px 14px', fontSize: fz - 2, fontWeight: 700, color: f.key === codeKey ? A.a : M.textC, fontFamily: uff, whiteSpace: 'nowrap', borderRight: `1px solid ${M.divider}`, width: 180 }}>
-                {f.label}
+                {f.header}
                 {f.required && <span style={{ color: '#ef4444', marginLeft: 3, fontSize: 9 }}>*</span>}
               </td>
               <td style={{ padding: '7px 14px', fontSize: fz - 1, color: M.textA, fontFamily: f.mono ? dff : uff }}>

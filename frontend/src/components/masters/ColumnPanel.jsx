@@ -90,7 +90,7 @@ export default function ColumnPanel({ fields, colOrder, hiddenC, onApply, onClos
 
                 {/* Label */}
                 <span style={{ flex: 1, fontSize: fz - 1, fontWeight: isFirst ? 900 : 700, color: isFirst ? A.a : M.textA, fontFamily: uff, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {f.label}
+                  {f.header || f.label}
                   {f.required && <span style={{ color: '#ef4444', fontSize: 9, marginLeft: 3 }}>*</span>}
                   {f.auto && <span style={{ fontSize: 8, color: M.textD, marginLeft: 4, fontWeight: 400 }}>(auto)</span>}
                 </span>

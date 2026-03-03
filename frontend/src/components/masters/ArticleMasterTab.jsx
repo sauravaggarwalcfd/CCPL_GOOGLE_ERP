@@ -95,16 +95,16 @@ const TOAST_COLORS = { success: '#15803d', delete: '#dc2626', view: '#7C3AED', i
 
 // ── Fields schema for records table ──
 const AM_FIELDS = [
-  { key: 'code',       label: 'Art Code',   w: 90,  mono: true },
-  { key: 'desc',       label: 'Description',w: 200 },
-  { key: 'l1Division', label: 'Division',   w: 130 },
-  { key: 'l2Category', label: 'Category',   w: 120 },
-  { key: 'gender',     label: 'Gender',     w: 75 },
-  { key: 'season',     label: 'Season',     w: 75 },
-  { key: 'wsp',        label: 'WSP ₹',      w: 75,  type: 'number' },
-  { key: 'mrp',        label: 'MRP ₹',      w: 75,  type: 'number' },
-  { key: 'hsnCode',    label: 'HSN',        w: 65,  mono: true },
-  { key: 'status',     label: 'Status',     w: 90,  badge: true },
+  { key: 'code',       label: '🔑 Article Code',      w: 120, mono: true },
+  { key: 'desc',       label: 'Article Description',   w: 200 },
+  { key: 'l1Division', label: 'L1 Division',           w: 130 },
+  { key: 'l2Category', label: 'L2 Product Category',   w: 140 },
+  { key: 'gender',     label: 'Gender',                w: 75 },
+  { key: 'season',     label: 'Season',                w: 75 },
+  { key: 'wsp',        label: 'W.S.P (Rs)',            w: 85,  type: 'number' },
+  { key: 'mrp',        label: 'MRP (Rs)',              w: 85,  type: 'number' },
+  { key: 'hsnCode',    label: '→ HSN Code',            w: 85,  mono: true },
+  { key: 'status',     label: 'Status',                w: 90,  badge: true },
 ];
 
 // ── Toast system ──
@@ -701,7 +701,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 {formErrors.l1Division && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.l1Division}</div>}
               </div>
               <div>
-                <label style={lbl}>L2 Category *</label>
+                <label style={lbl}>L2 Product Category *</label>
                 <select value={form.l2Category} onChange={e => setL2Category(e.target.value)}
                   disabled={!form.l1Division}
                   style={{ ...inp, borderColor: formErrors.l2Category ? '#ef4444' : M.inBd, opacity: form.l1Division ? 1 : 0.5 }}>
@@ -720,13 +720,13 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 </select>
               </div>
               <div>
-                <label style={lbl}>HSN Code</label>
+                <label style={lbl}>→ HSN Code</label>
                 <input value={form.hsnCode} onChange={e => setForm(f => ({ ...f, hsnCode: e.target.value }))}
                   style={inp} placeholder="Auto" />
                 <div style={{ fontSize: 7.5, color: M.tD, marginTop: 2 }}>Auto from L2</div>
               </div>
               <div>
-                <label style={lbl}>GST %</label>
+                <label style={lbl}>← GST % (Auto)</label>
                 <input value={form.gstPct} readOnly
                   style={{ ...inp, background: '#f0f4f0', cursor: 'default', textAlign: 'center', fontWeight: 700 }}
                   placeholder="—" />
@@ -737,7 +737,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
             {/* Row 2: Description (auto from L1›L2›L3) + Short Name */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, marginBottom: 14 }}>
               <div>
-                <label style={lbl}>Description (auto: L1 › L2 › L3)</label>
+                <label style={lbl}>Article Description (auto: L1 › L2 › L3)</label>
                 <input value={form.desc} readOnly
                   style={{ ...inp, background: '#f0f4f0', cursor: 'default', borderColor: formErrors.desc ? '#ef4444' : M.inBd }}
                   placeholder="Auto-filled from levels" />
@@ -816,12 +816,12 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
             {/* Row 5: WSP + MRP + Buyer Style + Tags */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
-                <label style={lbl}>WSP (₹)</label>
+                <label style={lbl}>W.S.P (Rs)</label>
                 <input type="number" value={form.wsp} onChange={e => setForm(f => ({ ...f, wsp: e.target.value }))}
                   style={inp} placeholder="0" />
               </div>
               <div>
-                <label style={lbl}>MRP (₹)</label>
+                <label style={lbl}>MRP (Rs)</label>
                 <input type="number" value={form.mrp} onChange={e => setForm(f => ({ ...f, mrp: e.target.value }))}
                   style={inp} placeholder="0" />
               </div>
@@ -831,7 +831,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                   style={inp} placeholder="Optional" />
               </div>
               <div>
-                <label style={lbl}>Tags</label>
+                <label style={lbl}>⟷ Tags</label>
                 <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
                   style={inp} placeholder="e.g. New, Featured" />
               </div>
@@ -1526,20 +1526,20 @@ function AM_ColumnNav({ hierarchy, M, A, uff, dff, fz, l1Label = "Division", l2L
 
 // ── Filterable / groupable / sortable field definitions ──
 const CARD_FIELDS = [
-  { key: 'l1Division', label: 'Division',    type: 'cat' },
-  { key: 'l1Category', label: 'L1 Category', type: 'cat' },
-  { key: 'l2Category', label: 'L2 Category', type: 'cat' },
-  { key: 'gender',     label: 'Gender',      type: 'cat' },
-  { key: 'season',     label: 'Season',      type: 'cat' },
-  { key: 'fitType',    label: 'Fit Type',    type: 'cat' },
-  { key: 'neckline',   label: 'Neckline',    type: 'cat' },
-  { key: 'sleeveType', label: 'Sleeve',      type: 'cat' },
-  { key: 'status',     label: 'Status',      type: 'cat' },
-  { key: 'wsp',        label: 'WSP ₹',      type: 'num' },
-  { key: 'mrp',        label: 'MRP ₹',      type: 'num' },
-  { key: 'hsnCode',    label: 'HSN Code',    type: 'cat' },
-  { key: 'code',       label: 'Art Code',    type: 'txt' },
-  { key: 'desc',       label: 'Description', type: 'txt' },
+  { key: 'l1Division', label: 'L1 Division',           type: 'cat' },
+  { key: 'l1Category', label: 'L1 Category',           type: 'cat' },
+  { key: 'l2Category', label: 'L2 Product Category',   type: 'cat' },
+  { key: 'gender',     label: 'Gender',                type: 'cat' },
+  { key: 'season',     label: 'Season',                type: 'cat' },
+  { key: 'fitType',    label: 'Fit Type',              type: 'cat' },
+  { key: 'neckline',   label: 'Neckline',              type: 'cat' },
+  { key: 'sleeveType', label: 'Sleeve Type',           type: 'cat' },
+  { key: 'status',     label: 'Status',                type: 'cat' },
+  { key: 'wsp',        label: 'W.S.P (Rs)',            type: 'num' },
+  { key: 'mrp',        label: 'MRP (Rs)',              type: 'num' },
+  { key: 'hsnCode',    label: '→ HSN Code',            type: 'cat' },
+  { key: 'code',       label: '🔑 Article Code',      type: 'txt' },
+  { key: 'desc',       label: 'Article Description',   type: 'txt' },
 ];
 const FILTER_OPS = {
   cat: ['is', 'is not', 'contains', 'starts with'],
