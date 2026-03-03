@@ -462,11 +462,23 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       try {
         const dd = await api.getArticleDropdowns();
         if (!cancelled && dd) {
-          if (dd.gender?.length)   setGenderOpts(dd.gender);
-          if (dd.fit?.length)      setFitOpts(dd.fit);
-          if (dd.neckline?.length) setNeckOpts(dd.neckline);
-          if (dd.sleeve?.length)   setSleeveOpts(dd.sleeve);
-          if (dd.status?.length)   setStatusOpts(dd.status);
+          // The GAS sheet has a 3-row header structure (Banner / Headers / Descriptions).
+          // Older GAS deployments read from row 2 instead of row 4, so the response may
+          // contain the header names ("Gender", "Fit Type", …) and description strings
+          // ("Men/Women/Kids/Unisex", "Regular/Slim/Relaxed/Oversized", …) mixed in with
+          // the real values. Filter those out before setting state.
+          const GARBAGE = new Set([
+            'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season',
+            'Men/Women/Kids/Unisex', 'Regular/Slim/Relaxed/Oversized',
+            'Round Neck/V-Neck/Collar etc.', 'Half/Full/Sleeveless etc.',
+            'Active/Inactive/Development', 'SS25/AW26 examples',
+          ]);
+          const clean = (arr) => (arr || []).filter(v => v && !GARBAGE.has(v));
+          const g = clean(dd.gender);   if (g.length)   setGenderOpts(g);
+          const f = clean(dd.fit);      if (f.length)   setFitOpts(f);
+          const n = clean(dd.neckline); if (n.length)   setNeckOpts(n);
+          const sl = clean(dd.sleeve);  if (sl.length)  setSleeveOpts(sl);
+          const st = clean(dd.status);  if (st.length)  setStatusOpts(st);
         }
       } catch (err) {
         console.warn('Failed to fetch article dropdowns from GAS:', err);
