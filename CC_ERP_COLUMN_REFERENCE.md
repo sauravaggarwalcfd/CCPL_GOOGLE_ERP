@@ -1,11 +1,13 @@
 # CC ERP — Complete Column Reference & Connection Guide
 
-> **Version:** V12.4 (3 Mar 2026) — FK Engine + Fabric SKU fixes
+> **Version:** V12.6 (3 Mar 2026) — Frontend Live Dropdowns & HSN Auto-Fill
 > **Files:** 4 Google Sheets | 56 Total Sheets | 24 GAS Files (14,407 lines) | React Frontend
 > **Generated:** 2 Mar 2026
 > **V9.1 Fixes:** Article Code manual entry, duplicate check self-match, L1/L2/L3 from ITEM_CATEGORIES
 > **V10 Changes:** ITEM_CATEGORIES restructured to column-grouped layout (22 cols). New ARTICLE_DROPDOWNS sheet. FK_DATA split per level. Auto-description (L1 › L2 › L3).
 > **V12.4 Fixes:** `_isFKColumn()` now recognizes `⟷` prefix → Yarn Names + Tags auto-fill works. Fabric SKU (col B) auto-builds from L3 Knit Type + Yarn Names.
+> **V12.5 Fixes:** Direct FK resolution bypassing MASTER_RELATIONS cache for reliable Yarn Name + Fabric Name lookups.
+> **V12.6 Fixes:** Frontend webapp now fetches all dropdowns live from GAS API. Season/Colour/Size Range dropdowns added. HSN → GST% auto-fill in webapp form. ARTICLE_DROPDOWNS API reads 7 columns (added Size Range col G).
 
 ---
 

@@ -1896,18 +1896,19 @@ function handleUpdateCategory(params) {
 /**
  * GET all dropdown values from the ARTICLE_DROPDOWNS sheet.
  * Sheet structure: Row 1=Banner, Row 2=Headers, Row 3=Descriptions, Row 4+=Data
- * Columns: A=Gender, B=Fit Type, C=Neckline, D=Sleeve Type, E=Status, F=Season
- * Returns: { gender:[], fit:[], neckline:[], sleeve:[], status:[], season:[] }
+ * Columns: A=Gender, B=Fit Type, C=Neckline, D=Sleeve Type, E=Status, F=Season, G=Size Range
+ * Returns: { gender:[], fit:[], neckline:[], sleeve:[], status:[], season:[], sizeRange:[] }
  */
 function handleGetArticleDropdowns(params) {
   // Sensible fallback values returned when sheet is missing or empty
   var defaults = {
-    gender:   ['Men', 'Women', 'Kids', 'Unisex'],
-    fit:      ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Crop', 'Athletic'],
-    neckline: ['Round Neck', 'V-Neck', 'Polo', 'Henley', 'Hood', 'Crew Neck', 'Quarter Zip', 'Mock Neck'],
-    sleeve:   ['Half Sleeve', 'Full Sleeve', 'Sleeveless', 'Cap Sleeve', '3/4 Sleeve', 'Raglan'],
-    status:   ['Active', 'Inactive', 'Development', 'Discontinued'],
-    season:   ['SS2024', 'AW2024', 'SS2025', 'AW2025', 'SS2026', 'AW2026', 'Year Round']
+    gender:    ['Men', 'Women', 'Kids', 'Unisex'],
+    fit:       ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Crop', 'Athletic'],
+    neckline:  ['Round Neck', 'V-Neck', 'Polo', 'Henley', 'Hood', 'Crew Neck', 'Quarter Zip', 'Mock Neck'],
+    sleeve:    ['Half Sleeve', 'Full Sleeve', 'Sleeveless', 'Cap Sleeve', '3/4 Sleeve', 'Raglan'],
+    status:    ['Active', 'Inactive', 'Development', 'Discontinued'],
+    season:    ['SS2024', 'AW2024', 'SS2025', 'AW2025', 'SS2026', 'AW2026', 'Year Round'],
+    sizeRange: ['S-M-L-XL-XXL', 'S-M-L-XL', 'M-L-XL-XXL', 'XS-S-M-L-XL', 'S-M-L', 'M-L-XL-XXL-3XL', 'Free Size', 'XS-S-M-L-XL-XXL-3XL']
   };
 
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
@@ -1918,13 +1919,13 @@ function handleGetArticleDropdowns(params) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 4) return defaults;
 
-  var data = sheet.getRange(4, 1, lastRow - 3, 6).getValues();
-  var keys = ['gender', 'fit', 'neckline', 'sleeve', 'status', 'season'];
+  var data = sheet.getRange(4, 1, lastRow - 3, 7).getValues();
+  var keys = ['gender', 'fit', 'neckline', 'sleeve', 'status', 'season', 'sizeRange'];
   var result = {};
   for (var k = 0; k < keys.length; k++) result[keys[k]] = [];
 
   for (var i = 0; i < data.length; i++) {
-    for (var c = 0; c < 6; c++) {
+    for (var c = 0; c < 7; c++) {
       var val = String(data[i][c] || '').trim();
       if (val && result[keys[c]].indexOf(val) === -1) {
         result[keys[c]].push(val);

@@ -50,6 +50,12 @@ const INIT_NECK_OPTS    = ["Round Neck", "V-Neck", "Polo", "Henley", "Hood", "Cr
 const INIT_SLEEVE_OPTS  = ["Half Sleeve", "Full Sleeve", "Sleeveless", "Cap Sleeve"];
 const INIT_GENDER_OPTS  = ["Men", "Women", "Unisex", "Kids"];
 const INIT_STATUS_OPTS  = ["Active", "Development", "Inactive"];
+const INIT_SEASON_OPTS  = ["SS2024", "AW2024", "SS2025", "AW2025", "SS2026", "AW2026", "Year Round"];
+const INIT_SIZE_RANGE_OPTS = ["S-M-L-XL-XXL", "S-M-L-XL", "M-L-XL-XXL", "XS-S-M-L-XL", "S-M-L", "M-L-XL-XXL-3XL", "Free Size", "XS-S-M-L-XL-XXL-3XL"];
+const INIT_COLOUR_OPTS  = ["Navy Blue", "White", "Black", "Charcoal Grey", "Red", "Royal Blue", "Olive Green", "Maroon", "Bottle Green", "Sky Blue", "Yellow", "Pink", "Orange", "Beige", "Cream", "Grey Melange"];
+
+// HSN → GST% mapping (from HSN_MASTER)
+const HSN_GST_MAP = { "6105": 5, "6109": 5, "6110": 12, "6112": 12, "6103": 5 };
 
 // ── Seed data — 23 sample Article Master records ──
 const AM_SEED_DATA = [
@@ -427,7 +433,10 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   const [fitOpts, setFitOpts]         = useState(INIT_FIT_OPTS);
   const [neckOpts, setNeckOpts]       = useState(INIT_NECK_OPTS);
   const [sleeveOpts, setSleeveOpts]   = useState(INIT_SLEEVE_OPTS);
-  const [statusOpts, setStatusOpts]   = useState(INIT_STATUS_OPTS);
+  const [statusOpts, setStatusOpts]       = useState(INIT_STATUS_OPTS);
+  const [seasonOpts, setSeasonOpts]       = useState(INIT_SEASON_OPTS);
+  const [sizeRangeOpts, setSizeRangeOpts] = useState(INIT_SIZE_RANGE_OPTS);
+  const [colourOpts, setColourOpts]       = useState(INIT_COLOUR_OPTS);
 
   // ─── FETCH LIVE DATA from GAS on mount ───
   useEffect(() => {
@@ -468,17 +477,19 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
           // ("Men/Women/Kids/Unisex", "Regular/Slim/Relaxed/Oversized", …) mixed in with
           // the real values. Filter those out before setting state.
           const GARBAGE = new Set([
-            'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season',
+            'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season', 'Size Range',
             'Men/Women/Kids/Unisex', 'Regular/Slim/Relaxed/Oversized',
             'Round Neck/V-Neck/Collar etc.', 'Half/Full/Sleeveless etc.',
-            'Active/Inactive/Development', 'SS25/AW26 examples',
+            'Active/Inactive/Development', 'SS25/AW26 examples', 'S-M-L-XL-XXL etc.',
           ]);
           const clean = (arr) => (arr || []).filter(v => v && !GARBAGE.has(v));
-          const g = clean(dd.gender);   if (g.length)   setGenderOpts(g);
-          const f = clean(dd.fit);      if (f.length)   setFitOpts(f);
-          const n = clean(dd.neckline); if (n.length)   setNeckOpts(n);
-          const sl = clean(dd.sleeve);  if (sl.length)  setSleeveOpts(sl);
-          const st = clean(dd.status);  if (st.length)  setStatusOpts(st);
+          const g  = clean(dd.gender);    if (g.length)  setGenderOpts(g);
+          const f  = clean(dd.fit);       if (f.length)  setFitOpts(f);
+          const n  = clean(dd.neckline);  if (n.length)  setNeckOpts(n);
+          const sl = clean(dd.sleeve);    if (sl.length) setSleeveOpts(sl);
+          const st = clean(dd.status);    if (st.length) setStatusOpts(st);
+          const sn = clean(dd.season);    if (sn.length) setSeasonOpts(sn);
+          const sr = clean(dd.sizeRange); if (sr.length) setSizeRangeOpts(sr);
         }
       } catch (err) {
         console.warn('Failed to fetch article dropdowns from GAS:', err);
@@ -515,7 +526,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   }, []);
 
   // ─── CREATE FORM STATE ───
-  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", l3Style: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", wsp: "", mrp: "", hsnCode: "", buyerStyle: "", status: "Active", tags: "" };
+  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", l3Style: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", colourNames: "", sizeRange: "", wsp: "", mrp: "", hsnCode: "", gstPct: "", buyerStyle: "", status: "Active", tags: "" };
   const [form, setForm]           = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
 
@@ -523,11 +534,13 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   const buildDesc = (l1, l2, l3) => [l1, l2, l3].filter(p => p && p.trim()).join(' › ');
 
   const setL1Division = (v) => {
-    setForm(f => ({ ...f, l1Division: v, l2Category: "", l3Style: "", hsnCode: "", desc: buildDesc(v, "", "") }));
+    setForm(f => ({ ...f, l1Division: v, l2Category: "", l3Style: "", hsnCode: "", gstPct: "", desc: buildDesc(v, "", "") }));
     setFormErrors({});
   };
   const setL2Category = (v) => {
-    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: l2Hsn[v] || "", desc: buildDesc(f.l1Division, v, "") }));
+    const hsn = l2Hsn[v] || "";
+    const gst = hsn ? (HSN_GST_MAP[hsn] || "") : "";
+    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: hsn, gstPct: gst, desc: buildDesc(f.l1Division, v, "") }));
     setFormErrors({});
   };
   const setL3Style = (v) => {
@@ -589,8 +602,11 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       l3Style: item.l3Style || "",
       gender: item.gender || "", fitType: item.fitType || "",
       neckline: item.neckline || "", sleeveType: item.sleeveType || "",
-      season: item.season || "", wsp: item.wsp || "", mrp: item.mrp || "",
-      hsnCode: item.hsnCode || "", buyerStyle: item.buyerStyle || "",
+      season: item.season || "", colourNames: item.colourNames || "",
+      sizeRange: item.sizeRange || "",
+      wsp: item.wsp || "", mrp: item.mrp || "",
+      hsnCode: item.hsnCode || "", gstPct: item.gstPct || "",
+      buyerStyle: item.buyerStyle || "",
       status: item.status || "Active", tags: item.tags || "",
     });
     setTab("create");
@@ -673,8 +689,8 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
               </div>
             )}
 
-            {/* Row 1: L1 Division + L2 Category + L3 Style + HSN */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 110px", gap: 14, marginBottom: 14 }}>
+            {/* Row 1: L1 Division + L2 Category + L3 Style + HSN + GST% */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 110px 80px", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>L1 Division *</label>
                 <select value={form.l1Division} onChange={e => setL1Division(e.target.value)}
@@ -707,6 +723,14 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 <label style={lbl}>HSN Code</label>
                 <input value={form.hsnCode} onChange={e => setForm(f => ({ ...f, hsnCode: e.target.value }))}
                   style={inp} placeholder="Auto" />
+                <div style={{ fontSize: 7.5, color: M.tD, marginTop: 2 }}>Auto from L2</div>
+              </div>
+              <div>
+                <label style={lbl}>GST %</label>
+                <input value={form.gstPct} readOnly
+                  style={{ ...inp, background: '#f0f4f0', cursor: 'default', textAlign: 'center', fontWeight: 700 }}
+                  placeholder="—" />
+                <div style={{ fontSize: 7.5, color: M.tD, marginTop: 2 }}>Auto</div>
               </div>
             </div>
 
@@ -758,13 +782,39 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
               </div>
             </div>
 
-            {/* Row 4: Season + WSP + MRP + Status */}
+            {/* Row 4: Season + Colour Names + Size Range + Status */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>Season</label>
-                <input value={form.season} onChange={e => setForm(f => ({ ...f, season: e.target.value }))}
-                  style={inp} placeholder="e.g. SS2024" />
+                <select value={form.season} onChange={e => setForm(f => ({ ...f, season: e.target.value }))} style={inp}>
+                  <option value="">—</option>
+                  {seasonOpts.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
+              <div>
+                <label style={lbl}>Colour Name(s)</label>
+                <select value={form.colourNames} onChange={e => setForm(f => ({ ...f, colourNames: e.target.value }))} style={inp}>
+                  <option value="">—</option>
+                  {colourOpts.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Size Range</label>
+                <select value={form.sizeRange} onChange={e => setForm(f => ({ ...f, sizeRange: e.target.value }))} style={inp}>
+                  <option value="">—</option>
+                  {sizeRangeOpts.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={lbl}>Status</label>
+                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inp}>
+                  {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {/* Row 5: WSP + MRP + Buyer Style + Tags */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>WSP (₹)</label>
                 <input type="number" value={form.wsp} onChange={e => setForm(f => ({ ...f, wsp: e.target.value }))}
@@ -775,16 +825,6 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
                 <input type="number" value={form.mrp} onChange={e => setForm(f => ({ ...f, mrp: e.target.value }))}
                   style={inp} placeholder="0" />
               </div>
-              <div>
-                <label style={lbl}>Status</label>
-                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inp}>
-                  {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 5: Buyer Style + Tags */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
               <div>
                 <label style={lbl}>Buyer Style No</label>
                 <input value={form.buyerStyle} onChange={e => setForm(f => ({ ...f, buyerStyle: e.target.value }))}
