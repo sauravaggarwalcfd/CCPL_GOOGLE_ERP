@@ -71,6 +71,24 @@ function onEdit(e) {
     }
   }
 
+  // ── Auto HSN: ARTICLE_MASTER — When L2 (col 8) changes, auto-fill HSN Code + GST% ──
+  // Reads HSN_MASTER directly, matches L2 value to HSN Description.
+  // Col 23 = → HSN Code, Col 24 = ← GST % (Auto)
+  if (sheetName === CONFIG.SHEETS.ARTICLE_MASTER && col === 8) {
+    try {
+      var l2ForHSN = String(sheet.getRange(row, 8).getValue() || '').trim();
+      if (l2ForHSN) {
+        var hsnMatch = _directLookupHSNByL2(l2ForHSN);
+        if (hsnMatch) {
+          sheet.getRange(row, 23).setValue(hsnMatch.code);
+          sheet.getRange(row, 24).setValue(hsnMatch.gst);
+        }
+      }
+    } catch (err) {
+      Logger.log('Auto HSN lookup error: ' + err.message);
+    }
+  }
+
   // ── Module 1: Auto Code Generation ──
   try {
     handleCodeGeneration(e);
@@ -85,11 +103,20 @@ function onEdit(e) {
     Logger.log('FK Engine error: ' + err.message);
   }
 
+  // ── V12.4: DIRECT FK DISPLAY OVERRIDE ──
+  // Bypasses MASTER_RELATIONS + cache. Reads referenced sheets directly by header name.
+  // Runs AFTER handleFKEdit to override with fresh, correct display names.
+  try {
+    _directFKResolveOnEdit(sheet, sheetName, row, col, e);
+  } catch (err) {
+    Logger.log('Direct FK resolve error: ' + err.message);
+  }
+
   // ── Auto SKU: RM_MASTER_FABRIC col B = L3 Knit Type + Yarn Names ──
   // V9 columns: E(5)=L3 Knit Type, F(6)=⟷ YARN COMPOSITION, G(7)=← Yarn Names (Auto), B(2)=∑ FINAL FABRIC SKU
-  // Triggers when L3 Knit Type (col 5) or Yarn Composition (col 6) is edited.
-  // handleFKEdit above has already resolved yarn codes→names into col G by this point.
-  if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && (col === 5 || col === 6)) {
+  // Triggers when L3 Knit Type (col 5) is edited.
+  // When col 6 is edited, _directFKResolveOnEdit above already rebuilds col B + col G.
+  if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && col === 5) {
     try {
       var knitType  = String(sheet.getRange(row, 5).getValue() || '').trim();
       var yarnNames = String(sheet.getRange(row, 7).getValue() || '').trim();
@@ -557,4 +584,230 @@ function getSheetHeaders(sheetName) {
     });
   }
   return fields;
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   V12.4 — DIRECT FK RESOLUTION HELPERS
+   Bypasses MASTER_RELATIONS sheet and cache entirely.
+   Reads referenced sheets DIRECTLY, finds columns by header
+   name matching, resolves FK codes to display names.
+   ─────────────────────────────────────────────────────────── */
+
+/**
+ * Called from onEdit after handleFKEdit. Detects specific FK edits and
+ * resolves display names by reading referenced sheets directly (no cache).
+ *
+ * Currently handles:
+ *   1. RM_MASTER_FABRIC ⟷ YARN COMPOSITION → Yarn Names + SKU rebuild
+ *   2. ARTICLE_MASTER → MAIN FABRIC USED → Fabric Name
+ */
+function _directFKResolveOnEdit(sheet, sheetName, row, col, e) {
+  if (row < 4) return;
+
+  var headerVal = String(sheet.getRange(2, col).getValue()).trim();
+  var cellValue = String(e.range.getValue() || '').trim();
+
+  // ── RM_MASTER_FABRIC: ⟷ YARN COMPOSITION → Yarn Names (col+1) ──
+  if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC) {
+    var normHeader = _normalizeHeader(headerVal);
+    if (normHeader === 'yarn composition') {
+      // Resolve yarn codes → yarn names from RM_MASTER_YARN (direct read)
+      var yarnDisplay = cellValue
+        ? _directResolveFK(CONFIG.SHEETS.RM_MASTER_YARN, cellValue, '# RM Code', 'Yarn Name', true)
+        : '';
+      sheet.getRange(row, col + 1).setValue(yarnDisplay);
+
+      // Also rebuild ∑ FINAL FABRIC SKU (col B) = L3 Knit Type — Yarn Names
+      var knitType = String(sheet.getRange(row, 5).getValue() || '').trim();
+      var skuParts = [knitType, yarnDisplay].filter(function(p) { return p !== ''; });
+      sheet.getRange(row, 2).setValue(skuParts.length > 0 ? skuParts.join(' — ') : '');
+      return;
+    }
+  }
+
+  // ── ARTICLE_MASTER: → MAIN FABRIC USED → Fabric Name (col+1) ──
+  if (sheetName === CONFIG.SHEETS.ARTICLE_MASTER) {
+    var normArtHeader = _normalizeHeader(headerVal);
+    if (normArtHeader === 'main fabric used') {
+      var fabricDisplay = cellValue
+        ? _directResolveFabricName(cellValue)
+        : '';
+      sheet.getRange(row, col + 1).setValue(fabricDisplay);
+      return;
+    }
+  }
+}
+
+
+/**
+ * Generic direct FK resolve. Reads the referenced sheet directly (NO cache,
+ * NO MASTER_RELATIONS). Finds code and display columns by header name.
+ *
+ * @param {string}  refSheetName   Name of the referenced sheet
+ * @param {string}  codes          Code(s) to resolve (comma-separated if multi)
+ * @param {string}  codeHeader     Header name of the code column in ref sheet
+ * @param {string}  displayHeader  Header name of the display column in ref sheet
+ * @param {boolean} isMulti        True for multi-select (comma-separated codes)
+ * @returns {string} Resolved display name(s), or the original code if not found
+ */
+function _directResolveFK(refSheetName, codes, codeHeader, displayHeader, isMulti) {
+  if (!codes || String(codes).trim() === '') return '';
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var refSheet = ss.getSheetByName(refSheetName);
+  if (!refSheet) {
+    Logger.log('_directResolveFK: Sheet "' + refSheetName + '" not found');
+    return String(codes);
+  }
+
+  var lastRow = refSheet.getLastRow();
+  var lastCol = refSheet.getLastColumn();
+  if (lastRow < 4 || lastCol < 1) return String(codes);
+
+  // Read headers from row 2 directly (no cache)
+  var headers = refSheet.getRange(2, 1, 1, lastCol).getValues()[0];
+
+  // Find columns using _findColumnIndex (from Module2_FKEngine.gs)
+  var codeIdx = _findColumnIndex(headers, codeHeader);
+  var dispIdx = _findColumnIndex(headers, displayHeader);
+
+  if (codeIdx === -1 || dispIdx === -1) {
+    Logger.log('_directResolveFK: Column not found in "' + refSheetName + '". ' +
+               'codeHeader="' + codeHeader + '" (idx=' + codeIdx + '), ' +
+               'displayHeader="' + displayHeader + '" (idx=' + dispIdx + ')');
+    return String(codes);
+  }
+
+  // Read data rows (row 4+) directly (no cache)
+  var numRows = lastRow - 3;
+  var data = refSheet.getRange(4, 1, numRows, lastCol).getValues();
+
+  // Build code → display map
+  var map = {};
+  for (var r = 0; r < data.length; r++) {
+    var c = String(data[r][codeIdx]).trim();
+    if (c) map[c] = String(data[r][dispIdx]).trim();
+  }
+
+  // Resolve codes to display names
+  if (isMulti) {
+    var codeList = String(codes).split(',');
+    var results = [];
+    for (var j = 0; j < codeList.length; j++) {
+      var code = codeList[j].trim();
+      if (code) results.push(map[code] || code);
+    }
+    return results.join(', ');
+  } else {
+    var trimmed = String(codes).trim();
+    return map[trimmed] || trimmed;
+  }
+}
+
+
+/**
+ * Resolves a fabric code to its display name from RM_MASTER_FABRIC.
+ * Tries ∑ FINAL FABRIC SKU first; falls back to L3 Knit Type — Yarn Names.
+ *
+ * @param {string} fabricCode  The fabric code (e.g. "RM-FAB-001")
+ * @returns {string} The fabric display name, or the code if not found
+ */
+function _directResolveFabricName(fabricCode) {
+  if (!fabricCode || String(fabricCode).trim() === '') return '';
+  fabricCode = String(fabricCode).trim();
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var fabSheet = ss.getSheetByName(CONFIG.SHEETS.RM_MASTER_FABRIC);
+  if (!fabSheet) return fabricCode;
+
+  var lastRow = fabSheet.getLastRow();
+  var lastCol = fabSheet.getLastColumn();
+  if (lastRow < 4 || lastCol < 1) return fabricCode;
+
+  // Read headers from row 2 directly (no cache)
+  var headers = fabSheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  var codeIdx = _findColumnIndex(headers, '# RM Code');
+  var skuIdx  = _findColumnIndex(headers, '∑ FINAL FABRIC SKU');
+  var knitIdx = _findColumnIndex(headers, 'L3 Knit Type');
+  var yarnIdx = _findColumnIndex(headers, '← Yarn Names (Auto)');
+
+  if (codeIdx === -1) return fabricCode;
+
+  // Read data rows directly (no cache)
+  var numRows = lastRow - 3;
+  var data = fabSheet.getRange(4, 1, numRows, lastCol).getValues();
+
+  for (var r = 0; r < data.length; r++) {
+    if (String(data[r][codeIdx]).trim() === fabricCode) {
+      // Try ∑ FINAL FABRIC SKU first (the fully-built display name)
+      if (skuIdx !== -1) {
+        var sku = String(data[r][skuIdx]).trim();
+        if (sku) return sku;
+      }
+      // Fallback: compose from L3 Knit Type + Yarn Names
+      var parts = [];
+      if (knitIdx !== -1) {
+        var knit = String(data[r][knitIdx]).trim();
+        if (knit) parts.push(knit);
+      }
+      if (yarnIdx !== -1) {
+        var yarn = String(data[r][yarnIdx]).trim();
+        if (yarn) parts.push(yarn);
+      }
+      return parts.length > 0 ? parts.join(' — ') : fabricCode;
+    }
+  }
+
+  return fabricCode; // Code not found in fabric master
+}
+
+
+/**
+ * Looks up HSN_MASTER by matching HSN Description to an L2 category name.
+ * HSN_MASTER rows for articles have Description = L2 value (e.g. "Tops - Polo").
+ * Returns { code, gst } or null if no match.
+ *
+ * @param {string} l2Value  The L2 Product Category (e.g. "Tops - Tee")
+ * @returns {Object|null} { code: "6109", gst: 5 } or null
+ */
+function _directLookupHSNByL2(l2Value) {
+  if (!l2Value) return null;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var hsnSheet = ss.getSheetByName(CONFIG.SHEETS.HSN_MASTER);
+  if (!hsnSheet) return null;
+
+  var lastRow = hsnSheet.getLastRow();
+  var lastCol = hsnSheet.getLastColumn();
+  if (lastRow < 4 || lastCol < 3) return null;
+
+  // Read headers from row 2 directly (no cache)
+  var headers = hsnSheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  var codeIdx = -1, descIdx = -1, gstIdx = -1;
+
+  for (var i = 0; i < headers.length; i++) {
+    var h = String(headers[i]).trim().toLowerCase();
+    if (h === 'hsn code') codeIdx = i;
+    if (h === 'hsn description') descIdx = i;
+    if (h === 'gst %' || h === 'gst%') gstIdx = i;
+  }
+
+  if (codeIdx === -1 || descIdx === -1 || gstIdx === -1) return null;
+
+  // Read data rows directly (no cache)
+  var data = hsnSheet.getRange(4, 1, lastRow - 3, lastCol).getValues();
+  var search = l2Value.trim().toLowerCase();
+
+  for (var r = 0; r < data.length; r++) {
+    var desc = String(data[r][descIdx]).trim().toLowerCase();
+    if (desc === search) {
+      return {
+        code: String(data[r][codeIdx]).trim(),
+        gst: data[r][gstIdx]
+      };
+    }
+  }
+
+  return null;
 }

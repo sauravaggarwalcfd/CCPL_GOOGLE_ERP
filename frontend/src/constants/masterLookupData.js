@@ -59,9 +59,11 @@ export const FK_DATA = {
     { v: "RM-YRN-002", l: "RM-YRN-002 — 40s Combed Cotton" },
   ],
   hsn_master: [
-    { v: "6105", l: "6105 — Polo Shirts Knitted", gst: 12 },
-    { v: "6109", l: "6109 — T-Shirts Knitted", gst: 12 },
-    { v: "6110", l: "6110 — Sweatshirts Knitted", gst: 12 },
+    { v: "6105", l: "6105 — Tops - Polo", gst: 5 },
+    { v: "6109", l: "6109 — Tops - Tee", gst: 5 },
+    { v: "6110", l: "6110 — Sweatshirt", gst: 12 },
+    { v: "6112", l: "6112 — Tracksuit", gst: 12 },
+    { v: "6103", l: "6103 — Bottoms", gst: 5 },
     { v: "6006", l: "6006 — Knit Fabric", gst: 5 },
     { v: "5205", l: "5205 — Cotton Yarn", gst: 5 },
   ],
@@ -141,5 +143,7 @@ export const DROPDOWN_OPTS = {
   packagingCat:  [{ v: "PLY", l: "PLY — Polybag" }, { v: "CTN", l: "CTN — Carton" }, { v: "HGR", l: "HGR — Hanger" }, { v: "TKT", l: "TKT — Ticket/Tag" }, { v: "STK", l: "STK — Sticker" }, { v: "OTH", l: "OTH — Other" }],
   trimCat:       [{ v: "THD", l: "THD — Thread" }, { v: "LBL", l: "LBL — Label" }, { v: "ELS", l: "ELS — Elastic" }, { v: "ZIP", l: "ZIP — Zipper" }, { v: "BUT", l: "BUT — Button" }, { v: "TPE", l: "TPE — Tape" }, { v: "DRW", l: "DRW — Drawstring" }, { v: "VLC", l: "VLC — Velcro" }, { v: "RVT", l: "RVT — Rivet" }, { v: "THP", l: "THP — Thermal Print" }, { v: "OTH", l: "OTH — Other" }],
   trimUom:       [{ v: "CONE", l: "CONE" }, { v: "MTR", l: "MTR" }, { v: "PCS", l: "PCS" }, { v: "KG", l: "KG" }, { v: "SET", l: "SET" }, { v: "ROLL", l: "ROLL" }],
+  colorNames:    [{ v: "Navy Blue", l: "Navy Blue" }, { v: "White", l: "White" }, { v: "Black", l: "Black" }, { v: "Charcoal Grey", l: "Charcoal Grey" }, { v: "Red", l: "Red" }, { v: "Royal Blue", l: "Royal Blue" }, { v: "Olive Green", l: "Olive Green" }, { v: "Maroon", l: "Maroon" }, { v: "Bottle Green", l: "Bottle Green" }, { v: "Sky Blue", l: "Sky Blue" }, { v: "Yellow", l: "Yellow" }, { v: "Pink", l: "Pink" }, { v: "Orange", l: "Orange" }, { v: "Beige", l: "Beige" }, { v: "Cream", l: "Cream" }, { v: "Grey Melange", l: "Grey Melange" }],
+  sizeRange:     [{ v: "S-M-L-XL-XXL", l: "S-M-L-XL-XXL" }, { v: "S-M-L-XL", l: "S-M-L-XL" }, { v: "M-L-XL-XXL", l: "M-L-XL-XXL" }, { v: "XS-S-M-L-XL", l: "XS-S-M-L-XL" }, { v: "S-M-L", l: "S-M-L" }, { v: "M-L-XL-XXL-3XL", l: "M-L-XL-XXL-3XL" }, { v: "Free Size", l: "Free Size" }, { v: "XS-S-M-L-XL-XXL-3XL", l: "XS-S-M-L-XL-XXL-3XL" }],
   yesNo:         [{ v: "Yes", l: "Yes" }, { v: "No", l: "No" }],
 };

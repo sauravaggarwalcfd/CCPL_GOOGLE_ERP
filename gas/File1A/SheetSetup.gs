@@ -253,7 +253,7 @@ function setupArticleMaster_(ss) {
     'L2 Product Category', 'L3 Style',
     'Season', 'Gender', 'Fit Type', 'Neckline',
     'Sleeve Type', '→ MAIN FABRIC USED', '← Fabric Name (Auto)',
-    'Color Code(s)', 'Size Range', '∑ FINAL MARKUP %', '∑ FINAL MARKDOWN %',
+    'Colour Name(s)', 'Size Range', '∑ FINAL MARKUP %', '∑ FINAL MARKDOWN %',
     'W.S.P (Rs)', 'MRP (Rs)', '→ HSN Code', '← GST % (Auto)',
     'Status', 'Remarks', '⟷ Tags'
   ];
@@ -264,7 +264,7 @@ function setupArticleMaster_(ss) {
     'Dropdown: style type (Pique, Hoodie, Crew Neck, etc.)',
     'Multi-select', 'Dropdown', 'Dropdown',
     'Dropdown', 'Dropdown', 'FK → RM_MASTER_FABRIC', 'Auto-filled by GAS',
-    'Multi-select → COLOR_MASTER', 'Display only', '(MRP−WSP)÷WSP×100',
+    'Dropdown → COLOR_MASTER names', 'Dropdown → ARTICLE_DROPDOWNS col G', '(MRP−WSP)÷WSP×100',
     '(MRP−WSP)÷MRP×100', 'Wholesale price/pc', 'Max retail price',
     'FK → HSN_MASTER', 'Auto from HSN', 'Active/Inactive/Dev/Discontinued',
     'Notes', 'Multi-select → TAG_MASTER'
@@ -292,28 +292,52 @@ function setupArticleMaster_(ss) {
     setColumnValidation_(sheet, 9, ['Pique Polo', 'Round Neck Tee', 'Hoodie', 'Jogger']);
   }
   // Read other dropdowns from ARTICLE_DROPDOWNS sheet (single source of truth)
+  // Columns: A=Gender, B=Fit, C=Neckline, D=Sleeve, E=Status, F=Season, G=Size Range
   var ddSheet = ss.getSheetByName('ARTICLE_DROPDOWNS');
   if (ddSheet && ddSheet.getLastRow() >= 4) {
-    var ddRows = ddSheet.getRange(4, 1, ddSheet.getLastRow() - 3, 6).getValues();
-    var genderOpts = [], fitOpts = [], neckOpts = [], sleeveOpts = [], statusOpts = [];
+    var ddCols = Math.min(ddSheet.getLastColumn(), 7);
+    var ddRows = ddSheet.getRange(4, 1, ddSheet.getLastRow() - 3, ddCols).getValues();
+    var genderOpts = [], fitOpts = [], neckOpts = [], sleeveOpts = [], statusOpts = [], sizeOpts = [];
     for (var d = 0; d < ddRows.length; d++) {
       if (String(ddRows[d][0]).trim()) genderOpts.push(String(ddRows[d][0]).trim());
       if (String(ddRows[d][1]).trim()) fitOpts.push(String(ddRows[d][1]).trim());
       if (String(ddRows[d][2]).trim()) neckOpts.push(String(ddRows[d][2]).trim());
       if (String(ddRows[d][3]).trim()) sleeveOpts.push(String(ddRows[d][3]).trim());
       if (String(ddRows[d][4]).trim()) statusOpts.push(String(ddRows[d][4]).trim());
+      if (ddCols >= 7 && String(ddRows[d][6]).trim()) sizeOpts.push(String(ddRows[d][6]).trim());
     }
     setColumnValidation_(sheet, 11, genderOpts.length ? genderOpts : ['Men', 'Women', 'Kids', 'Unisex']);
     setColumnValidation_(sheet, 12, fitOpts.length ? fitOpts : ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
     setColumnValidation_(sheet, 13, neckOpts.length ? neckOpts : ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
     setColumnValidation_(sheet, 14, sleeveOpts.length ? sleeveOpts : ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
     setColumnValidation_(sheet, 25, statusOpts.length ? statusOpts : CONFIG.STATUS_LIST);
+    // V12.5: Col R (18) = Size Range dropdown from ARTICLE_DROPDOWNS col G
+    if (sizeOpts.length > 0) {
+      setColumnValidation_(sheet, 18, sizeOpts);
+    } else {
+      setColumnValidation_(sheet, 18, ['S-M-L-XL-XXL', 'S-M-L-XL', 'M-L-XL-XXL', 'XS-S-M-L-XL', 'Free Size']);
+    }
   } else {
     setColumnValidation_(sheet, 11, ['Men', 'Women', 'Kids', 'Unisex']);
     setColumnValidation_(sheet, 12, ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Athletic']);
     setColumnValidation_(sheet, 13, ['Round Neck', 'V-Neck', 'Collar', 'Hooded', 'Mock Neck']);
     setColumnValidation_(sheet, 14, ['Half', 'Full', 'Sleeveless', '3-4', 'Raglan']);
     setColumnValidation_(sheet, 25, CONFIG.STATUS_LIST);
+    setColumnValidation_(sheet, 18, ['S-M-L-XL-XXL', 'S-M-L-XL', 'M-L-XL-XXL', 'XS-S-M-L-XL', 'Free Size']);
+  }
+
+  // V12.5: Col Q (17) = Colour Name(s) dropdown from COLOR_MASTER col B
+  var colorSheet = ss.getSheetByName(CONFIG.SHEETS.COLOR_MASTER);
+  if (colorSheet && colorSheet.getLastRow() >= 4) {
+    var colorData = colorSheet.getRange(4, 2, colorSheet.getLastRow() - 3, 1).getValues();
+    var colorNames = [];
+    for (var cn = 0; cn < colorData.length; cn++) {
+      var cName = String(colorData[cn][0]).trim();
+      if (cName) colorNames.push(cName);
+    }
+    if (colorNames.length > 0) {
+      setColumnValidation_(sheet, 17, colorNames);
+    }
   }
 }
 
@@ -755,11 +779,12 @@ function setupItemCategories_(ss) {
 function setupArticleDropdowns_(ss) {
   var sheet = getOrCreateSheet_(ss, 'ARTICLE_DROPDOWNS');
   var headers = [
-    'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season'
+    'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season', 'Size Range'
   ];
   var descriptions = [
     'Men/Women/Kids/Unisex', 'Regular/Slim/Relaxed/Oversized', 'Round Neck/V-Neck/Collar etc.',
-    'Half/Full/Sleeveless etc.', 'Active/Inactive/Development', 'SS25/AW26 examples'
+    'Half/Full/Sleeveless etc.', 'Active/Inactive/Development', 'SS25/AW26 examples',
+    'S-M-L-XL etc.'
   ];
 
   applyStandardFormat_(sheet,
@@ -769,14 +794,14 @@ function setupArticleDropdowns_(ss) {
   // Pre-populate dropdown values
   if (sheet.getLastRow() < 4) {
     var data = [
-      ['Men',    'Regular',   'Round Neck',   'Half Sleeve',  'Active',       'SS2024'],
-      ['Women',  'Slim',      'V-Neck',       'Full Sleeve',  'Inactive',     'AW2024'],
-      ['Kids',   'Relaxed',   'Polo',         'Sleeveless',   'Development',  'SS2025'],
-      ['Unisex', 'Oversized', 'Henley',       'Cap Sleeve',   'Discontinued', 'AW2025'],
-      ['',       'Crop',      'Hood',         '3/4 Sleeve',   '',             'SS2026'],
-      ['',       'Athletic',  'Crew Neck',    'Raglan',       '',             'AW2026'],
-      ['',       '',          'Quarter Zip',  '',             '',             'Year Round'],
-      ['',       '',          'Mock Neck',    '',             '',             ''],
+      ['Men',    'Regular',   'Round Neck',   'Half Sleeve',  'Active',       'SS2024',     'S-M-L-XL-XXL'],
+      ['Women',  'Slim',      'V-Neck',       'Full Sleeve',  'Inactive',     'AW2024',     'S-M-L-XL'],
+      ['Kids',   'Relaxed',   'Polo',         'Sleeveless',   'Development',  'SS2025',     'M-L-XL-XXL'],
+      ['Unisex', 'Oversized', 'Henley',       'Cap Sleeve',   'Discontinued', 'AW2025',     'XS-S-M-L-XL'],
+      ['',       'Crop',      'Hood',         '3/4 Sleeve',   '',             'SS2026',     'S-M-L'],
+      ['',       'Athletic',  'Crew Neck',    'Raglan',       '',             'AW2026',     'M-L-XL-XXL-3XL'],
+      ['',       '',          'Quarter Zip',  '',             '',             'Year Round', 'Free Size'],
+      ['',       '',          'Mock Neck',    '',             '',             '',           'XS-S-M-L-XL-XXL-3XL'],
     ];
     sheet.getRange(4, 1, data.length, data[0].length).setValues(data);
   }
@@ -1072,22 +1097,31 @@ function setupHSNMaster_(ss) {
     'CC ERP FILE 1A — HSN_MASTER — GST HSN Codes with Rates',
     headers, descriptions, CONFIG.TAB_COLORS.FILE_1A_ITEMS);
 
-  // Common textile HSN codes
+  // Textile HSN codes
+  // ARTICLE rows: HSN Description = L2 Product Category (for auto-fetch by L2)
+  // Other rows: standard HSN descriptions
   var hsnData = [
-    ['6109', 'T-shirts, singlets and other vests, knitted', 5, 'Garment', 'Yes'],
-    ['6105', 'Mens shirts, knitted', 5, 'Garment', 'Yes'],
-    ['6110', 'Jerseys, pullovers, cardigans, knitted', 12, 'Garment', 'Yes'],
-    ['6104', 'Womens suits, dresses, skirts, knitted', 5, 'Garment', 'Yes'],
+    // ── Article Garments (Description = L2 category for auto-match) ──
+    ['6105', 'Tops - Polo',   5,  'Garment', 'Yes'],
+    ['6109', 'Tops - Tee',    5,  'Garment', 'Yes'],
+    ['6110', 'Sweatshirt',    12, 'Garment', 'Yes'],
+    ['6112', 'Tracksuit',     12, 'Garment', 'Yes'],
+    ['6103', 'Bottoms',       5,  'Garment', 'Yes'],
+    // ── Fabric ──
     ['6001', 'Pile fabrics including long pile and terry, knitted', 5, 'Fabric', 'Yes'],
     ['6006', 'Other knitted fabrics', 5, 'Fabric', 'Yes'],
+    // ── Yarn ──
     ['5509', 'Yarn of synthetic staple fibres', 12, 'Yarn', 'Yes'],
     ['5205', 'Cotton yarn (not for retail)', 5, 'Yarn', 'Yes'],
     ['5402', 'Synthetic filament yarn', 12, 'Yarn', 'Yes'],
+    // ── Thread ──
     ['5204', 'Cotton sewing thread', 12, 'Thread', 'Yes'],
+    // ── Trim ──
     ['9606', 'Buttons, press fasteners, snap fasteners', 18, 'Trim', 'Yes'],
     ['9607', 'Slide fasteners (zippers)', 18, 'Trim', 'Yes'],
     ['5807', 'Labels, badges and similar articles of textiles', 12, 'Trim', 'Yes'],
     ['5806', 'Narrow woven fabrics (tapes, ribbons)', 12, 'Trim', 'Yes'],
+    // ── Packaging ──
     ['3920', 'Plastic sheets (poly bags)', 18, 'Packaging', 'Yes'],
     ['4819', 'Cartons, boxes of paper/paperboard', 18, 'Packaging', 'Yes']
   ];
@@ -1282,7 +1316,7 @@ function setupMasterRelations_(ss) {
   var relData = [
     ['REL-001', 'ARTICLE_MASTER', '→ MAIN FABRIC USED', 'RM_MASTER_FABRIC', '# RM Code', '∑ FINAL FABRIC SKU', 'Yes', '', 'No', 'No', 'FILE_1A', 'Yes', 'Article → Fabric FK'],
     ['REL-002', 'ARTICLE_MASTER', '→ HSN Code', 'HSN_MASTER', 'HSN Code', 'HSN Description', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Article → HSN'],
-    ['REL-003', 'ARTICLE_MASTER', 'Color Code(s)', 'COLOR_MASTER', 'Color Code', 'Color Name', 'Yes', '', 'Yes', 'No', 'FILE_1A', 'Yes', 'Article → Colors (multi)'],
+    ['REL-003', 'ARTICLE_MASTER', 'Colour Name(s)', 'COLOR_MASTER', 'Color Code', 'Color Name', 'No', '', 'No', 'No', 'FILE_1A', 'No', 'REMOVED V12.5 — Col Q stores colour names directly (dropdown), not FK codes'],
     ['REL-004', 'ARTICLE_MASTER', '⟷ Tags', 'TAG_MASTER', 'Tag Code', 'Tag Name', 'Yes', 'ARTICLE_MASTER', 'Yes', 'No', 'FILE_1A', 'Yes', 'Article → Tags (multi)'],
     ['REL-005', 'RM_MASTER_FABRIC', 'L3 Knit Type', 'FABRIC_TYPE_MASTER', 'Fabric Type Code', 'Knit Construction', 'No', '', 'No', 'No', 'FILE_1A', 'Yes', 'Fabric → Knit Type (V9: renamed from KNIT NAME / STRUCTURE)'],
     ['REL-006', 'RM_MASTER_FABRIC', '⟷ YARN COMPOSITION', 'RM_MASTER_YARN', '# RM Code', 'Yarn Name', 'Yes', '', 'Yes', 'No', 'FILE_1A', 'Yes', 'Fabric → Yarn (multi)'],

@@ -104,14 +104,14 @@
 | N | `Sleeve Type` | `sleeveType` | Dropdown | User picks | — | Half, Full, Sleeveless, Raglan |
 | O | `→ MAIN FABRIC USED` | `mainFabric` | FK Code | User selects | RM_MASTER_FABRIC | Stores `RM-FAB-NNN` code only |
 | P | `← Fabric Name (Auto)` | `fabricName` | Auto-display | **GAS fills** | — | Read-only, from RM_MASTER_FABRIC |
-| Q | `Color Code(s)` | `colorCodes` | Multi-FK | User selects | COLOR_MASTER | Multiple color codes |
-| R | `Size Range` | `sizeRange` | Display | **Auto-calc** | — | From SIZE_MASTER |
+| Q | `Colour Name(s)` | `colorCodes` | Dropdown | User selects | COLOR_MASTER | Colour names (not codes) from COLOR_MASTER col B |
+| R | `Size Range` | `sizeRange` | Dropdown | User selects | ARTICLE_DROPDOWNS col G | e.g. S-M-L-XL-XXL, Free Size |
 | S | `∑ FINAL MARKUP %` | `markupPct` | Formula | **GAS formula** | — | `(MRP−WSP)÷WSP×100` |
 | T | `∑ FINAL MARKDOWN %` | `markdownPct` | Formula | **GAS formula** | — | `(MRP−WSP)÷MRP×100` |
 | U | `W.S.P (Rs)` | `wsp` | Currency | User enters | — | Wholesale price per piece (₹) |
 | V | `MRP (Rs)` | `mrp` | Currency | User enters | — | Maximum retail price (₹) |
-| W | `→ HSN Code` | `hsnCode` | FK Code | User selects | HSN_MASTER | 6-8 digit HSN |
-| X | `← GST % (Auto)` | `gstPct` | Auto-display | **GAS fills** | — | Read-only, from HSN_MASTER |
+| W | `→ HSN Code` | `hsnCode` | FK Code | **Auto from L2** | HSN_MASTER | Auto-fills when L2 is selected (HSN Description = L2 name). User can override. |
+| X | `← GST % (Auto)` | `gstPct` | Auto-display | **Auto from L2** | HSN_MASTER | Auto-fills GST% alongside HSN Code when L2 is selected |
 | Y | `Status` | `status` | Dropdown | User picks | — | Active/Inactive/Development/Discontinued |
 | Z | `Remarks` | `remarks` | Text | User enters | — | Free-text notes |
 | AA | `⟷ Tags` | `tags` | Multi-FK | User selects | TAG_MASTER | Multiple tag codes |
@@ -423,11 +423,13 @@ Single source of truth for all Article Master dropdown values (for both GAS shee
 #### HSN_MASTER (5 columns)
 | Col | Header | Notes |
 |-----|--------|-------|
-| A | HSN Code | 6-8 digit HSN code |
-| B | Description | Goods description |
+| A | HSN Code | 4-8 digit HSN code |
+| B | HSN Description | **For articles:** L2 Product Category name (e.g. "Tops - Polo") for auto-match. For others: standard HSN description. |
 | C | GST % | 5, 12, 18, or 28 |
-| D | IGST % | Integrated GST rate |
+| D | Category | Garment, Fabric, Yarn, Trim, Packaging |
 | E | Active | Yes/No |
+
+**Auto-HSN for Articles:** When L2 Product Category is selected on ARTICLE_MASTER (col H), GAS scans HSN_MASTER col B for a matching description and auto-fills HSN Code (col W) + GST% (col X). To add a new L2→HSN mapping, add a row to HSN_MASTER with the L2 name as description.
 
 #### COLOR_MASTER (4 columns)
 | Col | Header | Notes |
@@ -510,7 +512,7 @@ Drives **all FK dropdowns, auto-display, multi-select, and cross-file references
 |------|---------------------|-------------------|--------|-------------|
 | REL-001 | ARTICLE → Main Fabric | RM_FABRIC → # RM Code | No | No |
 | REL-002 | ARTICLE → HSN Code | HSN_MASTER → HSN Code | No | No |
-| REL-003 | ARTICLE → Color Codes | COLOR_MASTER → Color Code | **Yes** | No |
+| REL-003 | ~~ARTICLE → Color Codes~~ | **REMOVED V12.5** — Col Q now stores colour names directly (dropdown), not FK codes | No | No |
 | REL-004 | ARTICLE → Tags | TAG_MASTER → Tag Code | **Yes** | No |
 | REL-005 | RM_FABRIC → Yarn Comp | RM_YARN → # RM Code | **Yes** | No |
 | REL-006 | RM_FABRIC → Supplier | SUPPLIER_MASTER → Code | No | **Yes (1B)** |

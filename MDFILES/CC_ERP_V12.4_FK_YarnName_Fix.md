@@ -221,4 +221,6 @@ The FK engine uses `_findColumnIndex(headers, "Yarn Name")` to locate the yarn n
 
 ---
 
+**Note:** V12.4 fixed `_isFKColumn` detection but the FK engine still failed due to stale cache / missing MASTER_RELATIONS data. See **V12.5** (`CC_ERP_V12.5_DirectFK_Fix.md`) for the complete fix that bypasses MASTER_RELATIONS + cache entirely.
+
 *CC ERP • V12.4 FK Engine Fix • 3 Mar 2026*
