@@ -1699,11 +1699,21 @@ function headerToKey_(header) {
  * Params: { includeInactive: true|false }
  */
 /**
- * GET all categories from ITEM_CATEGORIES sheet (V10 column-grouped layout).
- * Reads 22 cols: A=#, B-D=Article, E-G=Fabric, H-J=Yarn, K-M=Woven,
- *                N-P=Trim, Q-S=Consumable, T-V=Packaging
- * Returns flat array of { l1, l2, l3, master, active:"Yes" } objects
- * so the frontend can build cascading dropdowns per master.
+ * GET all categories from ITEM_CATEGORIES sheet.
+ * Supports both sheet layouts automatically:
+ *
+ *   V10 (column-grouped, 22 cols) — 3 cols per master, masters run in parallel rows.
+ *      A=#  |  B-D=Article  |  E-G=Fabric  |  H-J=Yarn  |  K-M=Woven
+ *           |  N-P=Trim     |  Q-S=Consumable  |  T-V=Packaging
+ *
+ *   V9 (row-based, 9 cols) — one row per category, master identified in col E.
+ *      A=Code  B=L1  C=L2  D=L3  E=Master  F=HSN  G=Active  H=Behavior  I=Remarks
+ *
+ * Detects format from data row 4 col E:
+ *   - If col E matches a known master code ('ARTICLE', 'RM-FABRIC', …) → V9
+ *   - Otherwise → V10
+ *
+ * Returns flat array of { l1, l2, l3, master, active, behavior } objects.
  */
 function handleGetAllCategories(params) {
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
@@ -1713,8 +1723,36 @@ function handleGetAllCategories(params) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 4) return [];
 
-  var data = sheet.getRange(4, 1, lastRow - 3, 22).getValues();
+  // ── Format detection ────────────────────────────────────────────────────────
+  // In V9, row 4 col E contains the master code ('ARTICLE', 'RM-FABRIC', etc.).
+  // In V10, row 4 col E contains the Fabric L1 value ('Raw Material').
+  var V9_MASTER_CODES = ['ARTICLE', 'RM-FABRIC', 'RM-YARN', 'RM-WOVEN', 'TRIM', 'CONSUMABLE', 'PACKAGING'];
+  var colEValue = String(sheet.getRange(4, 5, 1, 1).getValue() || '').trim();
+  var isV9 = V9_MASTER_CODES.indexOf(colEValue) >= 0;
 
+  if (isV9) {
+    // ── V9 row-based reading ─────────────────────────────────────────────────
+    // Cols: A=code, B=l1, C=l2, D=l3, E=master, F=hsn, G=active, H=behavior
+    var V9_BEHAVIOR = { 'ARTICLE': 'SELECTABLE', 'RM-FABRIC': 'FIXED', 'RM-YARN': 'FIXED',
+                        'RM-WOVEN': 'FIXED', 'TRIM': 'FIXED', 'CONSUMABLE': 'FIXED', 'PACKAGING': 'FIXED' };
+    var numCols = Math.min(sheet.getLastColumn(), 8);
+    var v9data = sheet.getRange(4, 1, lastRow - 3, numCols).getValues();
+    var result = [];
+    for (var i = 0; i < v9data.length; i++) {
+      var l1     = String(v9data[i][1] || '').trim();
+      var l2     = String(v9data[i][2] || '').trim();
+      var l3     = String(v9data[i][3] || '').trim();
+      var master = String(v9data[i][4] || '').trim();
+      var active = String(v9data[i][6] || 'Yes').trim() || 'Yes';
+      var beh    = String(v9data[i][7] || '').trim() || (V9_BEHAVIOR[master] || '');
+      if (!l1 && !l2 && !l3) continue;
+      if (!master) continue;
+      result.push({ l1: l1, l2: l2, l3: l3, master: master, active: active, behavior: beh });
+    }
+    return result;
+  }
+
+  // ── V10 column-grouped reading ───────────────────────────────────────────
   // Master definitions: [masterKey, startColIndex (0-based in data), l1Behavior]
   var masters = [
     ['ARTICLE',    1, 'SELECTABLE'],
@@ -1726,6 +1764,7 @@ function handleGetAllCategories(params) {
     ['PACKAGING', 19, 'FIXED']
   ];
 
+  var data = sheet.getRange(4, 1, lastRow - 3, 22).getValues();
   var result = [];
   for (var m = 0; m < masters.length; m++) {
     var masterKey = masters[m][0];
@@ -1856,18 +1895,30 @@ function handleUpdateCategory(params) {
 
 /**
  * GET all dropdown values from the ARTICLE_DROPDOWNS sheet.
+ * Sheet structure: Row 1=Banner, Row 2=Headers, Row 3=Descriptions, Row 4+=Data
  * Columns: A=Gender, B=Fit Type, C=Neckline, D=Sleeve Type, E=Status, F=Season
  * Returns: { gender:[], fit:[], neckline:[], sleeve:[], status:[], season:[] }
  */
 function handleGetArticleDropdowns(params) {
+  // Sensible fallback values returned when sheet is missing or empty
+  var defaults = {
+    gender:   ['Men', 'Women', 'Kids', 'Unisex'],
+    fit:      ['Regular', 'Slim', 'Relaxed', 'Oversized', 'Crop', 'Athletic'],
+    neckline: ['Round Neck', 'V-Neck', 'Polo', 'Henley', 'Hood', 'Crew Neck', 'Quarter Zip', 'Mock Neck'],
+    sleeve:   ['Half Sleeve', 'Full Sleeve', 'Sleeveless', 'Cap Sleeve', '3/4 Sleeve', 'Raglan'],
+    status:   ['Active', 'Inactive', 'Development', 'Discontinued'],
+    season:   ['SS2024', 'AW2024', 'SS2025', 'AW2025', 'SS2026', 'AW2026', 'Year Round']
+  };
+
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
   var sheet = ss.getSheetByName('ARTICLE_DROPDOWNS');
-  if (!sheet) return { gender: [], fit: [], neckline: [], sleeve: [], status: [], season: [] };
+  if (!sheet) return defaults;
 
+  // Data rows start at row 4 (rows 1-3 are Banner / Headers / Descriptions)
   var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return { gender: [], fit: [], neckline: [], sleeve: [], status: [], season: [] };
+  if (lastRow < 4) return defaults;
 
-  var data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
+  var data = sheet.getRange(4, 1, lastRow - 3, 6).getValues();
   var keys = ['gender', 'fit', 'neckline', 'sleeve', 'status', 'season'];
   var result = {};
   for (var k = 0; k < keys.length; k++) result[keys[k]] = [];
@@ -1879,6 +1930,11 @@ function handleGetArticleDropdowns(params) {
         result[keys[c]].push(val);
       }
     }
+  }
+
+  // Fall back to defaults for any column that came back empty
+  for (var k = 0; k < keys.length; k++) {
+    if (!result[keys[k]].length) result[keys[k]] = defaults[keys[k]];
   }
   return result;
 }

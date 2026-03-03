@@ -935,11 +935,14 @@ function _isYes(val) {
 function _isFKColumn(header) {
   if (!header) return false;
   var s = String(header).trim();
-  // Check for unicode -> prefix (U+2192) or the two-way sync symbol (U+27F7)
-  // The -> symbol indicates a foreign key TO another sheet
+  // Check for unicode → prefix (U+2192), two-way sync ⟷ (U+27F7), or literal '->'
+  // → indicates a single FK TO another sheet
+  // ⟷ indicates a multi-select FK (e.g. YARN COMPOSITION, Tags)
   return s.charAt(0) === CONFIG.HEADER_PREFIXES.FK_TO ||
          s.indexOf(CONFIG.HEADER_PREFIXES.FK_TO) !== -1 ||
-         s.indexOf('->') !== -1;
+         s.indexOf(CONFIG.HEADER_PREFIXES.TWO_WAY_SYNC) !== -1 ||
+         s.indexOf('->') !== -1 ||
+         s.indexOf('<->') !== -1;
 }
 
 

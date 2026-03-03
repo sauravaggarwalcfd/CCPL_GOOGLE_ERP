@@ -85,6 +85,21 @@ function onEdit(e) {
     Logger.log('FK Engine error: ' + err.message);
   }
 
+  // ── Auto SKU: RM_MASTER_FABRIC col B = L3 Knit Type + Yarn Names ──
+  // V9 columns: E(5)=L3 Knit Type, F(6)=⟷ YARN COMPOSITION, G(7)=← Yarn Names (Auto), B(2)=∑ FINAL FABRIC SKU
+  // Triggers when L3 Knit Type (col 5) or Yarn Composition (col 6) is edited.
+  // handleFKEdit above has already resolved yarn codes→names into col G by this point.
+  if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && (col === 5 || col === 6)) {
+    try {
+      var knitType  = String(sheet.getRange(row, 5).getValue() || '').trim();
+      var yarnNames = String(sheet.getRange(row, 7).getValue() || '').trim();
+      var skuParts  = [knitType, yarnNames].filter(function(p) { return p !== ''; });
+      sheet.getRange(row, 2).setValue(skuParts.length > 0 ? skuParts.join(' — ') : '');
+    } catch (err) {
+      Logger.log('Fabric SKU auto-build error: ' + err.message);
+    }
+  }
+
   // ── Module 3: Attribute Sync ──
   try {
     handleAttrEdit(e);

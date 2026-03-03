@@ -1,10 +1,11 @@
 # CC ERP — Complete Column Reference & Connection Guide
 
-> **Version:** V9.1 (2 Mar 2026) — Bug fixes applied
+> **Version:** V12.4 (3 Mar 2026) — FK Engine + Fabric SKU fixes
 > **Files:** 4 Google Sheets | 56 Total Sheets | 24 GAS Files (14,407 lines) | React Frontend
 > **Generated:** 2 Mar 2026
 > **V9.1 Fixes:** Article Code manual entry, duplicate check self-match, L1/L2/L3 from ITEM_CATEGORIES
 > **V10 Changes:** ITEM_CATEGORIES restructured to column-grouped layout (22 cols). New ARTICLE_DROPDOWNS sheet. FK_DATA split per level. Auto-description (L1 › L2 › L3).
+> **V12.4 Fixes:** `_isFKColumn()` now recognizes `⟷` prefix → Yarn Names + Tags auto-fill works. Fabric SKU (col B) auto-builds from L3 Knit Type + Yarn Names.
 
 ---
 
@@ -126,7 +127,7 @@
 | Col | Header | Frontend Key | Type | Behavior | FK Target | Notes |
 |-----|--------|-------------|------|----------|-----------|-------|
 | A | `# RM Code` | `code` | Auto-code | **GAS generates** | — | `RM-FAB-001`, `RM-FAB-002`, ... |
-| B | `∑ FINAL FABRIC SKU` | `fabricSku` | Formula | **GAS formula** | — | Built from knit type + yarn |
+| B | `∑ FINAL FABRIC SKU` | `fabricSku` | Formula | **GAS auto-build** | — | V12.4: `L3 Knit Type — Yarn Name(s)` built on edit of col E or F |
 | **C** | **`L1 Division`** | `l1Division` | Fixed | **Auto-fill** | — | Always "Raw Material" (green bg, read-only) |
 | **D** | **`L2 Category`** | `l2Category` | Fixed | **Auto-fill** | — | Always "Knit Fabric" (green bg, read-only) |
 | **E** | **`L3 Knit Type`** | `l3KnitType` | Dropdown | User picks | ITEM_CATEGORIES | Single Jersey, Pique, Fleece, French Terry, etc. |
@@ -757,11 +758,29 @@ UI Rendering (dropdowns, auto-fill, text, currency)
 
 ### FK Rules (Module2_FKEngine.gs)
 
-1. **`→` columns:** Store code only (e.g., `RM-FAB-001`)
-2. **`←` columns:** Read-only, GAS auto-fills display name from referenced sheet
-3. **`⟷` columns:** Multi-select — stores comma-separated codes
+1. **`→` columns:** Store code only (e.g., `RM-FAB-001`). `_isFKColumn()` detects `→` (U+2192) prefix.
+2. **`←` columns:** Read-only, GAS auto-fills display name from referenced sheet via `autoDisplayFKName()`.
+3. **`⟷` columns:** Multi-select FK — stores comma-separated codes. `_isFKColumn()` detects `⟷` (U+27F7) prefix. *(V12.4 fix: was missing, caused Yarn Names + Tags auto-fill to never trigger.)*
 4. **Cross-file FKs:** Use PropertiesService (L2 cache) for FILE_1B/1C data
 5. **MASTER_RELATIONS** drives all FK behavior — no hardcoding in modules
+6. **Column lookup by header name:** `_findColumnIndex()` finds columns by matching header text (row 2), NOT by column position. Safe across V9 column shifts.
+
+### FK Flow: RM_MASTER_FABRIC → RM_MASTER_YARN (REL-006)
+
+```
+User edits col F (⟷ YARN COMPOSITION) → e.g., "RM-YRN-001, RM-YRN-002"
+  │
+  ├─ _isFKColumn("⟷ YARN COMPOSITION") → TRUE (detects ⟷)
+  ├─ getRelationForColumn() → REL-006 (multiSelect=Yes)
+  ├─ resolveMultiSelectFK() → reads RM_MASTER_YARN:
+  │     "# RM Code" (col A) for matching, "Yarn Name" (col E) for display
+  │     → returns "30s Cotton Ring Spun, 40s Combed Cotton"
+  ├─ Writes col G (← Yarn Names Auto): "30s Cotton Ring Spun, 40s Combed Cotton"
+  │
+  └─ Auto SKU handler (Code.gs):
+       Reads col 5 (L3 Knit Type) + col 7 (Yarn Names)
+       → Writes col 2 (∑ FINAL FABRIC SKU): "Single Jersey — 30s Cotton Ring Spun, 40s Combed Cotton"
+```
 
 ### Dropdown Validation (SheetSetup)
 - All dropdowns use `allowInvalid: false` — GAS rejects invalid entries
@@ -812,7 +831,7 @@ Role stored in USER_MASTER (FILE 1B). Module5_AccessControl.gs hides/protects sh
 |------|-------|--------------|
 | Config.gs | 650 | File IDs, sheet names, item codes, status enums, cache keys |
 | Cache.gs | 742 | 3-layer cache, chunking, invalidation |
-| Code.gs | 530 | onOpen, onEdit, menu builders, trigger routing |
+| Code.gs | 560 | onOpen, onEdit (+ Fabric SKU auto-build V12.4), menu builders, trigger routing |
 | APIGateway.gs | 2000+ | doGet/doPost, 22 route handlers |
 | SheetSetup.gs | 1500+ | FILE 1A sheet creation & formatting |
 | SheetSetup_1B.gs | 800+ | FILE 1B sheet creation |
@@ -821,7 +840,7 @@ Role stored in USER_MASTER (FILE 1B). Module5_AccessControl.gs hides/protects sh
 | V9_Update.gs | 600+ | V8→V9 migration (L1/L2/L3 columns) |
 | MasterSetup.gs | 300+ | One-click setup for all 4 files |
 | Module1_CodeGen.gs | 900+ | Auto-generate item codes |
-| Module2_FKEngine.gs | 1250+ | FK dropdowns, auto-display, multi-select |
+| Module2_FKEngine.gs | 1300+ | FK dropdowns, auto-display, multi-select. V12.4: `_isFKColumn` detects `⟷` prefix |
 | Module3_AttrSync.gs | 800+ | Attribute name/value sync |
 | Module4_ChangeLog.gs | 350+ | Audit trail logging |
 | Module5_AccessControl.gs | 650+ | Role-based sheet protection |
