@@ -266,6 +266,24 @@ SCHEMA_MAP = {
 - Append-only (user adds, doesn't remove)
 - V12.4 FIX: `_isFKColumn()` now recognizes `⟷`
 
+### 5.5 Yarn Composition Multi-Select (V13)
+
+| Aspect | Column F (← Yarn Codes Auto) | Column G (⟷ YARN COMPOSITION) |
+|--------|------------------------------|-------------------------------|
+| Content | RM-YRN codes | Yarn names |
+| Separator | `, ` (comma + space) | ` \| ` (pipe) |
+| Editable | No (auto-filled) | Yes (dropdown + toggle) |
+| Source | Col A of RM_MASTER_YARN | Col E of RM_MASTER_YARN |
+
+**Flow:**
+1. User picks a yarn name from col G dropdown (data validation from RM_MASTER_YARN col E)
+2. `onEdit` toggle logic appends to existing pipe-separated values (or removes if already present)
+3. `_directFKResolveOnEdit` splits by `|`, looks up each name → code, writes comma-separated codes to col F
+4. Also rebuilds col B (∑ FINAL FABRIC SKU) = "L3 Knit Type — Yarn Names"
+5. `handleFKEdit` (Module 2) is **skipped** for this column to prevent writing to wrong col
+
+**Run `applyV13YarnDropdown()` on existing sheets to add the dropdown.**
+
 ### 5.4 Key Relations
 
 | REL | Parent | Column | → Ref Sheet | Display |
@@ -695,6 +713,7 @@ clasp open        # Open GAS editor
 
 | Date | Version | Changes to this file |
 |------|---------|---------------------|
+| 3 Mar 2026 | V13 | RM_MASTER_FABRIC col G: multi-select yarn dropdown with `\|` separator. Col F: auto-fetch codes with `,` separator. Rule 5.5 added. |
 | 3 Mar 2026 | V12.7 | Initial creation. All rules cataloged. Header display rule (2.1) and edit form rule (2.2) added. |
 
 ---

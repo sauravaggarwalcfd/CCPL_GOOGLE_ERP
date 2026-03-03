@@ -48,6 +48,31 @@ function applyV10Updates() {
 }
 
 /* ───────────────────────────────────────────────────────────
+   V13 PATCH — Adds yarn name dropdown to RM_MASTER_FABRIC col G.
+   Run this once on existing sheets to enable multi-select.
+   ─────────────────────────────────────────────────────────── */
+function applyV13YarnDropdown() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var fabricSheet = ss.getSheetByName(CONFIG.SHEETS.RM_MASTER_FABRIC);
+  var yarnSheet   = ss.getSheetByName(CONFIG.SHEETS.RM_MASTER_YARN);
+  if (!fabricSheet || !yarnSheet) {
+    Logger.log('V13: Missing FABRIC or YARN sheet — aborting.');
+    return;
+  }
+  var yarnLastRow = Math.max(yarnSheet.getLastRow(), 4);
+  var yarnNameRange = yarnSheet.getRange(4, 5, yarnLastRow - 3, 1); // col E = Yarn Name
+  var rule = SpreadsheetApp.newDataValidation()
+    .requireValueInRange(yarnNameRange, true)
+    .setAllowInvalid(true)
+    .build();
+  fabricSheet.getRange(4, 7, 500, 1).setDataValidation(rule);
+  SpreadsheetApp.flush();
+  Logger.log('V13: Yarn name dropdown applied to RM_MASTER_FABRIC col G (⟷ YARN COMPOSITION).');
+  Logger.log('V13: Multi-select is handled by onEdit toggle — picks append with | separator.');
+  Logger.log('V13: Col F (← Yarn Codes) auto-fills with comma-separated codes.');
+}
+
+/* ───────────────────────────────────────────────────────────
    MASTER SETUP — Creates/formats all File 1A sheets (fresh install)
    ─────────────────────────────────────────────────────────── */
 function setupAllSheets() {
@@ -383,6 +408,24 @@ function setupRMFabric_(ss) {
     setColumnValidation_(sheet, 5, ['Single Jersey', 'Pique', 'Fleece', 'French Terry', 'Rib',
       'Interlock', 'Autostriper', 'Waffle Knit', 'Lycra Jersey', 'Textured / Yarn Dyed', 'Other Knit']);
   }
+  // Col G (7): Yarn names dropdown from RM_MASTER_YARN col E (Yarn Name)
+  // Uses range-based validation so it stays in sync with live yarn data.
+  // Multi-select is handled by onEdit toggle logic in Code.gs (appends with | separator).
+  try {
+    var yarnSheet = ss.getSheetByName(CONFIG.SHEETS.RM_MASTER_YARN);
+    if (yarnSheet) {
+      var yarnLastRow = Math.max(yarnSheet.getLastRow(), 4);
+      var yarnNameRange = yarnSheet.getRange(4, 5, yarnLastRow - 3, 1); // col E = Yarn Name
+      var yarnRule = SpreadsheetApp.newDataValidation()
+        .requireValueInRange(yarnNameRange, true)
+        .setAllowInvalid(true)    // Allow invalid so multi-select toggle can write pipe-separated values
+        .build();
+      sheet.getRange(4, 7, 500, 1).setDataValidation(yarnRule);
+    }
+  } catch (err) {
+    Logger.log('Yarn dropdown validation error: ' + err.message);
+  }
+
   setColumnValidation_(sheet, 8, ['KORA', 'FINISHED']);
   setColumnValidation_(sheet, 9, ['KORA', 'COLOURED', 'DYED', 'MEL']);
   setColumnValidation_(sheet, 13, CONFIG.UOM_LIST);

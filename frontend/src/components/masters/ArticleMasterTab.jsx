@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import api from '../../services/api';
+import ArticleDataEntryForm from './ArticleDataEntryForm';
 
 // ═══════════════════════════════════════════════════════════════
 // ARTICLE MASTER TAB — Dedicated UI for ARTICLE_MASTER sheet
@@ -526,7 +527,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
   }, []);
 
   // ─── CREATE FORM STATE ───
-  const emptyForm = { code: "", desc: "", shortName: "", l1Division: "", l2Category: "", l3Style: "", gender: "", fitType: "", neckline: "", sleeveType: "", season: "", colourNames: "", sizeRange: "", wsp: "", mrp: "", hsnCode: "", gstPct: "", buyerStyle: "", status: "Active", tags: "" };
+  const emptyForm = { code: "", desc: "", shortName: "", imageLink: "", sketchLink: "", buyerStyle: "", l1Division: "", l2Category: "", l3Style: "", season: "", gender: "", fitType: "", neckline: "", sleeveType: "", mainFabric: "", fabricName: "", colorCodes: "", sizeRange: "", wsp: "", mrp: "", markupPct: "", markdownPct: "", hsnCode: "", gstPct: "", status: "Active", remarks: "", tags: "" };
   const [form, setForm]           = useState(emptyForm);
   const [formErrors, setFormErrors] = useState({});
 
@@ -548,8 +549,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     setFormErrors({});
   };
 
-  const l2Opts = form.l1Division ? (l2ByDiv[form.l1Division] || []) : [];
-  const l3Opts = form.l2Category ? (l3ByL2[form.l2Category] || []) : [];
+  // l2/l3 dropdown resolution is now inside ArticleDataEntryForm
 
   // ─── Article code validation (4-5 digits + 2 CAPS, e.g. 5249HP) ───
   const ARTICLE_CODE_REGEX = /^[0-9]{4,5}[A-Z]{2}$/;
@@ -592,22 +592,31 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     setFormErrors({});
   };
 
+  const handleClear = useCallback(() => {
+    setForm(emptyForm);
+    setEditItem(null);
+    setFormErrors({});
+  }, []);
+
   const handleEdit = (item) => {
     if (!canEdit) return; // guard — blocked if user has no edit rights
     setEditItem(item);
     setForm({
       code: item.code || "",
       desc: item.desc || "", shortName: item.shortName || "",
+      imageLink: item.imageLink || "", sketchLink: item.sketchLink || "",
+      buyerStyle: item.buyerStyle || "",
       l1Division: item.l1Division || "", l2Category: item.l2Category || "",
-      l3Style: item.l3Style || "",
+      l3Style: item.l3Style || "", season: item.season || "",
       gender: item.gender || "", fitType: item.fitType || "",
       neckline: item.neckline || "", sleeveType: item.sleeveType || "",
-      season: item.season || "", colourNames: item.colourNames || "",
+      mainFabric: item.mainFabric || "", fabricName: item.fabricName || "",
+      colorCodes: item.colorCodes || item.colourNames || "",
       sizeRange: item.sizeRange || "",
       wsp: item.wsp || "", mrp: item.mrp || "",
+      markupPct: item.markupPct || "", markdownPct: item.markdownPct || "",
       hsnCode: item.hsnCode || "", gstPct: item.gstPct || "",
-      buyerStyle: item.buyerStyle || "",
-      status: item.status || "Active", tags: item.tags || "",
+      status: item.status || "Active", remarks: item.remarks || "", tags: item.tags || "",
     });
     setTab("create");
   };
@@ -630,9 +639,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
     color: active ? A.a : M.tB, fontSize: 10, fontWeight: active ? 900 : 600,
     cursor: "pointer", fontFamily: uff,
   });
-  const inp  = { padding: "7px 10px", border: `1px solid ${M.inBd}`, borderRadius: 6, background: M.inBg, color: M.tA, fontSize: fz - 1, fontFamily: uff, width: "100%", boxSizing: "border-box", outline: "none" };
-  const lbl  = { fontSize: 9.5, fontWeight: 800, color: M.tD, fontFamily: uff, textTransform: "uppercase", letterSpacing: 0.4, display: "block", marginBottom: 4 };
-  const btn  = (bg, c) => ({ padding: "8px 18px", border: "none", borderRadius: 6, background: bg, color: c, fontSize: 11, fontWeight: 800, cursor: "pointer", fontFamily: uff });
+  // inp, lbl, btn style helpers removed — now inside ArticleDataEntryForm
 
   // ─── RENDER ───
   return (
@@ -668,201 +675,23 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
       )}
 
       {/* ── CONTENT AREA ── */}
-      <div style={{ flex: 1, overflow: tab === "layout" ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
+      <div style={{ flex: 1, overflow: (tab === "layout" || tab === "create") ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
 
         {/* ═══ CREATE / EDIT FORM ═══ */}
         {tab === "create" && (
-          <div style={{ padding: 24, maxWidth: 780, overflowY: "auto" }}>
-            <div style={{ fontSize: 13, fontWeight: 900, color: M.tA, fontFamily: uff, marginBottom: 20 }}>
-              {editItem ? `✏️ Editing ${editItem.code}` : "➕ New Article"}
-            </div>
-
-            {/* Row 0: Article Code (manual) */}
-            {!editItem && (
-              <div style={{ marginBottom: 14, maxWidth: 220 }}>
-                <label style={lbl}>🔑 Article Code *</label>
-                <input value={form.code} onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
-                  style={{ ...inp, fontFamily: "'IBM Plex Mono',monospace", fontWeight: 700, letterSpacing: 1.5, borderColor: formErrors.code ? '#ef4444' : M.inBd }}
-                  placeholder="e.g. 5249HP" maxLength={7} />
-                {formErrors.code && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.code}</div>}
-                <div style={{ fontSize: 8, color: M.tD, marginTop: 2 }}>4-5 digits + 2 uppercase letters</div>
-              </div>
-            )}
-
-            {/* Row 1: L1 Division + L2 Category + L3 Style + HSN + GST% */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 110px 80px", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>L1 Division *</label>
-                <select value={form.l1Division} onChange={e => setL1Division(e.target.value)}
-                  style={{ ...inp, borderColor: formErrors.l1Division ? '#ef4444' : M.inBd }}>
-                  <option value="">Select Division…</option>
-                  {divisions.map(d => <option key={d} value={d}>{divIcon(d)} {d}</option>)}
-                </select>
-                {formErrors.l1Division && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.l1Division}</div>}
-              </div>
-              <div>
-                <label style={lbl}>L2 Product Category *</label>
-                <select value={form.l2Category} onChange={e => setL2Category(e.target.value)}
-                  disabled={!form.l1Division}
-                  style={{ ...inp, borderColor: formErrors.l2Category ? '#ef4444' : M.inBd, opacity: form.l1Division ? 1 : 0.5 }}>
-                  <option value="">Select Category…</option>
-                  {l2Opts.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                {formErrors.l2Category && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.l2Category}</div>}
-              </div>
-              <div>
-                <label style={lbl}>L3 Style</label>
-                <select value={form.l3Style} onChange={e => setL3Style(e.target.value)}
-                  disabled={!form.l2Category}
-                  style={{ ...inp, opacity: form.l2Category ? 1 : 0.5 }}>
-                  <option value="">Select Style…</option>
-                  {l3Opts.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>→ HSN Code</label>
-                <input value={form.hsnCode} onChange={e => setForm(f => ({ ...f, hsnCode: e.target.value }))}
-                  style={inp} placeholder="Auto" />
-                <div style={{ fontSize: 7.5, color: M.tD, marginTop: 2 }}>Auto from L2</div>
-              </div>
-              <div>
-                <label style={lbl}>← GST % (Auto)</label>
-                <input value={form.gstPct} readOnly
-                  style={{ ...inp, background: '#f0f4f0', cursor: 'default', textAlign: 'center', fontWeight: 700 }}
-                  placeholder="—" />
-                <div style={{ fontSize: 7.5, color: M.tD, marginTop: 2 }}>Auto</div>
-              </div>
-            </div>
-
-            {/* Row 2: Description (auto from L1›L2›L3) + Short Name */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 220px", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>Article Description (auto: L1 › L2 › L3)</label>
-                <input value={form.desc} readOnly
-                  style={{ ...inp, background: '#f0f4f0', cursor: 'default', borderColor: formErrors.desc ? '#ef4444' : M.inBd }}
-                  placeholder="Auto-filled from levels" />
-                {formErrors.desc && <div style={{ fontSize: 9, color: '#ef4444', marginTop: 3 }}>{formErrors.desc}</div>}
-              </div>
-              <div>
-                <label style={lbl}>Short Name</label>
-                <input value={form.shortName} onChange={e => setForm(f => ({ ...f, shortName: e.target.value }))}
-                  style={inp} placeholder="e.g. Pique Polo" />
-              </div>
-            </div>
-
-            {/* Row 3: Gender + Fit Type + Neckline + Sleeve */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>Gender</label>
-                <select value={form.gender} onChange={e => setForm(f => ({ ...f, gender: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {genderOpts.map(g => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Fit Type</label>
-                <select value={form.fitType} onChange={e => setForm(f => ({ ...f, fitType: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {fitOpts.map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Neckline</label>
-                <select value={form.neckline} onChange={e => setForm(f => ({ ...f, neckline: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {neckOpts.map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Sleeve Type</label>
-                <select value={form.sleeveType} onChange={e => setForm(f => ({ ...f, sleeveType: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {sleeveOpts.map(x => <option key={x} value={x}>{x}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 4: Season + Colour Names + Size Range + Status */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>Season</label>
-                <select value={form.season} onChange={e => setForm(f => ({ ...f, season: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {seasonOpts.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Colour Name(s)</label>
-                <select value={form.colourNames} onChange={e => setForm(f => ({ ...f, colourNames: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {colourOpts.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Size Range</label>
-                <select value={form.sizeRange} onChange={e => setForm(f => ({ ...f, sizeRange: e.target.value }))} style={inp}>
-                  <option value="">—</option>
-                  {sizeRangeOpts.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={lbl}>Status</label>
-                <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} style={inp}>
-                  {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 5: WSP + MRP + Buyer Style + Tags */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 14, marginBottom: 14 }}>
-              <div>
-                <label style={lbl}>W.S.P (Rs)</label>
-                <input type="number" value={form.wsp} onChange={e => setForm(f => ({ ...f, wsp: e.target.value }))}
-                  style={inp} placeholder="0" />
-              </div>
-              <div>
-                <label style={lbl}>MRP (Rs)</label>
-                <input type="number" value={form.mrp} onChange={e => setForm(f => ({ ...f, mrp: e.target.value }))}
-                  style={inp} placeholder="0" />
-              </div>
-              <div>
-                <label style={lbl}>Buyer Style No</label>
-                <input value={form.buyerStyle} onChange={e => setForm(f => ({ ...f, buyerStyle: e.target.value }))}
-                  style={inp} placeholder="Optional" />
-              </div>
-              <div>
-                <label style={lbl}>⟷ Tags</label>
-                <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
-                  style={inp} placeholder="e.g. New, Featured" />
-              </div>
-            </div>
-
-            {/* Preview */}
-            {form.l1Division && form.l2Category && (
-              <div style={{ padding: 14, borderRadius: 8, border: `1px dashed ${A.a}`, background: A.al, marginBottom: 16 }}>
-                <div style={{ fontSize: 9, fontWeight: 900, textTransform: "uppercase", color: A.a, letterSpacing: 0.5, marginBottom: 6 }}>Preview</div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                  <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 12, color: divColor(form.l1Division) }}>{editItem ? editItem.code : (form.code || '—')}</span>
-                  <span style={{ color: M.div }}>│</span>
-                  <span style={{ fontWeight: 700, color: M.tA }}>{form.l1Division}</span>
-                  <span style={{ color: M.tD }}>›</span>
-                  <span style={{ fontWeight: 600, color: M.tB }}>{form.l2Category}</span>
-                  {form.l3Style && <><span style={{ color: M.tD }}>›</span><span style={{ fontWeight: 600, color: M.tB }}>{form.l3Style}</span></>}
-                  <span style={{ color: M.div }}>│</span>
-                  <span style={{ fontWeight: 800, color: M.tA }}>{form.desc}</span>
-                  {form.hsnCode && <><span style={{ color: M.div }}>│</span><span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 11, color: M.tC }}>HSN {form.hsnCode}</span></>}
-                </div>
-              </div>
-            )}
-
-            {/* Action buttons */}
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", paddingTop: 12, borderTop: `1px solid ${M.div}` }}>
-              <button onClick={() => { setForm(emptyForm); setEditItem(null); setFormErrors({}); }} style={btn(M.bBg, M.bTx)}>↺ Clear</button>
-              <button onClick={handleSave} style={btn(A.a, A.tx)}>
-                {editItem ? "💾 Update Article" : "✚ Save Article"}
-              </button>
-            </div>
-          </div>
+          <ArticleDataEntryForm
+            M={M} A={A} uff={uff} dff={dff}
+            form={form} setForm={setForm}
+            editItem={editItem}
+            formErrors={formErrors} setFormErrors={setFormErrors}
+            handleSave={handleSave} handleClear={handleClear}
+            divisions={divisions} l2ByDiv={l2ByDiv} l3ByL2={l3ByL2} l2Hsn={l2Hsn}
+            genderOpts={genderOpts} fitOpts={fitOpts} neckOpts={neckOpts}
+            sleeveOpts={sleeveOpts} statusOpts={statusOpts} seasonOpts={seasonOpts}
+            sizeRangeOpts={sizeRangeOpts} colourOpts={colourOpts}
+            setL1Division={setL1Division} setL2Category={setL2Category} setL3Style={setL3Style}
+            HSN_GST_MAP={HSN_GST_MAP} data={data}
+          />
         )}
 
         {/* ═══ RECORDS ═══ */}

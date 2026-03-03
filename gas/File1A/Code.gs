@@ -56,6 +56,31 @@ function onEdit(e) {
   // Ignore edits on ITEM_CHANGE_LOG itself (prevent recursion)
   if (sheetName === CONFIG.SHEETS.ITEM_CHANGE_LOG) return;
 
+  // ── Multi-select toggle: RM_MASTER_FABRIC col G (⟷ YARN COMPOSITION) ──
+  // User picks a yarn name from dropdown → append to existing values with | separator.
+  // If the name is already in the list, remove it (toggle behavior).
+  if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && col === 7) {
+    try {
+      var newVal  = String(e.value || '').trim();
+      var oldVal  = (e.oldValue !== undefined) ? String(e.oldValue).trim() : '';
+      if (newVal && oldVal) {
+        var existing = oldVal.split('|').map(function(s) { return s.trim(); }).filter(Boolean);
+        var idx = existing.indexOf(newVal);
+        if (idx !== -1) {
+          existing.splice(idx, 1);                   // toggle OFF — remove if present
+        } else {
+          existing.push(newVal);                      // toggle ON — append new name
+        }
+        var merged = existing.join(' | ');
+        e.range.setValue(merged);
+        // e.range still points to this cell; downstream _directFKResolveOnEdit
+        // reads the updated value via e.range.getValue()
+      }
+    } catch (err) {
+      Logger.log('Multi-select toggle error: ' + err.message);
+    }
+  }
+
   // ── Auto Description: ARTICLE_MASTER col B = L1 › L2 › L3 ──
   if (sheetName === CONFIG.SHEETS.ARTICLE_MASTER && (col === 7 || col === 8 || col === 9)) {
     try {
@@ -97,8 +122,12 @@ function onEdit(e) {
   }
 
   // ── Module 2: FK Auto-Display ──
+  // Skip handleFKEdit for RM_MASTER_FABRIC col G (⟷ YARN COMPOSITION) — it writes to col+1 (H)
+  // which is wrong. The correct handler is _directFKResolveOnEdit below (writes to col-1 = F).
   try {
-    handleFKEdit(e);
+    if (!(sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && col === 7)) {
+      handleFKEdit(e);
+    }
   } catch (err) {
     Logger.log('FK Engine error: ' + err.message);
   }
@@ -608,18 +637,18 @@ function _directFKResolveOnEdit(sheet, sheetName, row, col, e) {
   var headerVal = String(sheet.getRange(2, col).getValue()).trim();
   var cellValue = String(e.range.getValue() || '').trim();
 
-  // ── RM_MASTER_FABRIC: ⟷ YARN COMPOSITION (col G, names) → Yarn Codes (col F = col-1) ──
+  // ── RM_MASTER_FABRIC: ⟷ YARN COMPOSITION (col G, names separated by |) → Yarn Codes (col F, comma-separated) ──
   if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC) {
     var normHeader = _normalizeHeader(headerVal);
     if (normHeader === 'yarn composition') {
       // Resolve yarn names → yarn codes from RM_MASTER_YARN (direct read)
+      // Col G names are pipe-separated, col F codes are comma-separated
       var yarnCodes = cellValue
-        ? _directResolveFK(CONFIG.SHEETS.RM_MASTER_YARN, cellValue, 'Yarn Name', '# RM Code', true)
+        ? _directResolveFKPipeToComma(CONFIG.SHEETS.RM_MASTER_YARN, cellValue, 'Yarn Name', '# RM Code')
         : '';
       sheet.getRange(row, col - 1).setValue(yarnCodes);
 
       // Also rebuild ∑ FINAL FABRIC SKU (col B) = L3 Knit Type — Yarn Names
-      // cellValue already holds the yarn names (user input from col G)
       var knitType = String(sheet.getRange(row, 5).getValue() || '').trim();
       var skuParts = [knitType, cellValue].filter(function(p) { return p !== ''; });
       sheet.getRange(row, 2).setValue(skuParts.length > 0 ? skuParts.join(' — ') : '');
@@ -704,6 +733,65 @@ function _directResolveFK(refSheetName, codes, codeHeader, displayHeader, isMult
     var trimmed = String(codes).trim();
     return map[trimmed] || trimmed;
   }
+}
+
+
+/**
+ * Resolves pipe-separated names to comma-separated codes.
+ * Used for RM_MASTER_FABRIC col G (names | separated) → col F (codes , separated).
+ *
+ * @param {string} refSheetName   Name of the referenced sheet (RM_MASTER_YARN)
+ * @param {string} pipeNames      Pipe-separated names (e.g. "Cotton 40s | Polyester DTY")
+ * @param {string} nameHeader     Header of the name column in ref sheet (Yarn Name)
+ * @param {string} codeHeader     Header of the code column in ref sheet (# RM Code)
+ * @returns {string} Comma-separated codes (e.g. "RM-YRN-001, RM-YRN-003")
+ */
+function _directResolveFKPipeToComma(refSheetName, pipeNames, nameHeader, codeHeader) {
+  if (!pipeNames || String(pipeNames).trim() === '') return '';
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var refSheet = ss.getSheetByName(refSheetName);
+  if (!refSheet) {
+    Logger.log('_directResolveFKPipeToComma: Sheet "' + refSheetName + '" not found');
+    return '';
+  }
+
+  var lastRow = refSheet.getLastRow();
+  var lastCol = refSheet.getLastColumn();
+  if (lastRow < 4 || lastCol < 1) return '';
+
+  var headers = refSheet.getRange(2, 1, 1, lastCol).getValues()[0];
+  var nameIdx = _findColumnIndex(headers, nameHeader);
+  var codeIdx = _findColumnIndex(headers, codeHeader);
+
+  if (nameIdx === -1 || codeIdx === -1) {
+    Logger.log('_directResolveFKPipeToComma: Column not found. nameHeader="' +
+               nameHeader + '" (idx=' + nameIdx + '), codeHeader="' + codeHeader + '" (idx=' + codeIdx + ')');
+    return '';
+  }
+
+  var numRows = lastRow - 3;
+  var data = refSheet.getRange(4, 1, numRows, lastCol).getValues();
+
+  // Build name → code map (case-insensitive key for robustness)
+  var map = {};
+  for (var r = 0; r < data.length; r++) {
+    var name = String(data[r][nameIdx]).trim();
+    var code = String(data[r][codeIdx]).trim();
+    if (name && code) map[name.toLowerCase()] = code;
+  }
+
+  // Split by pipe, resolve each name → code
+  var nameList = String(pipeNames).split('|');
+  var codes = [];
+  for (var j = 0; j < nameList.length; j++) {
+    var n = nameList[j].trim();
+    if (!n) continue;
+    var resolved = map[n.toLowerCase()];
+    codes.push(resolved || n);    // fallback to name if code not found
+  }
+
+  return codes.join(', ');
 }
 
 
