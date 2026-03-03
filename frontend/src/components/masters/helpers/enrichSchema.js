@@ -66,6 +66,7 @@ export function enrichSchema(sheetKey) {
       hint: fm.hint || field.header || `Enter ${field.label}`,
       fieldType,
       opts: resolvedOpts,
+      _optsKey: fm.opts || null,
     };
   });
 

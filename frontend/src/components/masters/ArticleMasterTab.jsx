@@ -2564,7 +2564,7 @@ export function ArticleMasterLayoutPanel({ M: rawM, A, uff, dff, canEdit = true,
       if (!h[l1val].l2s[l2val]) h[l1val].l2s[l2val] = [];
       h[l1val].l2s[l2val].push(r);
     });
-    if (groupByL1 === "l1Division") return divisions.map(d => h[d]).filter(Boolean);
+    if (groupByL1 === "l1Division") return INIT_DIVISIONS.map(d => h[d]).filter(Boolean);
     return Object.keys(h).sort().map(k => h[k]);
   }, [processedData, groupByL1, groupByL2]);
 

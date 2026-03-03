@@ -113,9 +113,9 @@ function onEdit(e) {
   }
 
   // ── Auto SKU: RM_MASTER_FABRIC col B = L3 Knit Type + Yarn Names ──
-  // V9 columns: E(5)=L3 Knit Type, F(6)=⟷ YARN COMPOSITION, G(7)=← Yarn Names (Auto), B(2)=∑ FINAL FABRIC SKU
+  // V9 columns: E(5)=L3 Knit Type, F(6)=← Yarn Codes (Auto), G(7)=⟷ YARN COMPOSITION (names), B(2)=∑ FINAL FABRIC SKU
   // Triggers when L3 Knit Type (col 5) is edited.
-  // When col 6 is edited, _directFKResolveOnEdit above already rebuilds col B + col G.
+  // When col 7 is edited, _directFKResolveOnEdit above already rebuilds col B + col F.
   if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC && col === 5) {
     try {
       var knitType  = String(sheet.getRange(row, 5).getValue() || '').trim();
@@ -608,19 +608,20 @@ function _directFKResolveOnEdit(sheet, sheetName, row, col, e) {
   var headerVal = String(sheet.getRange(2, col).getValue()).trim();
   var cellValue = String(e.range.getValue() || '').trim();
 
-  // ── RM_MASTER_FABRIC: ⟷ YARN COMPOSITION → Yarn Names (col+1) ──
+  // ── RM_MASTER_FABRIC: ⟷ YARN COMPOSITION (col G, names) → Yarn Codes (col F = col-1) ──
   if (sheetName === CONFIG.SHEETS.RM_MASTER_FABRIC) {
     var normHeader = _normalizeHeader(headerVal);
     if (normHeader === 'yarn composition') {
-      // Resolve yarn codes → yarn names from RM_MASTER_YARN (direct read)
-      var yarnDisplay = cellValue
-        ? _directResolveFK(CONFIG.SHEETS.RM_MASTER_YARN, cellValue, '# RM Code', 'Yarn Name', true)
+      // Resolve yarn names → yarn codes from RM_MASTER_YARN (direct read)
+      var yarnCodes = cellValue
+        ? _directResolveFK(CONFIG.SHEETS.RM_MASTER_YARN, cellValue, 'Yarn Name', '# RM Code', true)
         : '';
-      sheet.getRange(row, col + 1).setValue(yarnDisplay);
+      sheet.getRange(row, col - 1).setValue(yarnCodes);
 
       // Also rebuild ∑ FINAL FABRIC SKU (col B) = L3 Knit Type — Yarn Names
+      // cellValue already holds the yarn names (user input from col G)
       var knitType = String(sheet.getRange(row, 5).getValue() || '').trim();
-      var skuParts = [knitType, yarnDisplay].filter(function(p) { return p !== ''; });
+      var skuParts = [knitType, cellValue].filter(function(p) { return p !== ''; });
       sheet.getRange(row, 2).setValue(skuParts.length > 0 ? skuParts.join(' — ') : '');
       return;
     }
@@ -730,7 +731,7 @@ function _directResolveFabricName(fabricCode) {
   var codeIdx = _findColumnIndex(headers, '# RM Code');
   var skuIdx  = _findColumnIndex(headers, '∑ FINAL FABRIC SKU');
   var knitIdx = _findColumnIndex(headers, 'L3 Knit Type');
-  var yarnIdx = _findColumnIndex(headers, '← Yarn Names (Auto)');
+  var yarnIdx = _findColumnIndex(headers, '⟷ YARN COMPOSITION');
 
   if (codeIdx === -1) return fabricCode;
 

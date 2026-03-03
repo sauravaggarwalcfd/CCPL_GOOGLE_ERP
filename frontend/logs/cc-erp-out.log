@@ -1,0 +1,17 @@
+2026-03-03 08:00:22: 8:00:22 AM [vite] (client) Re-optimizing dependencies because vite config has changed
+2026-03-03 08:00:22: 
+2026-03-03 08:00:22:   VITE v6.4.1  ready in 1427 ms
+2026-03-03 08:00:22: 
+2026-03-03 08:00:22:   ➜  Local:   http://localhost:9090/
+2026-03-03 08:00:22:   ➜  Network: http://10.0.3.87:9090/
+2026-03-03 08:02:38: 8:02:38 AM [vite] (client) page reload src/components/masters/ArticleMasterTab.jsx
+2026-03-03 08:03:16: 
+2026-03-03 08:03:16:   VITE v6.4.1  ready in 753 ms
+2026-03-03 08:03:16: 
+2026-03-03 08:03:16:   ➜  Local:   http://localhost:9090/
+2026-03-03 08:03:16:   ➜  Network: http://10.0.3.87:9090/
+2026-03-03 08:16:05: 
+2026-03-03 08:16:05:   VITE v6.4.1  ready in 510 ms
+2026-03-03 08:16:05: 
+2026-03-03 08:16:05:   ➜  Local:   http://localhost:9090/
+2026-03-03 08:16:05:   ➜  Network: http://10.0.3.87:9090/

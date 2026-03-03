@@ -55,8 +55,8 @@ export const FK_DATA = {
     { v: "RM-FAB-004", l: "RM-FAB-004 — French Terry 240GSM" },
   ],
   rm_yarn: [
-    { v: "RM-YRN-001", l: "RM-YRN-001 — 30s Cotton Ring Spun" },
-    { v: "RM-YRN-002", l: "RM-YRN-002 — 40s Combed Cotton" },
+    { v: "30s Cotton Ring Spun", l: "30s Cotton Ring Spun — RM-YRN-001" },
+    { v: "40s Combed Cotton", l: "40s Combed Cotton — RM-YRN-002" },
   ],
   hsn_master: [
     { v: "6105", l: "6105 — Tops - Polo", gst: 5 },
@@ -134,6 +134,7 @@ export const DROPDOWN_OPTS = {
   neckline:  [{ v: "Round Neck", l: "Round Neck" }, { v: "V-Neck", l: "V-Neck" }, { v: "Polo", l: "Polo" }, { v: "Henley", l: "Henley" }, { v: "Hood", l: "Hood" }, { v: "Crew Neck", l: "Crew Neck" }, { v: "Quarter Zip", l: "Quarter Zip" }, { v: "Mock Neck", l: "Mock Neck" }],
   sleeve:    [{ v: "Half Sleeve", l: "Half Sleeve" }, { v: "Full Sleeve", l: "Full Sleeve" }, { v: "Sleeveless", l: "Sleeveless" }, { v: "Cap Sleeve", l: "Cap Sleeve" }, { v: "3/4 Sleeve", l: "3/4 Sleeve" }, { v: "Raglan", l: "Raglan" }],
   status:    [{ v: "Active", l: "Active" }, { v: "Inactive", l: "Inactive" }, { v: "Development", l: "Development" }, { v: "Discontinued", l: "Discontinued" }],
+  season:    [{ v: "SS2024", l: "SS2024" }, { v: "AW2024", l: "AW2024" }, { v: "SS2025", l: "SS2025" }, { v: "AW2025", l: "AW2025" }, { v: "SS2026", l: "SS2026" }, { v: "AW2026", l: "AW2026" }, { v: "Year Round", l: "Year Round" }],
   fabricType:[{ v: "KORA", l: "KORA" }, { v: "FINISHED", l: "FINISHED" }],
   fabricColour: [{ v: "KORA", l: "KORA" }, { v: "COLOURED", l: "COLOURED" }, { v: "DYED", l: "DYED" }, { v: "MÉLANGE", l: "MÉLANGE" }],
   stretch:   [{ v: "Very High", l: "Very High" }, { v: "High", l: "High" }, { v: "Medium", l: "Medium" }, { v: "Low", l: "Low" }, { v: "None", l: "None" }],

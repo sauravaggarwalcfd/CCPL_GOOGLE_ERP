@@ -5,7 +5,7 @@
 > **Generated:** 2 Mar 2026
 > **V9.1 Fixes:** Article Code manual entry, duplicate check self-match, L1/L2/L3 from ITEM_CATEGORIES
 > **V10 Changes:** ITEM_CATEGORIES restructured to column-grouped layout (22 cols). New ARTICLE_DROPDOWNS sheet. FK_DATA split per level. Auto-description (L1 › L2 › L3).
-> **V12.4 Fixes:** `_isFKColumn()` now recognizes `⟷` prefix → Yarn Names + Tags auto-fill works. Fabric SKU (col B) auto-builds from L3 Knit Type + Yarn Names.
+> **V12.4 Fixes:** `_isFKColumn()` now recognizes `⟷` prefix → Yarn Codes + Tags auto-fill works. Fabric SKU (col B) auto-builds from L3 Knit Type + Yarn Names. **V12.5:** Col F = user selects yarn names (multi), Col G = auto-fills yarn codes.
 > **V12.5 Fixes:** Direct FK resolution bypassing MASTER_RELATIONS cache for reliable Yarn Name + Fabric Name lookups.
 > **V12.6 Fixes:** Frontend webapp now fetches all dropdowns live from GAS API. Season/Colour/Size Range dropdowns added. HSN → GST% auto-fill in webapp form. ARTICLE_DROPDOWNS API reads 7 columns (added Size Range col G).
 
@@ -133,8 +133,8 @@
 | **C** | **`L1 Division`** | `l1Division` | Fixed | **Auto-fill** | — | Always "Raw Material" (green bg, read-only) |
 | **D** | **`L2 Category`** | `l2Category` | Fixed | **Auto-fill** | — | Always "Knit Fabric" (green bg, read-only) |
 | **E** | **`L3 Knit Type`** | `l3KnitType` | Dropdown | User picks | ITEM_CATEGORIES | Single Jersey, Pique, Fleece, French Terry, etc. |
-| F | `⟷ YARN COMPOSITION` | `yarnComp` | Multi-FK | User selects | RM_MASTER_YARN | Select `RM-YRN-NNN` codes |
-| G | `← Yarn Names (Auto)` | `yarnNames` | Auto-display | **GAS fills** | — | Read-only, from RM_MASTER_YARN |
+| F | `← Yarn Codes (Auto)` | `yarnComp` | Auto-display | **GAS fills** | — | Read-only, auto-fills `RM-YRN-NNN` codes from RM_MASTER_YARN |
+| G | `⟷ YARN COMPOSITION` | `yarnNames` | Multi-FK | User selects | RM_MASTER_YARN | Select yarn **names** (multi-select) |
 | H | `FABRIC TYPE` | `fabricType` | Dropdown | User picks | — | KORA / FINISHED |
 | I | `COLOUR` | `colour` | Dropdown | User picks | — | KORA/COLOURED/DYED/MEL |
 | J | `GSM (Min)` | `gsmMin` | Number | User enters | — | Grams per sq meter |
@@ -772,17 +772,17 @@ UI Rendering (dropdowns, auto-fill, text, currency)
 ### FK Flow: RM_MASTER_FABRIC → RM_MASTER_YARN (REL-006)
 
 ```
-User edits col F (⟷ YARN COMPOSITION) → e.g., "RM-YRN-001, RM-YRN-002"
+User edits col G (⟷ YARN COMPOSITION) → e.g., "30s Cotton Ring Spun, 40s Combed Cotton"
   │
   ├─ _isFKColumn("⟷ YARN COMPOSITION") → TRUE (detects ⟷)
   ├─ getRelationForColumn() → REL-006 (multiSelect=Yes)
-  ├─ resolveMultiSelectFK() → reads RM_MASTER_YARN:
-  │     "# RM Code" (col A) for matching, "Yarn Name" (col E) for display
-  │     → returns "30s Cotton Ring Spun, 40s Combed Cotton"
-  ├─ Writes col G (← Yarn Names Auto): "30s Cotton Ring Spun, 40s Combed Cotton"
+  ├─ _directFKResolveOnEdit() → reads RM_MASTER_YARN:
+  │     "Yarn Name" (col E) for matching, "# RM Code" (col A) for display
+  │     → returns "RM-YRN-001, RM-YRN-002"
+  ├─ Writes col F (← Yarn Codes Auto): "RM-YRN-001, RM-YRN-002"
   │
   └─ Auto SKU handler (Code.gs):
-       Reads col 5 (L3 Knit Type) + col 7 (Yarn Names)
+       Reads col 5 (L3 Knit Type) + col 7 (Yarn Names from user input in col G)
        → Writes col 2 (∑ FINAL FABRIC SKU): "Single Jersey — 30s Cotton Ring Spun, 40s Combed Cotton"
 ```
 

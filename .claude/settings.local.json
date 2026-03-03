@@ -27,7 +27,13 @@
       "Bash(curl -s -L \"https://script.google.com/macros/s/AKfycbzAynnUkGS4tppsn0tpzcFmDhnl5SWJdMVWoBwPdHco7qDn-1dyiwBGGL5byyzACHhPSw/exec?action=getAllCategories&payload=%7B%7D\")",
       "Bash(python3 -c \"import sys,json; d=json.loads\\(sys.stdin.read\\(\\)\\); cats=d.get\\(''data'',[]\\); print\\(''Total cats:'', len\\(cats\\)\\); print\\(''First 5:'', json.dumps\\(cats[:5], indent=2\\)\\); print\\(''Masters:'', set\\(c.get\\(''master'',''''\\) for c in cats\\)\\)\")",
       "Bash(git add frontend/src/components/masters/ArticleMasterTab.jsx)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(pm2 list:*)",
+      "Bash(npx pm2:*)",
+      "Bash(lsof:*)",
+      "Bash(kill 146441:*)",
+      "Bash(mkdir:*)",
+      "Bash(curl:*)"
     ]
   }
 }

@@ -65,8 +65,80 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
   const [editingView, setEditingView] = useState(null);
 
   // ── Enriched schema (memoized) ──
-  const enriched = useMemo(() => enrichSchema(sheet.key), [sheet.key]);
+  const enrichedStatic = useMemo(() => enrichSchema(sheet.key), [sheet.key]);
   const schema = SCHEMA_MAP[sheet.key] || FALLBACK_SCHEMA;
+
+  // ── LIVE DROPDOWN DATA from GAS API (article_master only) ──
+  const [liveOpts, setLiveOpts] = useState(null);
+
+  useEffect(() => {
+    if (sheet.key !== 'article_master') { setLiveOpts(null); return; }
+    let cancelled = false;
+    async function fetchLiveDropdowns() {
+      try {
+        const [cats, dd] = await Promise.all([
+          api.getItemCategories(),
+          api.getArticleDropdowns(),
+        ]);
+        if (cancelled) return;
+        const ov = {};
+        // Header/description garbage from old GAS deployments
+        const GARBAGE = new Set([
+          'Gender', 'Fit Type', 'Neckline', 'Sleeve Type', 'Status', 'Season', 'Size Range',
+          'Men/Women/Kids/Unisex', 'Regular/Slim/Relaxed/Oversized',
+          'Round Neck/V-Neck/Collar etc.', 'Half/Full/Sleeveless etc.',
+          'Active/Inactive/Development', 'SS25/AW26 examples', 'S-M-L-XL-XXL etc.',
+        ]);
+        const clean = (arr) => (arr || []).filter(v => v && !GARBAGE.has(v));
+        const toVL  = (arr) => clean(arr).map(v => ({ v, l: v }));
+        // L1/L2/L3 from ITEM_CATEGORIES
+        if (Array.isArray(cats) && cats.length > 0) {
+          const artCats = cats.filter(c => c.master === 'ARTICLE' && c.l1);
+          const l1s = [...new Set(artCats.map(c => c.l1))];
+          const l2s = [...new Set(artCats.map(c => c.l2).filter(Boolean))];
+          const l3s = [...new Set(artCats.map(c => c.l3).filter(Boolean))];
+          if (l1s.length) ov.article_l1 = l1s.map(v => ({ v, l: v }));
+          if (l2s.length) ov.article_l2 = l2s.map(v => ({ v, l: v }));
+          if (l3s.length) ov.article_l3 = l3s.map(v => ({ v, l: v }));
+        }
+        // Dropdowns from ARTICLE_DROPDOWNS sheet
+        if (dd) {
+          if (dd.gender)    ov.gender    = toVL(dd.gender);
+          if (dd.fit)       ov.fit       = toVL(dd.fit);
+          if (dd.neckline)  ov.neckline  = toVL(dd.neckline);
+          if (dd.sleeve)    ov.sleeve    = toVL(dd.sleeve);
+          if (dd.status)    ov.status    = toVL(dd.status);
+          if (dd.season)    ov.season    = toVL(dd.season);
+          if (dd.sizeRange) ov.sizeRange = toVL(dd.sizeRange);
+        }
+        setLiveOpts(ov);
+      } catch (err) {
+        console.warn('[SheetWorkspace] Failed to fetch live dropdowns:', err);
+      }
+    }
+    fetchLiveDropdowns();
+    return () => { cancelled = true; };
+  }, [sheet.key]);
+
+  // ── Merge live data into enriched schema ──
+  const enriched = useMemo(() => {
+    if (!liveOpts || sheet.key !== 'article_master') return enrichedStatic;
+    return {
+      ...enrichedStatic,
+      fields: enrichedStatic.fields.map(f => {
+        // Override FK data (l1Division→article_l1, l2Category→article_l2, etc.)
+        if (f.fk && liveOpts[f.fk]) {
+          return { ...f, fkData: liveOpts[f.fk] };
+        }
+        // Override dropdown opts (gender, fit, neckline, sleeve, status, season, sizeRange, colorNames)
+        const metaOpts = f._optsKey; // we'll need to carry the opts key through
+        if (f._optsKey && liveOpts[f._optsKey]) {
+          return { ...f, opts: liveOpts[f._optsKey] };
+        }
+        return f;
+      }),
+    };
+  }, [enrichedStatic, liveOpts, sheet.key]);
 
   // ── Initialize views when sheet changes ──
   useEffect(() => {
@@ -89,11 +161,22 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     ? currentView.fields
     : enriched.fields.map(f => f.key);
 
+  // ── HSN → GST% map for article_master auto-fill ──
+  const HSN_GST = { "6105": "5", "6109": "5", "6110": "12", "6112": "12", "6103": "5" };
+  const L2_HSN  = { "Tops - Polo": "6105", "Tops - Tee": "6109", "Sweatshirt": "6110", "Tracksuit": "6112", "Bottoms": "6103" };
+
   // ── Field change handler ──
   const handleFieldChange = (key, val) => {
     setIsDirty(true);
     setErrors(prev => { const e = { ...prev }; delete e[key]; return e; });
-    setFormData(prev => ({ ...prev, [key]: val }));
+    // Article Master: auto-fill HSN + GST% when L2 changes
+    if (sheet.key === 'article_master' && key === 'l2Category') {
+      const hsn = L2_HSN[val] || '';
+      const gst = hsn ? (HSN_GST[hsn] || '') : '';
+      setFormData(prev => ({ ...prev, [key]: val, hsnCode: hsn, gstPct: gst }));
+    } else {
+      setFormData(prev => ({ ...prev, [key]: val }));
+    }
   };
 
   // ── Validate ──
