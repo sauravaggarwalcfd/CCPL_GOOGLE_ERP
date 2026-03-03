@@ -73,7 +73,9 @@ var LOCAL_MASTERS = [
   'SIZE_MASTER',
   'FABRIC_TYPE_MASTER',
   'TAG_MASTER',
-  'MASTER_RELATIONS'
+  'MASTER_RELATIONS',
+  'ARTICLE_DROPDOWNS',
+  'ITEM_CHANGE_LOG'
 ];
 
 /**
@@ -512,6 +514,20 @@ function invalidateCache(sheetName) {
   } catch (e) {
     Logger.log('invalidateCache L2 error for ' + sheetName + ': ' + e.message);
   }
+
+  // Increment version counter for incremental sync (getDataSince)
+  try {
+    var versionKey = 'VERSION_' + sheetName;
+    var current = parseInt(cache.get(versionKey) || '0', 10);
+    cache.put(versionKey, String(current + 1), CACHE_TTL);
+  } catch (e) {
+    Logger.log('invalidateCache version bump error for ' + sheetName + ': ' + e.message);
+  }
+
+  // Also invalidate sheet counts cache so getMasterSheetCounts picks up changes
+  try {
+    cache.remove('API_MASTER_SHEET_COUNTS');
+  } catch (e) {}
 
   Logger.log('Cache invalidated for ' + sheetName);
 }

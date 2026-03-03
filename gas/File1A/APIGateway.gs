@@ -152,7 +152,13 @@ var API_ROUTES = {
   // -------------------------------------------------------------------------
   // V10 — Article Dropdowns + Live Dropdown Data
   // -------------------------------------------------------------------------
-  'getArticleDropdowns':  handleGetArticleDropdowns
+  'getArticleDropdowns':  handleGetArticleDropdowns,
+
+  // -------------------------------------------------------------------------
+  // V13 — Performance: Boot Bundle + Incremental Sync
+  // -------------------------------------------------------------------------
+  'getBootBundle':        handleGetBootBundle,
+  'getDataSince':         handleGetDataSince
 };
 
 
@@ -721,32 +727,16 @@ function handleGetActivityFeed(params) {
   var limit = parseInt(params.limit, 10) || 20;
 
   try {
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CHANGE_LOG);
-    if (!sheet) return [];
+    // Use 3-layer cache instead of raw sheet read
+    var allData = getCachedData(CONFIG.SHEETS.ITEM_CHANGE_LOG);
+    if (!allData || !allData.length) return [];
 
-    var lastRow = sheet.getLastRow();
-    if (lastRow < 4) return [];
-
-    var lastCol = sheet.getLastColumn();
-    var headers = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
-    var numRows = Math.min(lastRow - 3, limit);
-
-    // Read the most recent rows (bottom of the sheet)
-    var startRow = Math.max(4, lastRow - numRows + 1);
-    var data = sheet.getRange(startRow, 1, lastRow - startRow + 1, lastCol).getValues();
-
+    // Return last N entries in reverse (newest first)
+    var start = Math.max(0, allData.length - limit);
     var feed = [];
-    // Iterate in reverse to get newest first
-    for (var r = data.length - 1; r >= 0 && feed.length < limit; r--) {
-      var entry = {};
-      for (var c = 0; c < headers.length; c++) {
-        var h = String(headers[c]).trim();
-        if (h) entry[h] = data[r][c];
-      }
-      feed.push(entry);
+    for (var i = allData.length - 1; i >= start && feed.length < limit; i--) {
+      feed.push(allData[i]);
     }
-
     return feed;
 
   } catch (err) {
@@ -1024,6 +1014,14 @@ var MASTER_SHEET_MAP = {
  * Example: { "article_master": 24, "rm_fabric": 18, ... }
  */
 function handleGetMasterSheetCounts(params) {
+  // Check CacheService first (5-min TTL)
+  var cache = CacheService.getScriptCache();
+  var cacheKey = 'API_MASTER_SHEET_COUNTS';
+  var cached = cache.get(cacheKey);
+  if (cached) {
+    try { return JSON.parse(cached); } catch(e) {}
+  }
+
   var result = {};
   var ssCache = {};
 
@@ -1041,6 +1039,9 @@ function handleGetMasterSheetCounts(params) {
       result[key] = 0;
     }
   }
+
+  // Cache for 5 minutes (300 seconds)
+  try { cache.put(cacheKey, JSON.stringify(result), 300); } catch(e) {}
   return result;
 }
 
@@ -1052,46 +1053,48 @@ function handleGetMasterSheetCounts(params) {
  */
 function handleGetMasterData(params) {
   var sheetKey = params.sheet || '';
+  var page     = parseInt(params.page, 10) || 0;   // 0 = no pagination (return all)
+  var pageSize = parseInt(params.pageSize, 10) || 100;
   var info = MASTER_SHEET_MAP[sheetKey];
-  if (!info) return [];
+  if (!info) return page ? { rows: [], total: 0, page: 1, totalPages: 0 } : [];
 
   var ssId = getMasterFileId_(info.file);
-  if (!ssId) return [];
+  if (!ssId) return page ? { rows: [], total: 0, page: 1, totalPages: 0 } : [];
 
-  var ss = SpreadsheetApp.openById(ssId);
-  var sh = ss.getSheetByName(info.sheet);
-  if (!sh) return [];
+  // Use 3-layer cache instead of raw sheet read
+  var cached = getCachedData(info.sheet, info.file !== '1A' ? ssId : undefined);
+  if (!cached || !cached.length) return page ? { rows: [], total: 0, page: 1, totalPages: 0 } : [];
 
-  var lastRow = sh.getLastRow();
-  var lastCol = sh.getLastColumn();
-  if (lastRow < 4 || lastCol < 1) return [];  // no data rows
-
-  // Row 2 = column headers
-  var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0]
-    .map(function(h) { return String(h).trim(); });
-
-  // Row 4+ = data rows
-  var numDataRows = lastRow - 3;
-  if (numDataRows < 1) return [];
-
-  var data = sh.getRange(4, 1, numDataRows, lastCol).getValues();
+  // Format dates in cached data
   var rows = [];
-
-  for (var i = 0; i < data.length; i++) {
+  for (var i = 0; i < cached.length; i++) {
     var row = {};
     var hasContent = false;
-    for (var j = 0; j < headers.length; j++) {
-      if (!headers[j]) continue;  // skip blank headers
-      var val = data[i][j];
+    for (var key in cached[i]) {
+      var val = cached[i][key];
       if (val instanceof Date) {
         val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd MMM yyyy');
       }
-      row[headers[j]] = val;
+      row[key] = val;
       if (val !== '' && val !== null && val !== undefined) hasContent = true;
     }
-    if (hasContent) rows.push(row);  // skip completely empty rows
+    if (hasContent) rows.push(row);
   }
-  return rows;
+
+  // If page=0, return all rows (backwards-compatible)
+  if (!page) return rows;
+
+  // Paginated response
+  var total = rows.length;
+  var start = (page - 1) * pageSize;
+  var slice = rows.slice(start, start + pageSize);
+  return {
+    rows:       slice,
+    total:      total,
+    page:       page,
+    pageSize:   pageSize,
+    totalPages: Math.ceil(total / pageSize)
+  };
 }
 
 
@@ -1136,6 +1139,7 @@ function handleSaveMasterRecord(params) {
           return record[h] !== undefined ? record[h] : '';
         });
         sh.getRange(rowNum, 1, 1, rowData.length).setValues([rowData]);
+        invalidateCache(info.sheet);
         return { saved: true, code: codeValue, action: 'updated' };
       }
     }
@@ -1146,6 +1150,7 @@ function handleSaveMasterRecord(params) {
       return record[h] !== undefined ? record[h] : '';
     });
     sh.appendRow(newRow);
+    invalidateCache(info.sheet);
     return { saved: true, action: 'created' };
   }
 }
@@ -1174,6 +1179,7 @@ function handleDeleteMasterRecord(params) {
   for (var i = 0; i < codes.length; i++) {
     if (String(codes[i][0]).trim() === String(code).trim()) {
       sh.deleteRow(i + 4);  // offset: data starts at row 4
+      invalidateCache(info.sheet);
       return { deleted: true, code: code };
     }
   }
@@ -1222,21 +1228,16 @@ function handleGetPODetail(params) {
   try {
     var ssId = getFile2Id_();
     if (!ssId) return null;
-    var ss = SpreadsheetApp.openById(ssId);
-    var sh = ss.getSheetByName('PO_MASTER');
-    if (!sh) return null;
-    var lastRow = sh.getLastRow();
-    var lastCol = sh.getLastColumn();
-    if (lastRow < 4) return null;
-    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
-    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
-    for (var i = 0; i < data.length; i++) {
-      if (String(data[i][0]).trim() === poCode) {
-        var row = {};
-        for (var j = 0; j < headers.length; j++) {
-          if (headers[j]) row[headers[j]] = data[i][j];
-        }
-        return row;
+
+    // Use 3-layer cache instead of raw sheet read
+    var allPOs = getCachedData('PO_MASTER', ssId);
+    if (!allPOs || !allPOs.length) return null;
+
+    // Find the matching PO by code (first column key)
+    var codeKey = Object.keys(allPOs[0])[0]; // first header = PO code column
+    for (var i = 0; i < allPOs.length; i++) {
+      if (String(allPOs[i][codeKey] || '').trim() === poCode) {
+        return allPOs[i];
       }
     }
     return null;
@@ -1257,28 +1258,27 @@ function handleGetLineItems(params) {
   try {
     var ssId = getFile2Id_();
     if (!ssId) return [];
-    var ss = SpreadsheetApp.openById(ssId);
-    var sh = ss.getSheetByName('PO_LINE_ITEMS');
-    if (!sh) return [];
-    var lastRow = sh.getLastRow();
-    var lastCol = sh.getLastColumn();
-    if (lastRow < 4) return [];
-    var headers = sh.getRange(2, 1, 1, lastCol).getValues()[0].map(function(h) { return String(h).trim(); });
-    var data = sh.getRange(4, 1, lastRow - 3, lastCol).getValues();
-    var results = [];
-    for (var i = 0; i < data.length; i++) {
-      // PO Code column — find it by header name containing "PO Code"
-      var poColIdx = -1;
-      for (var h = 0; h < headers.length; h++) {
-        if (headers[h].indexOf('PO Code') > -1 || headers[h].indexOf('PO_Code') > -1) { poColIdx = h; break; }
+
+    // Use 3-layer cache instead of raw sheet read
+    var allLines = getCachedData('PO_LINE_ITEMS', ssId);
+    if (!allLines || !allLines.length) return [];
+
+    // Find PO Code column header
+    var headers = Object.keys(allLines[0]);
+    var poColKey = '';
+    for (var h = 0; h < headers.length; h++) {
+      if (headers[h].indexOf('PO Code') > -1 || headers[h].indexOf('PO_Code') > -1) {
+        poColKey = headers[h];
+        break;
       }
-      if (poColIdx < 0) poColIdx = 1; // fallback: column B
-      if (String(data[i][poColIdx]).trim() === poCode) {
-        var row = {};
-        for (var j = 0; j < headers.length; j++) {
-          if (headers[j]) row[headers[j]] = data[i][j];
-        }
-        results.push(row);
+    }
+    if (!poColKey) poColKey = headers[1] || headers[0]; // fallback: second or first header
+
+    // Filter line items by PO code
+    var results = [];
+    for (var i = 0; i < allLines.length; i++) {
+      if (String(allLines[i][poColKey] || '').trim() === poCode) {
+        results.push(allLines[i]);
       }
     }
     return results;
@@ -1716,6 +1716,23 @@ function headerToKey_(header) {
  * Returns flat array of { l1, l2, l3, master, active, behavior } objects.
  */
 function handleGetAllCategories(params) {
+  // Try 3-layer cache first for fast response
+  var cached = getCachedData(CONFIG.SHEETS.ITEM_CATEGORIES);
+
+  // If cache returned row-based objects, detect format from data shape
+  if (cached && cached.length > 0) {
+    // Check if cached data is already in {l1, l2, l3, master} format (previously parsed)
+    // or in raw {header: value} format from readSheetData
+    var firstRow = cached[0];
+    if (firstRow.l1 !== undefined && firstRow.master !== undefined) {
+      // Already parsed — return as-is
+      return cached;
+    }
+    // Raw header-keyed data from cache — need to detect V9 vs V10 and parse
+    // Fall through to sheet-based parsing below
+  }
+
+  // Fallback: direct sheet read (when cache miss or raw data needs V9/V10 detection)
   var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
   var sheet = ss.getSheetByName(CONFIG.SHEETS.ITEM_CATEGORIES);
   if (!sheet) return [];
@@ -1724,15 +1741,11 @@ function handleGetAllCategories(params) {
   if (lastRow < 4) return [];
 
   // ── Format detection ────────────────────────────────────────────────────────
-  // In V9, row 4 col E contains the master code ('ARTICLE', 'RM-FABRIC', etc.).
-  // In V10, row 4 col E contains the Fabric L1 value ('Raw Material').
   var V9_MASTER_CODES = ['ARTICLE', 'RM-FABRIC', 'RM-YARN', 'RM-WOVEN', 'TRIM', 'CONSUMABLE', 'PACKAGING'];
   var colEValue = String(sheet.getRange(4, 5, 1, 1).getValue() || '').trim();
   var isV9 = V9_MASTER_CODES.indexOf(colEValue) >= 0;
 
   if (isV9) {
-    // ── V9 row-based reading ─────────────────────────────────────────────────
-    // Cols: A=code, B=l1, C=l2, D=l3, E=master, F=hsn, G=active, H=behavior
     var V9_BEHAVIOR = { 'ARTICLE': 'SELECTABLE', 'RM-FABRIC': 'FIXED', 'RM-YARN': 'FIXED',
                         'RM-WOVEN': 'FIXED', 'TRIM': 'FIXED', 'CONSUMABLE': 'FIXED', 'PACKAGING': 'FIXED' };
     var numCols = Math.min(sheet.getLastColumn(), 8);
@@ -1753,7 +1766,6 @@ function handleGetAllCategories(params) {
   }
 
   // ── V10 column-grouped reading ───────────────────────────────────────────
-  // Master definitions: [masterKey, startColIndex (0-based in data), l1Behavior]
   var masters = [
     ['ARTICLE',    1, 'SELECTABLE'],
     ['RM-FABRIC',  4, 'FIXED'],
@@ -1775,7 +1787,7 @@ function handleGetAllCategories(params) {
       var l1 = String(data[i][colIdx]     || '').trim();
       var l2 = String(data[i][colIdx + 1] || '').trim();
       var l3 = String(data[i][colIdx + 2] || '').trim();
-      if (!l1 && !l2 && !l3) continue; // empty row for this master
+      if (!l1 && !l2 && !l3) continue;
 
       result.push({
         l1:       l1,
@@ -1833,7 +1845,7 @@ function handleCreateCategory(params) {
   sheet.getRange(targetRow, 1).setValue(targetRow - 3);
 
   // Invalidate cache
-  try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
+  try { invalidateCache('ITEM_CATEGORIES'); } catch(e) {}
 
   return { saved: true, master: master, l1: l1, l2: l2, l3: l3, action: 'created' };
 }
@@ -1883,7 +1895,7 @@ function handleUpdateCategory(params) {
   sheet.getRange(rowIndex, startCol, 1, 3).setValues([[l1, l2, l3]]);
 
   // Invalidate cache
-  try { CacheService.getScriptCache().remove(CONFIG.CACHE_KEYS.ITEM_CATEGORIES); } catch(e) {}
+  try { invalidateCache('ITEM_CATEGORIES'); } catch(e) {}
 
   return { saved: true, master: master, l1: l1, l2: l2, l3: l3, action: 'updated' };
 }
@@ -1911,24 +1923,31 @@ function handleGetArticleDropdowns(params) {
     sizeRange: ['S-M-L-XL-XXL', 'S-M-L-XL', 'M-L-XL-XXL', 'XS-S-M-L-XL', 'S-M-L', 'M-L-XL-XXL-3XL', 'Free Size', 'XS-S-M-L-XL-XXL-3XL']
   };
 
-  var ss = SpreadsheetApp.openById(CONFIG.FILE_IDS.FILE_1A);
-  var sheet = ss.getSheetByName('ARTICLE_DROPDOWNS');
-  if (!sheet) return defaults;
+  // Use 3-layer cache instead of raw sheet read
+  var cached = getCachedData('ARTICLE_DROPDOWNS');
+  if (!cached || !cached.length) return defaults;
 
-  // Data rows start at row 4 (rows 1-3 are Banner / Headers / Descriptions)
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 4) return defaults;
-
-  var data = sheet.getRange(4, 1, lastRow - 3, 7).getValues();
+  // The cache returns [{header: value}, ...] row objects.
+  // Map header keys to our output keys.
+  var headerToKey = {};
   var keys = ['gender', 'fit', 'neckline', 'sleeve', 'status', 'season', 'sizeRange'];
+  // Detect headers from first cached row
+  var firstRow = cached[0];
+  var headerNames = Object.keys(firstRow);
+  // Map by position (A=Gender, B=Fit Type, C=Neckline, D=Sleeve Type, E=Status, F=Season, G=Size Range)
+  for (var h = 0; h < Math.min(headerNames.length, 7); h++) {
+    headerToKey[headerNames[h]] = keys[h];
+  }
+
   var result = {};
   for (var k = 0; k < keys.length; k++) result[keys[k]] = [];
 
-  for (var i = 0; i < data.length; i++) {
-    for (var c = 0; c < 7; c++) {
-      var val = String(data[i][c] || '').trim();
-      if (val && result[keys[c]].indexOf(val) === -1) {
-        result[keys[c]].push(val);
+  for (var i = 0; i < cached.length; i++) {
+    for (var hdr in headerToKey) {
+      var outKey = headerToKey[hdr];
+      var val = String(cached[i][hdr] || '').trim();
+      if (val && result[outKey] && result[outKey].indexOf(val) === -1) {
+        result[outKey].push(val);
       }
     }
   }
@@ -1938,4 +1957,80 @@ function handleGetArticleDropdowns(params) {
     if (!result[keys[k]].length) result[keys[k]] = defaults[keys[k]];
   }
   return result;
+}
+
+
+// =============================================================================
+// V13 — PERFORMANCE: BOOT BUNDLE
+// =============================================================================
+
+/**
+ * Returns all boot-time data in a single response, eliminating 6 separate
+ * GAS web app invocations on page load.
+ *
+ * @param {Object} params - (no params required)
+ * @returns {Object} Combined boot payload
+ */
+function handleGetBootBundle(params) {
+  return {
+    bootstrap:     handleGetUIBootstrap(params),
+    onlineUsers:   handleGetOnlineUsers(params),
+    notifications: handleGetNotifications(params),
+    activityFeed:  handleGetActivityFeed(params),
+    dashboardStats:handleGetDashboardStats(params),
+    shortcuts:     handleGetUserShortcuts(params)
+  };
+}
+
+
+// =============================================================================
+// V13 — PERFORMANCE: INCREMENTAL SYNC
+// =============================================================================
+
+/**
+ * Lightweight endpoint for checking if a sheet's data has changed.
+ * Returns empty rows if the client's version matches the server version
+ * (no changes), otherwise returns full data + new version.
+ *
+ * @param {Object} params - { sheet: string, version: string }
+ * @returns {Object} { rows: [], unchanged: boolean, version: string }
+ */
+function handleGetDataSince(params) {
+  var sheetKey = params.sheet || '';
+  var clientVersion = String(params.version || '0');
+  var info = MASTER_SHEET_MAP[sheetKey];
+  if (!info) return { rows: [], unchanged: true, version: '0' };
+
+  var cache = CacheService.getScriptCache();
+  var versionKey = 'VERSION_' + info.sheet;
+  var serverVersion = cache.get(versionKey) || '0';
+
+  // If versions match, no changes — return empty
+  if (clientVersion === serverVersion) {
+    return { rows: [], unchanged: true, version: serverVersion };
+  }
+
+  // Data changed — return full cached data + new version
+  var ssId = getMasterFileId_(info.file);
+  var data = getCachedData(info.sheet, info.file !== '1A' ? ssId : undefined);
+
+  // Format dates
+  var rows = [];
+  if (data && data.length) {
+    for (var i = 0; i < data.length; i++) {
+      var row = {};
+      var hasContent = false;
+      for (var key in data[i]) {
+        var val = data[i][key];
+        if (val instanceof Date) {
+          val = Utilities.formatDate(val, Session.getScriptTimeZone(), 'dd MMM yyyy');
+        }
+        row[key] = val;
+        if (val !== '' && val !== null && val !== undefined) hasContent = true;
+      }
+      if (hasContent) rows.push(row);
+    }
+  }
+
+  return { rows: rows, unchanged: false, version: serverVersion };
 }

@@ -65,55 +65,70 @@ export default function App(){
     return ()=>window.removeEventListener("keydown",handler);
   },[]);
 
-  // ─ Fetch all data from GAS API on mount
+  // ─ Fetch all data from GAS API on mount (single bundled call)
   useEffect(()=>{
     let cancelled = false;
     async function fetchAll(){
       try {
-        const [bootstrap, onlineUsers, notifData, activityData, statsData, shortcutData] = await Promise.allSettled([
-          api.getUIBootstrap(),
-          api.getOnlineUsers(),
-          api.getNotifications(),
-          api.getActivityFeed(),
-          api.getDashboardStats(),
-          api.getUserShortcuts(),
-        ]);
+        // Try boot bundle first (single call), fall back to 6 parallel calls
+        let b_data = null, onlineData = null, notifResult = null, activityResult = null, statsResult = null, shortcutResult = null;
+        try {
+          const bundle = await api.getBootBundle();
+          if (bundle) {
+            b_data = bundle.bootstrap;
+            onlineData = bundle.onlineUsers;
+            notifResult = bundle.notifications;
+            activityResult = bundle.activityFeed;
+            statsResult = bundle.dashboardStats;
+            shortcutResult = bundle.shortcuts;
+          }
+        } catch(bundleErr) {
+          // Boot bundle not available — fall back to parallel calls
+          console.warn("Boot bundle failed, falling back to parallel calls:", bundleErr.message);
+          const [bootstrap, onlineUsers, notifData, activityData, statsData, shortcutData] = await Promise.allSettled([
+            api.getUIBootstrap(),
+            api.getOnlineUsers(),
+            api.getNotifications(),
+            api.getActivityFeed(),
+            api.getDashboardStats(),
+            api.getUserShortcuts(),
+          ]);
+          if (bootstrap.status === "fulfilled") b_data = bootstrap.value;
+          if (onlineUsers.status === "fulfilled") onlineData = onlineUsers.value;
+          if (notifData.status === "fulfilled") notifResult = notifData.value;
+          if (activityData.status === "fulfilled") activityResult = activityData.value;
+          if (statsData.status === "fulfilled") statsResult = statsData.value;
+          if (shortcutData.status === "fulfilled") shortcutResult = shortcutData.value;
+
+          const allFailed = [bootstrap, onlineUsers, notifData, activityData, statsData, shortcutData].every(r => r.status === "rejected");
+          if (allFailed) {
+            setApiError("Cannot connect to GAS API. Check VITE_GAS_URL and that the GAS web app is deployed.");
+          }
+        }
         if (cancelled) return;
 
-        if (bootstrap.status === "fulfilled" && bootstrap.value) {
-          const b = bootstrap.value;
-          if (b.user) setMe(b.user);
-          // Server returns preferences.theme (not config)
-          const serverTheme = b.config || (b.preferences && b.preferences.theme);
+        if (b_data) {
+          if (b_data.user) setMe(b_data.user);
+          const serverTheme = b_data.config || (b_data.preferences && b_data.preferences.theme);
           if (serverTheme) setCfg(prev => ({...prev, ...serverTheme}));
-          // Merge server modules with client MODS_INIT to preserve UI properties
-          // (lbl, icon emoji, badge, col, desc, stats) that the server doesn't return
-          if (b.modules && Array.isArray(b.modules)) {
+          if (b_data.modules && Array.isArray(b_data.modules)) {
             setMods(prev => prev.map(clientMod => {
-              const serverMod = b.modules.find(sm => sm.id === clientMod.id);
+              const serverMod = b_data.modules.find(sm => sm.id === clientMod.id);
               return serverMod ? { ...clientMod, ...serverMod, icon: clientMod.icon, lbl: clientMod.lbl, col: clientMod.col, desc: clientMod.desc, badge: serverMod.badge ?? clientMod.badge, stats: clientMod.stats } : clientMod;
             }));
           }
         }
-        if (onlineUsers.status === "fulfilled" && onlineUsers.value) {
-          setOthers(onlineUsers.value);
-        }
-        if (notifData.status === "fulfilled" && notifData.value) {
-          setNotifs(notifData.value);
-        }
-        if (activityData.status === "fulfilled" && activityData.value) {
-          setActivity(activityData.value);
-        }
-        if (statsData.status === "fulfilled" && statsData.value) {
-          const s = statsData.value;
-          // Transform API object {po:{...}, grn:{...}} into card array for dashboard
+        if (onlineData) setOthers(onlineData);
+        if (notifResult) setNotifs(notifResult);
+        if (activityResult) setActivity(activityResult);
+        if (statsResult) {
+          const s = statsResult;
           const cards = [];
           if (s.po) cards.push({lbl:"Open POs", val:String(s.po.total||0), sub:`${s.po.draft||0} draft · ${s.po.approved||0} approved`, col:"#E8690A", icon:"📦"});
           if (s.grn) cards.push({lbl:"GRN", val:String(s.grn.total||0), sub:`${s.grn.pending||0} pending · ${s.grn.accepted||0} accepted`, col:"#0078D4", icon:"📥"});
           if (s.notifications) cards.push({lbl:"Notifications", val:String(s.notifications.total||0), sub:`${s.notifications.unread||0} unread`, col:"#7C3AED", icon:"🔔"});
           cards.push({lbl:"Online", val:String(s.onlineUsers||0), sub:"Active users", col:"#15803D", icon:"👥"});
           setDashStats(cards);
-          // Update module badges with real counts
           if (s.po) {
             setMods(prev => prev.map(m => {
               if (m.id === "procurement") return {...m, badge: (s.po.draft||0) + (s.po.approved||0) + (s.po.sent||0)};
@@ -121,14 +136,7 @@ export default function App(){
             }));
           }
         }
-        if (shortcutData.status === "fulfilled" && shortcutData.value) {
-          setShortcuts(shortcutData.value);
-        }
-        // Check if ALL calls failed (API unreachable)
-        const allFailed = [bootstrap, onlineUsers, notifData, activityData, statsData, shortcutData].every(r => r.status === "rejected");
-        if (allFailed) {
-          setApiError("Cannot connect to GAS API. Check VITE_GAS_URL and that the GAS web app is deployed.");
-        }
+        if (shortcutResult) setShortcuts(shortcutResult);
       } catch(err) {
         console.error("Failed to load data from API:", err);
         setApiError(err.message);

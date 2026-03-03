@@ -9,6 +9,8 @@
  * The GAS backend parses: e.parameter.action + e.parameter.payload (JSON string)
  */
 
+import dataCache from './dataCache';
+
 const GAS_URL = import.meta.env.VITE_GAS_URL || '';
 
 async function request(action, payload = null) {
@@ -33,10 +35,22 @@ async function request(action, payload = null) {
   return json.data;
 }
 
+/** Helper: cached GET — returns from cache if available, else fetches and caches */
+async function cachedRequest(cacheKey, action, payload = null, ttl = undefined) {
+  const cached = dataCache.get(cacheKey);
+  if (cached) return cached;
+  const data = await request(action, payload);
+  dataCache.set(cacheKey, data, ttl);
+  return data;
+}
+
 const api = {
   // UI Bootstrap
   getUIBootstrap: () => request('getUIBootstrap'),
   saveUserTheme: (config) => request('saveUserTheme', config),
+
+  // Boot Bundle — single call replaces 6 parallel boot requests
+  getBootBundle: () => request('getBootBundle'),
 
   // Presence
   heartbeat: (mod, page) => request('heartbeat', { module: mod, page }),
@@ -52,36 +66,69 @@ const api = {
   addShortcut: (shortcut) => request('addShortcut', { shortcutId: shortcut }),
   removeShortcut: (id) => request('removeShortcut', { shortcutId: id }),
 
-  // Procurement
-  getPOList: () => request('getPOList'),
-  getGRNList: () => request('getGRNList'),
-  savePO: (data, lines) => request('savePO', { poData: data, lineItems: lines }),
-  saveGRN: (data, lines) => request('saveGRN', { grnData: data, lineItems: lines }),
+  // Procurement (cached reads)
+  getPOList: () => cachedRequest('poList', 'getPOList'),
+  getGRNList: () => cachedRequest('grnList', 'getGRNList'),
+  savePO: async (data, lines) => {
+    const result = await request('savePO', { poData: data, lineItems: lines });
+    dataCache.invalidate('poList');
+    return result;
+  },
+  saveGRN: async (data, lines) => {
+    const result = await request('saveGRN', { grnData: data, lineItems: lines });
+    dataCache.invalidate('grnList');
+    return result;
+  },
   getOpenPOs: () => request('getOpenPOs'),
 
-  // Master Data
-  getItems: () => request('getItems'),
-  getSuppliers: () => request('getSuppliers'),
+  // Master Data (cached reads)
+  getItems: () => cachedRequest('items', 'getItems'),
+  getSuppliers: () => cachedRequest('suppliers', 'getSuppliers'),
   searchItems: (query) => request('searchItems', { query }),
 
-  // Masters Hub
-  getMasterSheetCounts: () => request('getMasterSheetCounts'),
-  getMasterData: (sheet, file) => request('getMasterData', { sheet, file }),
-  saveMasterRecord: (sheet, file, record, isEdit) => request('saveMasterRecord', { sheet, file, record, isEdit }),
-  deleteMasterRecord: (sheet, file, code) => request('deleteMasterRecord', { sheet, file, code }),
+  // Masters Hub (cached reads, invalidation on write)
+  getMasterSheetCounts: () => cachedRequest('masterSheetCounts', 'getMasterSheetCounts'),
+  getMasterData: (sheet, file, page = 0, pageSize = 100) => {
+    const cacheKey = `masterData_${sheet}_${file}_p${page}`;
+    return cachedRequest(cacheKey, 'getMasterData', { sheet, file, page, pageSize });
+  },
+  saveMasterRecord: async (sheet, file, record, isEdit) => {
+    const result = await request('saveMasterRecord', { sheet, file, record, isEdit });
+    dataCache.invalidatePrefix(`masterData_${sheet}`);
+    dataCache.invalidate('masterSheetCounts');
+    return result;
+  },
+  deleteMasterRecord: async (sheet, file, code) => {
+    const result = await request('deleteMasterRecord', { sheet, file, code });
+    dataCache.invalidatePrefix(`masterData_${sheet}`);
+    dataCache.invalidate('masterSheetCounts');
+    return result;
+  },
 
-  // Item Categories (V10 column-grouped layout)
-  getItemCategories: (includeInactive) => request('getAllCategories', { includeInactive }),
-  createCategory: (data) => request('createCategory', data),
-  updateCategory: (updates) => request('updateCategory', updates),
+  // Item Categories (cached)
+  getItemCategories: (includeInactive) => cachedRequest('itemCategories', 'getAllCategories', { includeInactive }),
+  createCategory: async (data) => {
+    const result = await request('createCategory', data);
+    dataCache.invalidate('itemCategories');
+    return result;
+  },
+  updateCategory: async (updates) => {
+    const result = await request('updateCategory', updates);
+    dataCache.invalidate('itemCategories');
+    return result;
+  },
 
-  // Article Dropdowns (from ARTICLE_DROPDOWNS sheet)
-  getArticleDropdowns: () => request('getArticleDropdowns'),
+  // Article Dropdowns (cached — rarely changes)
+  getArticleDropdowns: () => cachedRequest('articleDropdowns', 'getArticleDropdowns', null, 10 * 60 * 1000),
 
   // Procurement — PO detail
   getPODetail: (poCode) => request('getPODetail', { poCode }),
   getLineItems: (poCode) => request('getLineItems', { poCode }),
-  updatePOStatus: (poCode, newStatus) => request('updatePOStatus', { poCode, newStatus }),
+  updatePOStatus: async (poCode, newStatus) => {
+    const result = await request('updatePOStatus', { poCode, newStatus });
+    dataCache.invalidate('poList');
+    return result;
+  },
 
   // Workflow
   getWorkflow: (module) => request('getWorkflow', { module }),
@@ -117,6 +164,9 @@ const api = {
   // Export & Print
   exportDocument: (type, id, format) => request('exportDocument', { documentType: type, documentCode: id, format }),
   printDocument: (type, id) => request('printDocument', { documentType: type, documentCode: id }),
+
+  // Incremental Sync — lightweight check if data changed
+  getDataSince: (sheet, version) => request('getDataSince', { sheet, version }),
 };
 
 export default api;

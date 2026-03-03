@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { SCHEMA_MAP } from '../../constants/masterSchemas';
 import api from '../../services/api';
 import SortPanel from './SortPanel';
@@ -355,6 +355,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   }, [sheet.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Fetch data ──
+  const dataVersionRef = useRef('0');
   useEffect(() => {
     setLoading(true);
     setRows([]);
@@ -363,6 +364,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
     setShowAddForm(false);
     setEditRow(null);
     setFormData({});
+    dataVersionRef.current = '0';
     api.getMasterData(sheet.key, fileLabel)
       .then(data => {
         if (Array.isArray(data)) setRows(data.map(r => mapRawToSchema(r, schema)));
@@ -372,6 +374,22 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         setFetchError(err.message || 'Failed to fetch data');
       })
       .finally(() => setLoading(false));
+  }, [sheet.key]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Background auto-refresh: poll every 60s for changes ──
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const resp = await api.getDataSince(sheet.key, dataVersionRef.current);
+        if (resp && !resp.unchanged && resp.rows && resp.rows.length) {
+          setRows(resp.rows.map(r => mapRawToSchema(r, schema)));
+          dataVersionRef.current = resp.version || '0';
+        } else if (resp && resp.version) {
+          dataVersionRef.current = resp.version;
+        }
+      } catch (_) { /* silent — don't disrupt the user */ }
+    }, 60000);
+    return () => clearInterval(interval);
   }, [sheet.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Derived: visible columns ──
@@ -450,12 +468,24 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
       await api.saveMasterRecord(sheet.key, fileLabel, rawRecord, !!editRow);
       showToast(editRow ? '✓ Record updated' : '✓ Record saved', 'success');
       setShowAddForm(false);
+
+      // Optimistic update — update local rows without re-fetching entire sheet
+      if (editRow) {
+        setRows(prev => prev.map(r =>
+          r[codeKey] === editRow[codeKey] ? { ...r, ...formData } : r
+        ));
+      } else {
+        setRows(prev => [...prev, { ...formData }]);
+      }
       setEditRow(null);
       setFormData({});
-      const data = await api.getMasterData(sheet.key, fileLabel);
-      if (Array.isArray(data)) setRows(data.map(r => mapRawToSchema(r, schema)));
     } catch (err) {
       showToast('Error: ' + err.message, 'delete');
+      // On error, re-fetch to ensure consistency
+      try {
+        const data = await api.getMasterData(sheet.key, fileLabel);
+        if (Array.isArray(data)) setRows(data.map(r => mapRawToSchema(r, schema)));
+      } catch (_) { /* silent fallback */ }
     } finally {
       setSaving(false);
     }
