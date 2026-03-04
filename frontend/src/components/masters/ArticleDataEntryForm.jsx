@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import api from '../../services/api';
+import { SCHEMA_ARTICLE_MASTER } from '../../constants/masterSchemas';
 import { SEED_DATA as CAT_SEED, CATEGORY_HIERARCHY } from './ItemCategoryTab';
 
 // ═══════════════════════════════════════════════════════════════
@@ -1520,7 +1521,7 @@ export default function ArticleDataEntryForm({
           fontSize:10, fontWeight:800, cursor:"pointer" }}>↺ Clear</button>
         <button onClick={onSave} style={{
           padding:"6px 20px", border:"none", borderRadius:6,
-          background: reqLeft.length>0 ? "#94a3b8" : C.red,
+          background: editItem ? C.blue : (reqLeft.length>0 ? "#94a3b8" : C.red),
           color:"#fff", fontSize:10, fontWeight:900, cursor:"pointer",
           animation:shake?"ccShake .5s ease":"none",
           transition:"background .2s" }}>
@@ -1693,7 +1694,15 @@ export function ArticleDataEntryWrapper({ M, A, uff, dff, editRecord, onEditClea
     if (!form.desc?.trim()) errs.desc = "Required";
     if (Object.keys(errs).length) { setFormErrors(errs); throw new Error('validation'); }
     const isUpdate = !!editItem;
-    await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, isUpdate);
+    // GAS expects raw header keys (row 2 of sheet), not schema keys — convert before sending
+    const rawRecord = {};
+    for (const f of SCHEMA_ARTICLE_MASTER) {
+      if (f.header && form[f.key] !== undefined && form[f.key] !== '') {
+        rawRecord[f.header] = f.key === 'code' ? form[f.key].trim() : form[f.key];
+      }
+    }
+    const result = await api.saveMasterRecord('article_master', 'FILE 1A — Items', rawRecord, isUpdate);
+    if (result && result.saved === false) throw new Error(result.message || 'Save failed');
     const saved = { ...form, code: form.code.trim() };
     if (isUpdate) {
       setData(prev => prev.map(r => r.code === saved.code ? saved : r));
