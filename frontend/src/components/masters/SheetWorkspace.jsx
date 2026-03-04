@@ -12,6 +12,7 @@ import ViewsPanel from './ViewsPanel';
 import StatusBar from './StatusBar';
 import ItemCategoryTab from './ItemCategoryTab';
 import { ArticleMasterLayoutPanel } from './ArticleMasterTab';
+import { ArticleDataEntryWrapper } from './ArticleDataEntryForm';
 import { TrimMasterLayoutPanel } from './TrimMasterTab';
 import api from '../../services/api';
 
@@ -391,7 +392,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
       </div>
 
       {/* ── Active View Banner ── */}
-      {currentView && mainTab === "entry" && (
+      {currentView && mainTab === "entry" && !isArticleMaster && (
         <div style={{ padding: "5px 16px", display: "flex", alignItems: "center", gap: 8, borderBottom: `1px solid ${M.divider}`, background: `${currentView.color}09`, flexShrink: 0 }}>
           <div style={{ width: 3, height: 14, background: currentView.color, borderRadius: 2, flexShrink: 0 }} />
           <span style={{ fontSize: 10, fontWeight: 900, color: currentView.color, fontFamily: uff }}>VIEW:</span>
@@ -406,7 +407,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
       )}
 
       {/* ── Views Bar (Data Entry tab only — Bulk tab has its own views) ── */}
-      {mainTab === "entry" && (
+      {mainTab === "entry" && !isArticleMaster && (
         <ViewsBar
           views={currentViews}
           activeViewId={activeViewId}
@@ -419,7 +420,10 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
 
       {/* ── Tab Content ── */}
       <div style={{ flex: 1, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        {mainTab === "entry" && (
+        {mainTab === "entry" && isArticleMaster && (
+          <ArticleDataEntryWrapper M={M} A={A} uff={uff} dff={dff} />
+        )}
+        {mainTab === "entry" && !isArticleMaster && (
           <DataEntryTab
             enriched={enriched}
             formData={formData}

@@ -1,4 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import api from '../../services/api';
+import { SEED_DATA as CAT_SEED, CATEGORY_HIERARCHY } from './ItemCategoryTab';
 
 // ═══════════════════════════════════════════════════════════════
 // ArticleDataEntryForm — V3: Views Bar + Filter/Sort + Live Preview
@@ -1505,5 +1507,154 @@ export default function ArticleDataEntryForm({
           onClose={()=>setShowSort(false)}/>
       )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SELF-CONTAINED WRAPPER — used by SheetWorkspace for article_master
+   Manages its own form state + GAS fetching. No props required.
+═══════════════════════════════════════════════════════════════ */
+
+// Derive initial dropdown data from seed (same logic as ArticleMasterTab)
+const _artCats = CAT_SEED.filter(c => c.master === "ARTICLE" && c.active === "Yes");
+const _INIT_DIVISIONS = [...new Set(_artCats.map(c => c.l1))];
+const _INIT_L2_BY_DIV = {}, _INIT_L3_BY_L2 = {}, _INIT_L2_HSN = {};
+for (const c of _artCats) {
+  if (!_INIT_L2_BY_DIV[c.l1]) _INIT_L2_BY_DIV[c.l1] = [];
+  if (!_INIT_L2_BY_DIV[c.l1].includes(c.l2)) _INIT_L2_BY_DIV[c.l1].push(c.l2);
+  if (!_INIT_L3_BY_L2[c.l2]) _INIT_L3_BY_L2[c.l2] = [];
+  if (c.l3 && !_INIT_L3_BY_L2[c.l2].includes(c.l3)) _INIT_L3_BY_L2[c.l2].push(c.l3);
+  if (c.hsn && !_INIT_L2_HSN[c.l2]) _INIT_L2_HSN[c.l2] = c.hsn;
+}
+const _HSN_GST_MAP = { "6105": 5, "6109": 5, "6110": 12, "6112": 12, "6103": 5 };
+const _EMPTY_FORM = {
+  code:"", desc:"", shortName:"", imageLink:"", sketchLink:"", buyerStyle:"",
+  l1Division:"", l2Category:"", l3Style:"", season:"", gender:"",
+  fitType:"", neckline:"", sleeveType:"",
+  mainFabric:"", fabricName:"", colorCodes:"", sizeRange:"",
+  wsp:"", mrp:"", markupPct:"", markdownPct:"", hsnCode:"", gstPct:"",
+  status:"Active", remarks:"", tags:"",
+};
+const _GARBAGE = new Set([
+  'Gender','Fit Type','Neckline','Sleeve Type','Status','Season','Size Range',
+  'Men/Women/Kids/Unisex','Regular/Slim/Relaxed/Oversized',
+  'Round Neck/V-Neck/Collar etc.','Half/Full/Sleeveless etc.',
+  'Active/Inactive/Development','SS25/AW26 examples','S-M-L-XL-XXL etc.',
+]);
+
+export function ArticleDataEntryWrapper({ M, A, uff, dff }) {
+  const [form,       setForm]       = useState({ ..._EMPTY_FORM });
+  const [formErrors, setFormErrors] = useState({});
+  const [editItem,   setEditItem]   = useState(null);
+  const [data,       setData]       = useState([]);
+
+  // Dropdown state — seeded from local data, refreshed from GAS
+  const [divisions,    setDivisions]    = useState(_INIT_DIVISIONS);
+  const [l2ByDiv,      setL2ByDiv]      = useState(_INIT_L2_BY_DIV);
+  const [l3ByL2,       setL3ByL2]       = useState(_INIT_L3_BY_L2);
+  const [l2Hsn,        setL2Hsn]        = useState(_INIT_L2_HSN);
+  const [genderOpts,   setGenderOpts]   = useState(["Men","Women","Unisex","Kids"]);
+  const [fitOpts,      setFitOpts]      = useState(["Regular","Slim","Relaxed","Oversized","Crop"]);
+  const [neckOpts,     setNeckOpts]     = useState(["Round Neck","V-Neck","Polo","Henley","Hood","Crew Neck"]);
+  const [sleeveOpts,   setSleeveOpts]   = useState(["Half Sleeve","Full Sleeve","Sleeveless","Cap Sleeve"]);
+  const [statusOpts,   setStatusOpts]   = useState(["Active","Development","Inactive"]);
+  const [seasonOpts,   setSeasonOpts]   = useState(["SS2024","AW2024","SS2025","AW2025","SS2026","AW2026","Year Round"]);
+  const [sizeRangeOpts,setSizeRangeOpts]= useState(["S-M-L-XL-XXL","S-M-L-XL","M-L-XL-XXL","XS-S-M-L-XL","Free Size"]);
+  const [colourOpts,   setColourOpts]   = useState(["Navy Blue","White","Black","Charcoal Grey","Red","Royal Blue","Olive Green"]);
+
+  // Fetch live data from GAS on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const cats = await api.getItemCategories();
+        if (!cancelled && Array.isArray(cats) && cats.length > 0) {
+          const artCats = cats.filter(c => c.master === 'ARTICLE');
+          if (artCats.length > 0) {
+            const newDiv = [...new Set(artCats.map(c => c.l1))];
+            const newL2 = {}, newL3 = {}, newHsn = {};
+            for (const c of artCats) {
+              if (!newL2[c.l1]) newL2[c.l1] = [];
+              if (!newL2[c.l1].includes(c.l2)) newL2[c.l1].push(c.l2);
+              if (!newL3[c.l2]) newL3[c.l2] = [];
+              if (c.l3 && !newL3[c.l2].includes(c.l3)) newL3[c.l2].push(c.l3);
+              if (c.hsn && !newHsn[c.l2]) newHsn[c.l2] = c.hsn;
+            }
+            const h = CATEGORY_HIERARCHY['ARTICLE'];
+            if (h?.defaultHSN) Object.assign(newHsn, h.defaultHSN);
+            if (!cancelled) { setDivisions(newDiv); setL2ByDiv(newL2); setL3ByL2(newL3); setL2Hsn(newHsn); }
+          }
+        }
+      } catch (e) { console.warn('GAS categories fetch failed:', e); }
+
+      try {
+        const dd = await api.getArticleDropdowns();
+        if (!cancelled && dd) {
+          const clean = arr => (arr || []).filter(v => v && !_GARBAGE.has(v));
+          const g  = clean(dd.gender);    if (g.length)  setGenderOpts(g);
+          const f  = clean(dd.fit);       if (f.length)  setFitOpts(f);
+          const n  = clean(dd.neckline);  if (n.length)  setNeckOpts(n);
+          const sl = clean(dd.sleeve);    if (sl.length) setSleeveOpts(sl);
+          const st = clean(dd.status);    if (st.length) setStatusOpts(st);
+          const sn = clean(dd.season);    if (sn.length) setSeasonOpts(sn);
+          const sr = clean(dd.sizeRange); if (sr.length) setSizeRangeOpts(sr);
+        }
+      } catch (e) { console.warn('GAS dropdowns fetch failed:', e); }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // L1/L2/L3 cascade handlers (auto-fill HSN/GST on L2 change)
+  const setL1Division = useCallback(v => {
+    setFormErrors({});
+    setForm(f => ({ ...f, l1Division: v, l2Category: "", l3Style: "" }));
+  }, []);
+
+  const setL2Category = useCallback(v => {
+    setFormErrors({});
+    const hsn = l2Hsn[v] || "";
+    const gst = hsn ? (_HSN_GST_MAP[hsn] ?? "") : "";
+    setForm(f => ({ ...f, l2Category: v, l3Style: "", hsnCode: hsn, gstPct: gst ? String(gst) : "" }));
+  }, [l2Hsn]);
+
+  const setL3Style = useCallback(v => {
+    setFormErrors({});
+    setForm(f => ({ ...f, l3Style: v }));
+  }, []);
+
+  // Save handler — posts to GAS
+  const handleSave = useCallback(async () => {
+    const errs = {};
+    if (!form.code?.trim()) errs.code = "Required";
+    if (!form.l1Division)   errs.l1Division = "Required";
+    if (!form.l2Category)   errs.l2Category = "Required";
+    if (!form.desc?.trim()) errs.desc = "Required";
+    if (Object.keys(errs).length) { setFormErrors(errs); return; }
+    try {
+      await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, false);
+      setData(prev => [...prev, { ...form, code: form.code.trim() }]);
+    } catch (e) { console.warn('Save failed:', e); }
+  }, [form]);
+
+  const handleClear = useCallback(() => {
+    setForm({ ..._EMPTY_FORM });
+    setFormErrors({});
+    setEditItem(null);
+  }, []);
+
+  return (
+    <ArticleDataEntryForm
+      M={M} A={A} uff={uff} dff={dff}
+      form={form} setForm={setForm}
+      editItem={editItem}
+      formErrors={formErrors} setFormErrors={setFormErrors}
+      handleSave={handleSave} handleClear={handleClear}
+      divisions={divisions} l2ByDiv={l2ByDiv} l3ByL2={l3ByL2} l2Hsn={l2Hsn}
+      genderOpts={genderOpts} fitOpts={fitOpts} neckOpts={neckOpts}
+      sleeveOpts={sleeveOpts} statusOpts={statusOpts} seasonOpts={seasonOpts}
+      sizeRangeOpts={sizeRangeOpts} colourOpts={colourOpts}
+      setL1Division={setL1Division} setL2Category={setL2Category} setL3Style={setL3Style}
+      HSN_GST_MAP={_HSN_GST_MAP} data={data}
+    />
   );
 }
