@@ -1815,7 +1815,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           const hasVal = val !== undefined && val !== null && val !== '';
           return (
             <td key={f.key}
-              onClick={() => openEdit(row)}
+              onClick={() => setV2DetailRow(row)}
               style={{ padding: `${f.thumb ? 3 : pyV - 1}px 8px`, borderRight: `1px solid ${M.divider}`, maxWidth: 240, overflow: 'hidden', cursor: 'pointer', verticalAlign: 'middle' }}
             >
               {f.badge ? (
