@@ -36,7 +36,9 @@
       "Bash(curl:*)",
       "Bash(ls:*)",
       "Bash(npx react-scripts:*)",
-      "Bash(npm run dev)"
+      "Bash(npm run dev)",
+      "Bash(npm run serve)",
+      "Bash(PORT=9090 npm start:*)"
     ]
   }
 }

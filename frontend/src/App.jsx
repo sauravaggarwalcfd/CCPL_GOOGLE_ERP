@@ -334,7 +334,7 @@ export default function App(){
       )}
 
       {/* BODY */}
-      <div style={{flex:1,display:"flex",overflow:"hidden"}}>
+      <div style={{flex:1,minHeight:0,display:"flex",overflow:"hidden"}}>
 
         {/* SIDEBAR */}
         <div style={{width:collapsed?46:sw,flexShrink:0,background:M.sidebarBg,borderRight:`1px solid ${M.sidebarBd}`,display:"flex",flexDirection:"column",overflow:"hidden",transition:drag?"none":"width .2s ease",zIndex:100}}>
