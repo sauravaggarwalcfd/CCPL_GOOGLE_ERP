@@ -285,40 +285,6 @@ export default function Masters({ M, A, cfg, fz, dff, setCfg }) {
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: M.bg, fontFamily: uff }}>
 
-      {/* ── CONTENT HEADER ── */}
-      <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: "10px 20px", display: "flex", alignItems: "center", gap: 10, flexShrink: 0, flexWrap: "wrap" }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: uff }}>
-            {activeSheet ? `${FILES[activeSheet.fileKey].label} ›` : "Masters"}{" "}
-            {activeSheet ? activeSheet.sheet.name : "Data Hub"}
-          </div>
-          <div style={{ fontSize: 17, fontWeight: 900, color: M.textA, fontFamily: uff }}>
-            {activeSheet ? activeSheet.sheet.name : "📋 Master Data Hub"}
-          </div>
-        </div>
-
-        {/* Global search — always present */}
-        <div style={{ position: "relative" }}>
-          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: M.textD, pointerEvents: "none" }}>🔍</span>
-          <input
-            value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search masters…"
-            style={{ padding: "6px 12px 6px 30px", background: M.surfMid, border: `1px solid ${M.divider}`, borderRadius: 7, fontSize: 11, fontFamily: uff, color: M.textA, width: 200, outline: "none" }}
-          />
-        </div>
-
-        {/* Hub: file shortcut buttons that slide open the file sidebar */}
-        {!activeSheet && (
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {Object.values(FILES).map(f => (
-              <button key={f.key} onClick={() => handleOpenFileSide(f.key)}
-                style={{ padding: "6px 14px", background: f.accent, border: `1.5px solid ${f.badge}`, borderRadius: 7, fontSize: 11, fontWeight: 800, color: f.color, cursor: "pointer", fontFamily: uff }}>
-                {f.icon} {f.short}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* ── API STATUS ── */}
       {countsError && (

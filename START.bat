@@ -1,248 +1,164 @@
 @echo off
-title CC ERP — Server Start
+:: ═══════════════════════════════════════════════
+:: WRAPPER: Re-launch with cmd /k so window NEVER closes
+:: ═══════════════════════════════════════════════
+if not "%~1"=="__RUNNING__" (
+    cmd /k "%~f0" __RUNNING__
+    exit /b
+)
+
+title CC ERP - Server Start
 color 0A
 setlocal enabledelayedexpansion
 
 echo ============================================
-echo    CC ERP — Auto Update + Start Server
+echo    CC ERP - Auto Update + Start Server
 echo ============================================
 echo.
 
-:: ── CONFIG ──
+:: -- CONFIG --
 set REPO=https://github.com/sauravaggarwalcfd/CCPL_GOOGLE_ERP.git
 set BRANCH=main
 set PORT=9090
 
-:: ── Auto-detect location: repo lives NEXT TO this .bat file ──
-:: If START.bat is at D:\MyStuff\START.bat → PROJECT = D:\MyStuff\CCPL_GOOGLE_ERP
+:: -- Auto-detect location --
 set "BATDIR=%~dp0"
-:: Remove trailing backslash
-if "%BATDIR:~-1%"=="\" set "BATDIR=%BATDIR:~0,-1%"
-set "PROJECT=%BATDIR%\CCPL_GOOGLE_ERP"
-set "FRONTEND=%PROJECT%\frontend"
+if "!BATDIR:~-1!"=="\" set "BATDIR=!BATDIR:~0,-1!"
+set "PROJECT=!BATDIR!"
+set "FRONTEND=!PROJECT!\frontend"
 
-:: ── Check if START.bat is INSIDE the repo already ──
-:: (user may have cloned the full repo, not just downloaded START.bat)
-if exist "%BATDIR%\frontend\package.json" (
-    set "PROJECT=%BATDIR%"
-    set "FRONTEND=%BATDIR%\frontend"
-    echo [INFO] Detected: START.bat is inside the repo folder.
-    echo        Project: %BATDIR%
+:: -- Check if START.bat is INSIDE the repo or NEXT TO it --
+if exist "!BATDIR!\frontend\package.json" (
+    set "PROJECT=!BATDIR!"
+    set "FRONTEND=!BATDIR!\frontend"
+    echo [INFO] START.bat is inside the repo folder.
+) else if exist "!BATDIR!\CCPL_GOOGLE_ERP\frontend\package.json" (
+    set "PROJECT=!BATDIR!\CCPL_GOOGLE_ERP"
+    set "FRONTEND=!BATDIR!\CCPL_GOOGLE_ERP\frontend"
+    echo [INFO] Found repo next to START.bat.
 ) else (
-    echo [INFO] Project folder: %PROJECT%
+    echo [INFO] Project folder: !PROJECT!
 )
+echo       Project: !PROJECT!
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 0 — Check prerequisites
-:: ═══════════════════════════════════════════════
-echo [0/6] Checking prerequisites...
+:: =============================================
+:: STEP 0 - Check prerequisites
+:: =============================================
+echo [0/7] Checking prerequisites...
 
-git --version >nul 2>&1
+where git >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo [ERROR] Git is NOT installed!
-    echo         Download from: https://git-scm.com
-    echo.
-    pause
-    exit /b 1
+    echo [ERROR] Git is NOT installed! Download from: https://git-scm.com
+    goto :done
 )
-for /f "tokens=*" %%i in ('git --version') do echo       %%i
+echo       Git OK
 
-node -v >nul 2>&1
+where node >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo [ERROR] Node.js is NOT installed!
-    echo         Download from: https://nodejs.org
-    echo.
-    pause
-    exit /b 1
+    echo [ERROR] Node.js is NOT installed! Download from: https://nodejs.org
+    goto :done
 )
-for /f "tokens=*" %%i in ('node -v') do echo       Node %%i
+echo       Node OK
 
-call pm2 -v >nul 2>&1
+where pm2 >nul 2>&1
 if errorlevel 1 (
-    echo.
-    echo [WARN] PM2 not found — installing globally...
-    call npm install -g pm2
-    echo       PM2 installed.
+    echo [WARN] PM2 not found - installing globally...
+    cmd /c npm install -g pm2
 )
-for /f "tokens=*" %%i in ('call pm2 -v 2^>nul') do echo       PM2 v%%i
-
-echo       All prerequisites OK.
+echo       PM2 OK
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 1 — Clone or Pull
-:: ═══════════════════════════════════════════════
-if not exist "%PROJECT%\.git" (
-    echo [1/6] Repository not found locally. Cloning fresh...
-    echo       Cloning %REPO%
-    echo       into    %PROJECT%
-    echo.
-    git clone --progress %REPO% "%PROJECT%"
-    if errorlevel 1 (
-        echo.
-        echo [ERROR] Clone failed! Check your internet connection.
-        pause
-        exit /b 1
-    )
-    echo.
-    echo       Clone complete!
-    echo.
-) else (
-    echo [1/6] Fetching latest updates from GitHub...
-    cd /d "%PROJECT%"
-
-    :: Show current local version before pulling
-    echo.
-    echo  --- LOCAL VERSION (before update) ---
-    for /f "tokens=*" %%i in ('git log -1 --format^="%%h %%s (%%cr)"') do echo       %%i
-    echo.
-
-    :: Fetch all remote changes
-    git fetch origin %BRANCH% --progress 2>&1
-    echo.
-
-    :: Check if there are new commits
-    for /f %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a"
-    for /f %%a in ('git rev-parse origin/%BRANCH%') do set "REMOTE_HASH=%%a"
-
-    if "!LOCAL_HASH!"=="!REMOTE_HASH!" (
-        echo       Already up to date — no new commits.
-        echo.
+:: =============================================
+:: STEP 1 - Clone or Pull (skip if ZIP download)
+:: =============================================
+if exist "!FRONTEND!\package.json" (
+    if exist "!PROJECT!\.git" (
+        echo [1/7] Pulling latest from GitHub...
+        cd /d "!PROJECT!"
+        git fetch origin %BRANCH% 2>nul
+        git pull origin %BRANCH% 2>nul
+        echo       Done.
     ) else (
-        echo  --- NEW COMMITS AVAILABLE ---
-        git log --oneline HEAD..origin/%BRANCH%
-        echo.
-        echo  --- FILES CHANGED ---
-        git diff --stat HEAD..origin/%BRANCH%
-        echo.
-
-        :: Pull the changes
-        echo       Pulling updates...
-        git pull origin %BRANCH%
-        if errorlevel 1 (
-            echo [WARN] Pull conflict — resetting to match remote...
-            git reset --hard origin/%BRANCH%
-        )
-        echo.
-        echo  --- UPDATED TO ---
-        for /f "tokens=*" %%i in ('git log -1 --format^="%%h %%s (%%cr)"') do echo       %%i
-        echo.
+        echo [1/7] Project files found. Skipping git pull.
     )
-)
-
-:: Navigate to project
-cd /d "%PROJECT%"
-
-:: ═══════════════════════════════════════════════
-:: STEP 2 — Install / update dependencies
-:: ═══════════════════════════════════════════════
-echo [2/6] Checking dependencies...
-cd /d "%FRONTEND%"
-
-:: Only run npm install if node_modules missing or package.json changed
-if not exist "%FRONTEND%\node_modules" (
-    echo       node_modules not found — installing...
-    call npm install
 ) else (
-    echo       Updating dependencies (if any new)...
-    call npm install --silent 2>nul
+    echo [1/7] No project files found. Cloning from GitHub...
+    git clone --progress %REPO% "!PROJECT!"
+    if errorlevel 1 (
+        echo [ERROR] Clone failed!
+        goto :done
+    )
+    echo       Clone complete!
 )
+echo.
+
+cd /d "!PROJECT!"
+
+:: =============================================
+:: STEP 2 - Install dependencies
+:: =============================================
+echo [2/7] Installing dependencies...
+cd /d "!FRONTEND!"
+cmd /c npm install
 echo       Done.
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 3 — Build production bundle
-:: ═══════════════════════════════════════════════
-echo [3/6] Building production bundle...
-cd /d "%FRONTEND%"
-call npm run build
-if errorlevel 1 (
-    echo [WARN] Build had issues, but continuing with server start...
-)
+:: =============================================
+:: STEP 3 - Build
+:: =============================================
+echo [3/7] Building...
+cd /d "!FRONTEND!"
+cmd /c npm run build
 echo       Done.
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 4 — Stop old PM2 process
-:: ═══════════════════════════════════════════════
-echo [4/6] Stopping old PM2 process (if running)...
-call pm2 delete cc-erp 2>nul
+:: =============================================
+:: STEP 4 - Stop old PM2 process
+:: =============================================
+echo [4/7] Stopping old server...
+cmd /c pm2 delete cc-erp 2>nul
 echo       Cleared.
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 5 — Start PM2 server
-:: ═══════════════════════════════════════════════
-echo [5/6] Starting CC ERP on port %PORT% via PM2...
-cd /d "%PROJECT%"
-call pm2 start ecosystem.config.cjs --only cc-erp
+:: =============================================
+:: STEP 5 - Start PM2 server
+:: =============================================
+echo [5/7] Starting server on port %PORT%...
+cd /d "!PROJECT!"
+cmd /c pm2 start ecosystem.config.cjs --only cc-erp
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 6 — Save PM2 state (survives reboot)
-:: ═══════════════════════════════════════════════
-echo [6/6] Saving PM2 process list (auto-start on reboot)...
-call pm2 save
+:: =============================================
+:: STEP 6 - Save PM2 state
+:: =============================================
+echo [6/7] Saving PM2 state...
+cmd /c pm2 save
 echo.
 
-:: ═══════════════════════════════════════════════
-:: STEP 7 — Open Chrome browser
-:: ═══════════════════════════════════════════════
-echo [7/7] Opening CC ERP in Chrome...
-echo       Waiting 5 seconds for server to start...
-timeout /t 5 /nobreak >nul
-
-:: Try Chrome at common install locations
-set "CHROME="
-if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
-    set "CHROME=C:\Program Files\Google\Chrome\Application\chrome.exe"
-)
-if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
-    set "CHROME=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
-)
-if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
-    set "CHROME=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
-)
-
-if defined CHROME (
-    echo       Found Chrome: !CHROME!
-    start "" "!CHROME!" "http://localhost:%PORT%"
-) else (
-    echo       Chrome not found at default locations, opening in default browser...
-    start http://localhost:%PORT%
-)
-echo       Browser opened!
-
-:: ═══════════════════════════════════════════════
-:: DONE — Show status
-:: ═══════════════════════════════════════════════
+:: =============================================
+:: STEP 7 - Open browser
+:: =============================================
+echo [7/7] Opening browser in 5 seconds...
+ping 127.0.0.1 -n 6 >nul
+echo       Launching http://localhost:%PORT% ...
+explorer "http://localhost:%PORT%"
+echo       Browser launched!
 echo.
+
 echo ============================================
 echo    CC ERP is RUNNING!
 echo ============================================
 echo.
-echo    Local:   http://localhost:%PORT%
-echo    Network: http://YOUR_IP:%PORT%
+echo    URL:     http://localhost:%PORT%
+echo    Project: !PROJECT!
 echo.
-echo    Project: %PROJECT%
+cmd /c pm2 status
 echo.
 
-:: Show actual network IP
-echo    Your network IPs:
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
-    set "IP=%%a"
-    set "IP=!IP: =!"
-    echo      http://!IP!:%PORT%
-)
+:done
 echo.
 echo ============================================
-echo.
-call pm2 status
-echo.
-echo Press any key to close this window.
-echo (PM2 server keeps running in background!)
-echo.
-pause
+echo    Window will stay open. Type EXIT to close.
+echo    Server keeps running in background.
+echo ============================================

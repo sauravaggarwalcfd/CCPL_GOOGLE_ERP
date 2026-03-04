@@ -335,19 +335,6 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
           <span style={{ fontSize: 15, fontWeight: 900, color: M.textA, fontFamily: uff }}>{sheet.name}</span>
           <span style={{ background: A.al, border: `1px solid ${A.a}40`, color: A.a, borderRadius: 4, padding: "2px 9px", fontSize: 10, fontWeight: 900, fontFamily: dff }}>{enriched.totalCols} COLS</span>
           <span style={{ fontSize: 10, color: M.textC, fontFamily: uff }}>{sheet.desc}</span>
-          <div style={{ marginLeft: "auto", display: "flex", gap: 5 }}>
-            {[
-              { l: "MAND", v: stats.mandatory, c: "#ef4444" },
-              { l: "AUTO", v: stats.auto, c: A.a },
-              { l: "FK", v: stats.fk, c: "#2563eb" },
-              { l: "FILLED", v: stats.filled, c: "#15803d" },
-            ].map(s => (
-              <div key={s.l} style={{ background: M.surfLow || M.bg, border: `1px solid ${M.divider}`, borderRadius: 5, padding: "3px 8px", textAlign: "center", minWidth: 36 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: s.c, fontFamily: dff }}>{s.v}</div>
-                <div style={{ fontSize: 7, fontWeight: 900, color: M.textD, letterSpacing: 0.5, textTransform: "uppercase", fontFamily: uff }}>{s.l}</div>
-              </div>
-            ))}
-          </div>
         </div>
 
         {/* ── Tab bar ── */}
@@ -382,19 +369,6 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
           })}
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, paddingBottom: 6, paddingRight: 2 }}>
-            {/* Views button */}
-            <button onClick={() => setShowViewsPanel(true)} style={{
-              display: "flex", alignItems: "center", gap: 5, padding: "4px 12px", borderRadius: 5,
-              border: `1.5px solid ${currentView ? currentView.color : M.inputBd}`,
-              background: currentView ? `${currentView.color}15` : M.inputBg,
-              color: currentView ? currentView.color : M.textB,
-              fontSize: 10, fontWeight: 900, cursor: "pointer", height: 28, fontFamily: uff,
-            }}>
-              <span style={{ fontSize: 13 }}>{currentView ? currentView.icon : "🔖"}</span>
-              <span>{currentView ? currentView.name : "Views"}</span>
-              <span style={{ background: currentView ? currentView.color : M.surfMid, color: currentView ? "#fff" : M.textD, borderRadius: 10, padding: "1px 6px", fontSize: 8.5, fontWeight: 900 }}>{currentViews.length}</span>
-            </button>
-
             {/* Entry mode toggle */}
             {mainTab === "entry" && (
               <>
