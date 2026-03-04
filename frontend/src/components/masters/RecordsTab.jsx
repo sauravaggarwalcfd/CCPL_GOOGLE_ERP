@@ -6,6 +6,19 @@ import ColumnPanel from './ColumnPanel';
 import RecordDetailModal from './RecordDetailModal';
 import ViewEditModal from './ViewEditModal';
 
+// ── Drive thumbnail URL helper ──
+function driveThumbUrl(link) {
+  if (!link) return null;
+  const url = link.split('|')[0].trim();
+  if (!url) return null;
+  const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m1) return `https://drive.google.com/thumbnail?id=${m1[1]}&sz=w120`;
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w120`;
+  if (/\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/i.test(url)) return url;
+  return url;
+}
+
 // ── Mapping: raw sheet headers ↔ schema keys ──
 function mapRawToSchema(rawRow, schema) {
   const mapped = {};
@@ -273,6 +286,14 @@ function buildRenderList(sorted, groupBy, subGroupBy) {
   return items;
 }
 
+// ── Row height presets (Airtable-style) ──────────────────────────────────────
+const RH_PRESETS = {
+  short:  { label: 'Short',      rowH: 28,  thumb: 20  },
+  medium: { label: 'Medium',     rowH: 52,  thumb: 44  },
+  tall:   { label: 'Tall',       rowH: 96,  thumb: 80  },
+  xtall:  { label: 'Extra Tall', rowH: 148, thumb: 130 },
+};
+
 /**
  * RecordsTab — full-featured data table with sort, grouping, column management,
  * aggregation footer, views system, record detail modal.
@@ -318,6 +339,22 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   // === COLUMN DRAG ===
   const [colDragIdx, setColDragIdx] = useState(null);
   const [colDropIdx, setColDropIdx] = useState(null);
+
+  // === COLUMN / ROW RESIZE ===
+  const [colWidths, setColWidths] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`${fileKey}_rec_colW`) || '{}'); } catch { return {}; }
+  });
+  const [rowHeights, setRowHeights] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(`${fileKey}_rec_rowH`) || '{}'); } catch { return {}; }
+  });
+  const _colWRef = useRef({});
+  const _rowHRef = useRef({});
+
+  // === ROW HEIGHT MODE (global preset) ===
+  const [rowHeightMode, setRowHeightMode] = useState(() =>
+    localStorage.getItem(`${fileKey}_rec_rhMode`) || 'short'
+  );
+  const [showRowHeightMenu, setShowRowHeightMenu] = useState(false);
 
   // === INLINE PANELS ===
   const [showFP, setShowFP]                 = useState(false);   // filter panel
@@ -529,9 +566,46 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
 
   // ── Column width helper ──
   const colW = (f) => {
+    if (colWidths[f.key]) return colWidths[f.key];
     if (f.w === '1fr') return 220;
     const n = parseInt(f.w);
     return isNaN(n) ? 140 : n;
+  };
+
+  const startColResize = (e, key, curW) => {
+    e.stopPropagation(); e.preventDefault();
+    _colWRef.current = { ...colWidths };
+    const startX = e.clientX;
+    const onMove = me => {
+      const w = Math.max(48, curW + me.clientX - startX);
+      _colWRef.current = { ..._colWRef.current, [key]: w };
+      setColWidths(p => ({ ...p, [key]: w }));
+    };
+    const onUp = () => {
+      localStorage.setItem(`${fileKey}_rec_colW`, JSON.stringify(_colWRef.current));
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  };
+
+  const startRowResize = (e, rowId, curH) => {
+    e.stopPropagation(); e.preventDefault();
+    _rowHRef.current = { ...rowHeights };
+    const startY = e.clientY;
+    const onMove = me => {
+      const h = Math.max(28, curH + me.clientY - startY);
+      _rowHRef.current = { ..._rowHRef.current, [rowId]: h };
+      setRowHeights(p => ({ ...p, [rowId]: h }));
+    };
+    const onUp = () => {
+      localStorage.setItem(`${fileKey}_rec_rowH`, JSON.stringify(_rowHRef.current));
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   };
 
   // ── Summary labels ──
@@ -690,8 +764,15 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           </div>
         </td>
         {/* Row # */}
-        <td style={{ padding: `${pyV}px 6px`, borderRight: `1px solid ${M.divider}`, fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: M.textD, textAlign: 'center' }}>
+        <td style={{ padding: `${pyV}px 6px`, borderRight: `1px solid ${M.divider}`, fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: M.textD, textAlign: 'center', position: 'relative', height: rowHeights[row[codeKey]] || RH_PRESETS[rowHeightMode]?.rowH || undefined, verticalAlign: 'middle' }}>
           {String(rowIdx + 1).padStart(2, '0')}
+          {/* Row resize handle */}
+          <div
+            onMouseDown={e => startRowResize(e, row[codeKey], rowHeights[row[codeKey]] || RH_PRESETS[rowHeightMode]?.rowH || pyV * 2 + 16)}
+            style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, cursor: 'row-resize', zIndex: 2, background: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,.35)'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+          />
         </td>
         {/* Data cells */}
         {visCols.map((f, fi) => {
@@ -700,12 +781,39 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           return (
             <td key={f.key}
               onClick={() => openEdit(row)}
-              style={{ padding: `${pyV - 1}px 8px`, borderRight: `1px solid ${M.divider}`, maxWidth: 240, overflow: 'hidden', cursor: 'pointer' }}
+              style={{ padding: `${f.thumb ? 3 : pyV - 1}px 8px`, borderRight: `1px solid ${M.divider}`, maxWidth: 240, overflow: 'hidden', cursor: 'pointer', verticalAlign: 'middle' }}
             >
               {f.badge ? (
                 (() => {
                   const sc = STATUS_COLORS[val] || fallbackStatus;
                   return <span style={{ fontSize: fz - 2, fontWeight: 800, padding: '2px 8px', borderRadius: 12, background: sc.bg, color: sc.color, whiteSpace: 'nowrap' }}>{hasVal ? String(val) : '—'}</span>;
+                })()
+              ) : f.thumb && hasVal ? (
+                (() => {
+                  const tsz = RH_PRESETS[rowHeightMode]?.thumb || 36;
+                  const br = tsz <= 24 ? 3 : tsz <= 50 ? 4 : 6;
+                  if (f.multi) {
+                    /* sketchLink — pipe-separated, show up to 3 thumbs */
+                    return (
+                      <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                        {String(val).split('|').map(s => s.trim()).filter(Boolean).slice(0, 3).map((link, li) => {
+                          const src = driveThumbUrl(link);
+                          return src ? (
+                            <a key={li} href={link} target="_blank" rel="noreferrer" title={link}>
+                              <img src={src} alt="" style={{ width: tsz, height: tsz, objectFit: 'cover', borderRadius: br, border: '1px solid #e2e8f0', display: 'block' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                            </a>
+                          ) : null;
+                        })}
+                      </div>
+                    );
+                  }
+                  /* imageLink — single thumb */
+                  const src = driveThumbUrl(String(val));
+                  return src ? (
+                    <a href={String(val)} target="_blank" rel="noreferrer" title={String(val)} onClick={e => e.stopPropagation()}>
+                      <img src={src} alt="" style={{ width: tsz, height: tsz, objectFit: 'cover', borderRadius: br, border: '1px solid #e2e8f0', display: 'block' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                    </a>
+                  ) : null;
                 })()
               ) : hasVal ? (
                 <span style={{ fontSize: fz - 2, color: fi === 0 ? A.a : M.textA, fontWeight: fi === 0 ? 700 : 400, fontFamily: f.mono ? "'IBM Plex Mono',monospace" : uff, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -786,6 +894,50 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           style={{ padding: '5px 11px', border: `1px solid ${hiddenC.length > 0 || showCM ? '#7C3AED' : M.inputBd}`, borderRadius: 6, background: hiddenC.length > 0 || showCM ? 'rgba(124,58,237,.1)' : M.inputBg, color: hiddenC.length > 0 || showCM ? '#7C3AED' : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap', flexShrink: 0 }}>
           {colLabel}
         </button>
+
+        {/* Row Height picker */}
+        <div style={{ position: 'relative', flexShrink: 0 }}>
+          <button
+            onClick={() => setShowRowHeightMenu(p => !p)}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', border: `1px solid ${showRowHeightMenu || rowHeightMode !== 'short' ? '#0891B2' : M.inputBd}`, borderRadius: 6, background: showRowHeightMenu || rowHeightMode !== 'short' ? 'rgba(8,145,178,.1)' : M.inputBg, color: showRowHeightMenu || rowHeightMode !== 'short' ? '#0891B2' : M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap' }}
+          >
+            ↕ {RH_PRESETS[rowHeightMode]?.label || 'Row Height'}
+          </button>
+          {showRowHeightMenu && (
+            <>
+              <div onClick={() => setShowRowHeightMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 300 }} />
+              <div style={{ position: 'absolute', top: 36, left: 0, zIndex: 301, background: M.surfHigh, border: `1px solid ${M.divider}`, borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.18)', width: 200, padding: '12px 0 8px', overflow: 'hidden' }}>
+                <div style={{ padding: '0 14px 10px', borderBottom: `1px solid ${M.divider}` }}>
+                  <div style={{ fontSize: 10, fontWeight: 900, color: M.textA, fontFamily: uff, letterSpacing: 0.4, textTransform: 'uppercase' }}>Row Height</div>
+                  <div style={{ fontSize: 9, color: M.textD, fontFamily: uff, marginTop: 2 }}>Controls thumbnail preview size</div>
+                </div>
+                {Object.entries(RH_PRESETS).map(([key, preset]) => {
+                  const isActive = rowHeightMode === key;
+                  const swatchH = key === 'short' ? 6 : key === 'medium' ? 14 : key === 'tall' ? 22 : 30;
+                  return (
+                    <div
+                      key={key}
+                      onClick={() => { setRowHeightMode(key); setRowHeights({}); localStorage.setItem(`${fileKey}_rec_rhMode`, key); localStorage.removeItem(`${fileKey}_rec_rowH`); setShowRowHeightMenu(false); }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', cursor: 'pointer', background: isActive ? 'rgba(8,145,178,.08)' : 'transparent' }}
+                      onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = M.hoverBg; }}
+                      onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      {/* Visual swatch */}
+                      <div style={{ width: 36, height: 30, borderRadius: 5, border: `1.5px solid ${isActive ? '#0891B2' : M.divider}`, background: M.bg, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 3, flexShrink: 0, overflow: 'hidden' }}>
+                        <div style={{ width: '100%', height: swatchH, borderRadius: 2, background: isActive ? '#0891B2' : M.surfMid }} />
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: isActive ? '#0891B2' : M.textA, fontFamily: uff }}>{preset.label}</div>
+                        <div style={{ fontSize: 9, color: M.textD, fontFamily: uff }}>Thumb: {preset.thumb}px</div>
+                      </div>
+                      {isActive && <span style={{ fontSize: 13, color: '#0891B2' }}>✓</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Group by select */}
         <select value={groupBy || ''} onChange={e => { setGroupBy(e.target.value || null); setSubGroupBy(null); }}
@@ -1240,6 +1392,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                           background: activeSort ? 'rgba(124,58,237,.08)' : M.tblHead,
                           opacity: colDragIdx === fi ? 0.45 : 1,
                           whiteSpace: 'nowrap',
+                          position: 'relative',
                         }}
                         onMouseEnter={e => { if (colDragIdx === null) e.currentTarget.style.background = M.hoverBg; }}
                         onMouseLeave={e => { if (colDragIdx === null) e.currentTarget.style.background = activeSort ? 'rgba(124,58,237,.08)' : M.tblHead; }}
@@ -1251,6 +1404,14 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                             {activeSort ? (activeSort.dir === 'asc' ? '↑' : '↓') : '↕'}
                           </span>
                         </div>
+                        {/* Column resize handle */}
+                        <div
+                          onMouseDown={e => startColResize(e, f.key, colW(f))}
+                          onClick={e => e.stopPropagation()}
+                          style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 5, cursor: 'col-resize', zIndex: 2, background: 'transparent' }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(124,58,237,.35)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                        />
                       </th>
                     );
                   })}
