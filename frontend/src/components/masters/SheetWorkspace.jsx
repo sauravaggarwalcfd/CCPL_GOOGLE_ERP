@@ -332,22 +332,19 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
       {/* ── Master Header ── */}
-      {/* When article_master is in entry tab: collapse sheet-name row, remove border (V3 dark bar sits flush below) */}
       <div style={{
-        padding: isV3Entry ? "4px 16px 0" : "10px 16px 0",
-        background: isV3Entry ? "#1a2332" : M.surfHigh,
-        borderBottom: isV3Entry ? "none" : `1px solid ${M.divider}`,
+        padding: "10px 16px 0",
+        background: M.surfHigh,
+        borderBottom: `1px solid ${M.divider}`,
         flexShrink: 0,
       }}>
-        {/* Sheet name row — hidden for V3 entry (V3 shell bar provides breadcrumb) */}
-        {!isV3Entry && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 16 }}>{sheet.icon}</span>
-            <span style={{ fontSize: 15, fontWeight: 900, color: M.textA, fontFamily: uff }}>{sheet.name}</span>
-            <span style={{ background: A.al, border: `1px solid ${A.a}40`, color: A.a, borderRadius: 4, padding: "2px 9px", fontSize: 10, fontWeight: 900, fontFamily: dff }}>{enriched.totalCols} COLS</span>
-            <span style={{ fontSize: 10, color: M.textC, fontFamily: uff }}>{sheet.desc}</span>
-          </div>
-        )}
+        {/* Sheet name row — always visible */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 16 }}>{sheet.icon}</span>
+          <span style={{ fontSize: 15, fontWeight: 900, color: M.textA, fontFamily: uff }}>{sheet.name}</span>
+          <span style={{ background: A.al, border: `1px solid ${A.a}40`, color: A.a, borderRadius: 4, padding: "2px 9px", fontSize: 10, fontWeight: 900, fontFamily: dff }}>{enriched.totalCols} COLS</span>
+          <span style={{ fontSize: 10, color: M.textC, fontFamily: uff }}>{sheet.desc}</span>
+        </div>
 
         {/* ── Tab bar ── */}
         <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
@@ -359,39 +356,27 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
                 borderRadius: "5px 5px 0 0",
                 display: "flex", alignItems: "center", gap: 6,
                 transition: "all .15s",
-                ...(isV3Entry ? {
-                  // Dark-mode tab bar to match V3 shell bar below
-                  background: active ? "#253347" : "transparent",
-                  borderTop: `2px solid ${active ? A.a : "transparent"}`,
-                  borderRight: `1px solid ${active ? "#2d3f50" : "transparent"}`,
-                  borderLeft:  `1px solid ${active ? "#2d3f50" : "transparent"}`,
-                  borderBottom: "none",
-                  marginBottom: 0,
-                } : {
-                  background: active ? M.surfHigh : M.surfLow || M.bg,
-                  borderTop: `2px solid ${active ? A.a : "transparent"}`,
-                  borderRight: `1px solid ${active ? M.divider : "transparent"}`,
-                  borderLeft:  `1px solid ${active ? M.divider : "transparent"}`,
-                  borderBottom: `1px solid ${active ? M.surfHigh : M.divider}`,
-                  marginBottom: active ? -1 : 0,
-                }),
+                background: active ? M.surfHigh : M.surfLow || M.bg,
+                borderTop: `2px solid ${active ? A.a : "transparent"}`,
+                borderRight: `1px solid ${active ? M.divider : "transparent"}`,
+                borderLeft:  `1px solid ${active ? M.divider : "transparent"}`,
+                borderBottom: `1px solid ${active ? M.surfHigh : M.divider}`,
+                marginBottom: active ? -1 : 0,
               }}>
                 <span style={{ fontSize: 11, fontWeight: active ? 900 : 700, fontFamily: uff,
-                  color: isV3Entry
-                    ? (active ? A.a : "#64748b")
-                    : (active ? A.a : M.textC) }}>{t.icon} {t.label}</span>
+                  color: active ? A.a : M.textC }}>{t.icon} {t.label}</span>
                 {(t.id === "entry" || t.id === "bulk") && isDirty && <span style={{ background: "#f59e0b", width: 6, height: 6, borderRadius: "50%" }} />}
                 {t.id === "records" && (
                   <span style={{ borderRadius: 10, padding: "1px 6px", fontSize: 9, fontWeight: 900,
-                    background: active ? A.a : isV3Entry ? "#2d3f50" : M.surfMid,
-                    color: active ? "#fff" : isV3Entry ? "#94a3b8" : M.textD }}>
+                    background: active ? A.a : M.surfMid,
+                    color: active ? "#fff" : M.textD }}>
                     {sheetCounts?.[sheet.key] ?? "—"}
                   </span>
                 )}
                 {t.id === "specs" && (
                   <span style={{ borderRadius: 10, padding: "1px 6px", fontSize: 9, fontWeight: 900,
-                    background: active ? A.a : isV3Entry ? "#2d3f50" : M.surfMid,
-                    color: active ? "#fff" : isV3Entry ? "#94a3b8" : M.textD }}>
+                    background: active ? A.a : M.surfMid,
+                    color: active ? "#fff" : M.textD }}>
                     {enriched.totalCols}
                   </span>
                 )}

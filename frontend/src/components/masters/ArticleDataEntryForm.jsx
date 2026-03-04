@@ -752,13 +752,82 @@ function SortPanel({ sorts, setSorts, onClose }) {
   );
 }
 
+/* ─── IMAGE SLIDER ───────────────────────────────────────────── */
+function ImageSlider({ rawLinks, height, emptyIcon, emptyLabel }) {
+  const [idx, setIdx] = useState(0);
+  const urls = (rawLinks || "").split("|").map(s => s.trim()).filter(Boolean).map(driveThumbUrl).filter(Boolean);
+  const total = urls.length;
+
+  // reset index when links change
+  const prevLinksRef = useRef(rawLinks);
+  if (prevLinksRef.current !== rawLinks) { prevLinksRef.current = rawLinks; if (idx >= total) setIdx(0); }
+
+  if (!total) return (
+    <div style={{ height, borderRadius:9, display:"flex", flexDirection:"column",
+      alignItems:"center", justifyContent:"center",
+      background:"linear-gradient(135deg,#253347,#1a2839)", border:"1px dashed #3d5166" }}>
+      <div style={{ fontSize:28, marginBottom:4 }}>{emptyIcon}</div>
+      <div style={{ fontSize:8, color:"#4d6070" }}>{emptyLabel}</div>
+    </div>
+  );
+
+  const safeIdx = Math.min(idx, total - 1);
+
+  return (
+    <div style={{ position:"relative", height, borderRadius:9, overflow:"hidden",
+      background:"#0a1120", border:`1px solid ${C.slate3}` }}>
+
+      {/* Image */}
+      <img src={urls[safeIdx]} alt={`img-${safeIdx+1}`} referrerPolicy="no-referrer"
+        style={{ width:"100%", height:"100%", objectFit:"contain", display:"block" }}
+        onError={e => { e.target.style.opacity=".25"; }} />
+
+      {/* Prev / Next */}
+      {total > 1 && <>
+        <button onClick={()=>setIdx(p=>(p-1+total)%total)} style={{
+          position:"absolute", left:5, top:"50%", transform:"translateY(-50%)",
+          width:24, height:24, borderRadius:"50%", border:"none",
+          background:"rgba(0,0,0,.65)", color:"#fff", cursor:"pointer",
+          fontSize:14, display:"flex", alignItems:"center", justifyContent:"center",
+          lineHeight:1, padding:0 }}>‹</button>
+        <button onClick={()=>setIdx(p=>(p+1)%total)} style={{
+          position:"absolute", right:5, top:"50%", transform:"translateY(-50%)",
+          width:24, height:24, borderRadius:"50%", border:"none",
+          background:"rgba(0,0,0,.65)", color:"#fff", cursor:"pointer",
+          fontSize:14, display:"flex", alignItems:"center", justifyContent:"center",
+          lineHeight:1, padding:0 }}>›</button>
+      </>}
+
+      {/* Dots */}
+      {total > 1 && (
+        <div style={{ position:"absolute", bottom:6, left:"50%", transform:"translateX(-50%)",
+          display:"flex", gap:4, alignItems:"center" }}>
+          {urls.map((_, i) => (
+            <button key={i} onClick={()=>setIdx(i)} style={{
+              width: i===safeIdx ? 14 : 5, height:5, borderRadius:3, border:"none",
+              background: i===safeIdx ? C.orange : "rgba(255,255,255,.35)",
+              cursor:"pointer", transition:"all .2s", padding:0 }}/>
+          ))}
+        </div>
+      )}
+
+      {/* Count badge */}
+      {total > 1 && (
+        <div style={{ position:"absolute", top:6, left:7, padding:"2px 6px", borderRadius:8,
+          background:"rgba(0,0,0,.65)", fontSize:8, color:"#fff", fontWeight:700 }}>
+          {safeIdx+1}/{total}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── PREVIEW PANEL ──────────────────────────────────────────── */
 function Preview({ fd }) {
   const filled = MAN.filter(f => fd[f.key]).length;
   const pct    = Math.round(filled / MAN.length * 100);
   const markup = fd.wsp && fd.mrp ? Math.round((+fd.mrp - +fd.wsp) / +fd.wsp * 100) : null;
   const st     = fd.status ? STATUS_COLORS[fd.status] : null;
-  const imgSrc = driveThumbUrl(fd.imageLink);
 
   return (
     <div style={{
@@ -775,57 +844,37 @@ function Preview({ fd }) {
 
       <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
 
-        {/* Image card */}
-        <div style={{ height:120, borderRadius:9,
-          background: imgSrc ? '#0e1620' : "linear-gradient(135deg,#253347,#1a2839)",
-          display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
-          border: imgSrc ? `1px solid ${C.slate3}` : "1px dashed #3d5166",
-          position:"relative", overflow:"hidden" }}>
-          {imgSrc
-            ? <img src={imgSrc} alt="" referrerPolicy="no-referrer"
-                style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }}
-                onError={e => { e.target.style.display='none'; }} />
-            : <>
-                <div style={{ fontSize:28, marginBottom:4 }}>👕</div>
-                <div style={{ fontSize:8, color:"#4d6070" }}>No image linked</div>
-              </>
-          }
+        {/* ── Article Image (slider if multiple pipe-separated links) ── */}
+        <div style={{ position:"relative" }}>
+          <ImageSlider rawLinks={fd.imageLink} height={140} emptyIcon="👕" emptyLabel="No image linked" />
+          {/* Status badge overlay */}
           {st && (
             <div style={{ position:"absolute", top:7, right:7, display:"flex", alignItems:"center", gap:3,
-              padding:"2px 7px", borderRadius:10, background:"rgba(0,0,0,.55)", backdropFilter:"blur(4px)" }}>
+              padding:"2px 7px", borderRadius:10, background:"rgba(0,0,0,.55)", backdropFilter:"blur(4px)",
+              zIndex:2 }}>
               <div style={{ width:5, height:5, borderRadius:"50%", background:st.dot }}/>
               <span style={{ fontSize:8, fontWeight:900, color:"#fff" }}>{fd.status}</span>
             </div>
           )}
+          {/* Article code badge overlay */}
           {fd.code && (
-            <div style={{ position:"absolute", bottom:7, left:8,
-              padding:"2px 7px", borderRadius:4, background:"rgba(0,0,0,.6)",
-              fontFamily:"'IBM Plex Mono',monospace", fontSize:9.5, fontWeight:900, color:C.orange }}>
+            <div style={{ position:"absolute", bottom:16, left:8,
+              padding:"2px 7px", borderRadius:4, background:"rgba(0,0,0,.7)",
+              fontFamily:"'IBM Plex Mono',monospace", fontSize:9.5, fontWeight:900, color:C.orange,
+              zIndex:2 }}>
               {fd.code}
             </div>
           )}
         </div>
 
-        {/* Sketch thumbnails */}
-        {fd.sketchLink && (() => {
-          const links = fd.sketchLink.split('|').map(s => s.trim()).filter(Boolean);
-          const thumbs = links.map(l => driveThumbUrl(l)).filter(Boolean);
-          if (!thumbs.length) return null;
-          return (
-            <div style={{ background:C.slate2, borderRadius:6, padding:"7px 9px", border:`1px solid ${C.slate3}` }}>
-              <div style={{ fontSize:7.5, fontWeight:900, color:"#4d6070", textTransform:"uppercase", letterSpacing:.8, marginBottom:5 }}>
-                Sketch{thumbs.length > 1 ? 'es' : ''}
-              </div>
-              <div style={{ display:"flex", gap:5, flexWrap:"wrap" }}>
-                {thumbs.map((src, i) => (
-                  <img key={i} src={src} alt={'Sketch '+(i+1)} referrerPolicy="no-referrer"
-                    style={{ width:56, height:56, objectFit:"cover", borderRadius:5, border:"1px solid #3d5166" }}
-                    onError={e => { e.target.style.display='none'; }} />
-                ))}
-              </div>
-            </div>
-          );
-        })()}
+        {/* ── Sketch Links (slider if multiple) ── */}
+        {fd.sketchLink && (
+          <div>
+            <div style={{ fontSize:7.5, fontWeight:900, color:"#4d6070", textTransform:"uppercase",
+              letterSpacing:.8, marginBottom:5 }}>Sketch</div>
+            <ImageSlider rawLinks={fd.sketchLink} height={110} emptyIcon="✏️" emptyLabel="No sketch" />
+          </div>
+        )}
 
         {/* Name block */}
         {(fd.desc || fd.shortName || fd.buyerStyle) ? (

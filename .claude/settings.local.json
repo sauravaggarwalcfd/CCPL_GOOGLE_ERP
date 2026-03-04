@@ -40,7 +40,10 @@
       "Bash(npm run serve)",
       "Bash(PORT=9090 npm start:*)",
       "Bash(npx:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(git stash:*)",
+      "Bash(git push:*)",
+      "Bash(git:*)"
     ]
   }
 }
