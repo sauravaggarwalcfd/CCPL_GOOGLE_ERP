@@ -344,6 +344,8 @@ function V2ImgThumb({ src, size=44, radius=6, M }) {
   const [err, setErr] = useState(false);
   const dimColor = M?.textD || '#d1d8e0';
   const thumbSrc = src ? driveThumbUrl(src) : null;
+  // Reset error when source changes (fixes split-view image vanishing on row switch)
+  useEffect(() => { setErr(false); }, [thumbSrc]);
   if (!thumbSrc || err) return (
     <div style={{ width:size, height:size, borderRadius:radius, flexShrink:0,
       background:'#f1f5f9', border:'1px solid #e4e8ef',
@@ -362,6 +364,8 @@ function V2SketchThumb({ src, size=38, radius=5, M }) {
   const dimColor = M?.textD || '#d1d8e0';
   const mutedColor = M?.textD || '#9aa5b4';
   const thumbSrc = src ? driveThumbUrl(src) : null;
+  // Reset error when source changes
+  useEffect(() => { setErr(false); }, [thumbSrc]);
   if (!thumbSrc || err) return (
     <div style={{ width:size, height:size, borderRadius:radius, flexShrink:0,
       background:'#fafafa', border:'1px dashed #d1d8e0',
@@ -393,6 +397,78 @@ function V2SketchThumb({ src, size=38, radius=5, M }) {
   );
 }
 
+// ── Mini image slider for table/sheet view cells (supports pipe-separated links) ──
+function CellImgSlider({ rawSrc, size, radius, isSketch = false, M }) {
+  const [idx, setIdx] = useState(0);
+  const [err, setErr] = useState(false);
+  const dimColor = M?.textD || '#d1d8e0';
+
+  const urls = useMemo(() => {
+    if (!rawSrc) return [];
+    return rawSrc.split('|').map(s => s.trim()).filter(Boolean).map(driveThumbUrl).filter(Boolean);
+  }, [rawSrc]);
+
+  // Reset on source change
+  useEffect(() => { setIdx(0); setErr(false); }, [rawSrc]);
+
+  const total = urls.length;
+  const safeIdx = total ? Math.min(idx, total - 1) : 0;
+  const src = urls[safeIdx];
+
+  if (!total || err || !src) {
+    return (
+      <div style={{ width: size, height: size, borderRadius: radius, flexShrink: 0,
+        background: isSketch ? '#fafafa' : '#f1f5f9',
+        border: isSketch ? '1px dashed #d1d8e0' : '1px solid #e4e8ef',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: size > 40 ? 16 : 11, color: dimColor }}>
+        {isSketch ? '\u270F' : '\uD83D\uDCF7'}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0,
+      borderRadius: radius, overflow: 'hidden', border: '1px solid #e4e8ef' }}>
+      <img src={src} onError={() => setErr(true)} alt=""
+        style={{ width: size, height: size, objectFit: 'cover', display: 'block',
+          filter: isSketch ? 'grayscale(35%)' : 'none' }} />
+      {total > 1 && (
+        <>
+          {/* Prev arrow */}
+          {safeIdx > 0 && (
+            <button onClick={e => { e.stopPropagation(); setIdx(i => i - 1); setErr(false); }}
+              style={{ position: 'absolute', left: 1, top: '50%', transform: 'translateY(-50%)',
+                width: 14, height: 14, borderRadius: '50%', border: 'none',
+                background: 'rgba(0,0,0,.65)', color: '#fff', cursor: 'pointer',
+                fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, lineHeight: 1, zIndex: 2 }}>\u2039</button>
+          )}
+          {/* Next arrow */}
+          {safeIdx < total - 1 && (
+            <button onClick={e => { e.stopPropagation(); setIdx(i => i + 1); setErr(false); }}
+              style={{ position: 'absolute', right: 1, top: '50%', transform: 'translateY(-50%)',
+                width: 14, height: 14, borderRadius: '50%', border: 'none',
+                background: 'rgba(0,0,0,.65)', color: '#fff', cursor: 'pointer',
+                fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                padding: 0, lineHeight: 1, zIndex: 2 }}>\u203a</button>
+          )}
+          {/* Dot indicators */}
+          <div style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)',
+            display: 'flex', gap: 2, zIndex: 2 }}>
+            {urls.map((_, i) => (
+              <div key={i} onClick={e => { e.stopPropagation(); setIdx(i); setErr(false); }}
+                style={{ width: i === safeIdx ? 6 : 4, height: 4, borderRadius: 2, cursor: 'pointer',
+                  background: i === safeIdx ? '#fff' : 'rgba(255,255,255,.55)',
+                  boxShadow: '0 0 2px rgba(0,0,0,.5)', transition: 'all .15s' }} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function V2Tags({ v, M }) {
   const dimColor = M?.textD || '#d1d8e0';
   if (!v) return <span style={{ color:dimColor, fontSize:10 }}>{'\u2014'}</span>;
@@ -412,8 +488,8 @@ function V2CellVal({ col, row, M, A }) {
   const accentColor = A?.a || '#E8690A';
   const textColor = M?.textA || '#1a2332';
   const dimColor = M?.textD || '#d1d8e0';
-  if (col.special === 'thumb' || col.thumb)  return <V2ImgThumb src={row.imageLink || row[col.key]} size={42} radius={6} M={M}/>;
-  if (col.special === 'sketch') return <V2SketchThumb src={row.sketchLink || row[col.key]} size={36} radius={5} M={M}/>;
+  if (col.special === 'thumb' || col.thumb)  return <CellImgSlider rawSrc={row.imageLink || row[col.key]} size={42} radius={6} M={M} />;
+  if (col.special === 'sketch') return <CellImgSlider rawSrc={row.sketchLink || row[col.key]} size={36} radius={5} M={M} isSketch />;
   if (col.badge) return <V2StatusBadge s={row[col.key]}/>;
   if (col.key === 'tags') return <V2Tags v={row[col.key]} M={M}/>;
   const raw = row[col.key];
@@ -1827,26 +1903,12 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                 (() => {
                   const tsz = RH_PRESETS[rowHeightMode]?.thumb || 36;
                   const br = tsz <= 24 ? 3 : tsz <= 50 ? 4 : 6;
-                  if (f.multi) {
-                    return (
-                      <div style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
-                        {String(val).split('|').map(s => s.trim()).filter(Boolean).slice(0, 3).map((link, li) => {
-                          const src = driveThumbUrl(link);
-                          return src ? (
-                            <a key={li} href={link} target="_blank" rel="noreferrer" title={link}>
-                              <img src={src} alt="" style={{ width: tsz, height: tsz, objectFit: 'cover', borderRadius: br, border: '1px solid #e2e8f0', display: 'block' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                            </a>
-                          ) : null;
-                        })}
-                      </div>
-                    );
-                  }
-                  const src = driveThumbUrl(String(val));
-                  return src ? (
-                    <a href={String(val)} target="_blank" rel="noreferrer" title={String(val)} onClick={e => e.stopPropagation()}>
-                      <img src={src} alt="" style={{ width: tsz, height: tsz, objectFit: 'cover', borderRadius: br, border: '1px solid #e2e8f0', display: 'block' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
-                    </a>
-                  ) : null;
+                  return (
+                    <div onClick={e => e.stopPropagation()}>
+                      <CellImgSlider rawSrc={String(val)} size={tsz} radius={br} M={M}
+                        isSketch={f.key === 'sketchLink' || f.key === 'sketch'} />
+                    </div>
+                  );
                 })()
               ) : hasVal ? (
                 <span style={{ fontSize: fz - 2, color: fi === 0 ? A.a : M.textA, fontWeight: fi === 0 ? 700 : 400, fontFamily: f.mono ? "'IBM Plex Mono',monospace" : uff, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
