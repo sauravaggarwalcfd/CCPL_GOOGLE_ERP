@@ -1147,7 +1147,8 @@ export default function ArticleDataEntryForm({
 
   // Save wrapper — awaits GAS call, shows ok only on success
   const onSave = useCallback(async () => {
-    if (reqLeft.length > 0) { setShk(true); setTimeout(()=>setShk(false),600); return; }
+    // Skip required-field gate when editing (record already exists in sheet)
+    if (!editItem && reqLeft.length > 0) { setShk(true); setTimeout(()=>setShk(false),600); return; }
     try {
       await handleSave();
       setOk(true); setTimeout(()=>setOk(false),2500);
@@ -1155,7 +1156,7 @@ export default function ArticleDataEntryForm({
       // handleSave already set formErrors; shake to signal failure
       setShk(true); setTimeout(()=>setShk(false),600);
     }
-  }, [reqLeft.length, handleSave]);
+  }, [editItem, reqLeft.length, handleSave]);
 
   // Clear wrapper
   const onClear = useCallback(() => {
