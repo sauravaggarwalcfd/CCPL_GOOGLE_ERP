@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { SCHEMA_MAP } from '../../constants/masterSchemas';
 import api from '../../services/api';
 import SortPanel from './SortPanel';
@@ -94,6 +94,29 @@ const TOAST_COLORS = {
 
 // ── CC_RED — mandatory accent for Default pill / Add New button ──
 const CC_RED = '#CC0000';
+
+// ── System views (V2) — article-specific views + generic fallback ──
+const ARTICLE_SYSTEM_VIEWS = [
+  { id: 'all', name: 'All Columns', icon: '⊞', color: '#64748b', isSystem: true,
+    desc: 'Every column across all fields', cols: null },
+  { id: 'overview', name: 'Article Overview', icon: '👁', color: '#E8690A', isSystem: true,
+    desc: 'Key identity + status at a glance',
+    cols: ['imageLink','code','desc','shortName','sketchLink','l2Category','gender','season','status','tags'] },
+  { id: 'pricing', name: 'Pricing & Tax', icon: '₹', color: '#15803d', isSystem: true,
+    desc: 'Article code + all pricing columns',
+    cols: ['code','desc','wsp','mrp','markupPct','markdownPct','hsnCode','gstPct','status'] },
+  { id: 'fabric', name: 'Fabric Focus', icon: '🧵', color: '#6c3fc5', isSystem: true,
+    desc: 'Fabric, colour and size columns',
+    cols: ['code','desc','mainFabric','fabricName','colorCodes','sizeRange','status'] },
+];
+const DEFAULT_SYSTEM_VIEWS = [
+  { id: 'all', name: 'All Columns', icon: '⊞', color: '#64748b', isSystem: true,
+    desc: 'Every column across all fields', cols: null },
+];
+function getSystemViews(sheetKey) {
+  if (sheetKey === 'ARTICLE_MASTER') return ARTICLE_SYSTEM_VIEWS;
+  return DEFAULT_SYSTEM_VIEWS;
+}
 
 // ── AGG accent colours (§F) ──
 const AGG_COLORS = {
@@ -294,6 +317,488 @@ const RH_PRESETS = {
   xtall:  { label: 'Extra Tall', rowH: 148, thumb: 130 },
 };
 
+// ── V2 Filter Panel (right drawer) ──
+function FilterPanelV2({ data, colFilters, setColFilters, visCols, allFields, onClose, M, A, uff, fz }) {
+  const [local, setLocal] = useState({ ...colFilters });
+  const filterableCols = visCols.filter(c => !c.thumb && !c.hidden);
+
+  const uniqueVals = col => {
+    const vals = [...new Set(data.map(r => r[col.key]).filter(v => v !== undefined && v !== ''))];
+    return vals.sort((a, b) => String(a).localeCompare(String(b)));
+  };
+
+  const isTextSearch = f => !f.options && !f.badge && f.type !== 'select';
+  const apply = () => { setColFilters(local); onClose(); };
+  const clear = () => { setColFilters({}); onClose(); };
+  const activeCount = Object.values(local).filter(v => v && v !== 'all').length;
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(15,23,42,.28)', backdropFilter: 'blur(2px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 320,
+        background: M.surfHigh, boxShadow: '-10px 0 40px rgba(0,0,0,.12)',
+        display: 'flex', flexDirection: 'column', animation: 'slideFromRight .22s ease' }}>
+
+        <div style={{ padding: '13px 14px 11px', borderBottom: `1px solid ${M.divider}`,
+          background: '#1e293b', display: 'flex', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 900, color: '#e2e8f0', flex: 1, fontFamily: uff }}>
+            ⊟ Column Filters
+            {activeCount > 0 && <span style={{ marginLeft: 6, fontSize: 9, padding: '1px 6px',
+              borderRadius: 8, background: A.a, color: '#fff', fontWeight: 900 }}>{activeCount} ON</span>}
+          </span>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 16, color: '#94a3b8', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+          {filterableCols.map(c => {
+            const vals = uniqueVals(c);
+            const cur = local[c.key] || 'all';
+            return (
+              <div key={c.key} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, textTransform: 'uppercase',
+                  letterSpacing: .5, marginBottom: 5, fontFamily: uff,
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  {c.header}
+                  {cur !== 'all' && (
+                    <button onClick={() => setLocal(p => ({ ...p, [c.key]: 'all' }))} style={{
+                      border: 'none', background: 'none', color: A.a,
+                      fontSize: 8.5, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>× clear</button>
+                  )}
+                </div>
+
+                {isTextSearch(c) ? (
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                      fontSize: 12, color: M.textD, pointerEvents: 'none' }}>⌕</span>
+                    <input value={cur === 'all' ? '' : cur}
+                      onChange={e => setLocal(p => ({ ...p, [c.key]: e.target.value || 'all' }))}
+                      placeholder={`Search ${(c.header || c.key).toLowerCase()}…`}
+                      style={{ width: '100%', padding: '6px 10px 6px 26px',
+                        border: `1.5px solid ${cur !== 'all' ? A.a : M.divider}`,
+                        borderRadius: 7, fontSize: 10.5, outline: 'none',
+                        background: cur !== 'all' ? A.al : M.inputBg,
+                        fontFamily: uff, color: M.textA }} />
+                    {cur !== 'all' && (
+                      <button onClick={() => setLocal(p => ({ ...p, [c.key]: 'all' }))} style={{
+                        position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)',
+                        border: 'none', background: 'none', color: M.textD, cursor: 'pointer', fontSize: 13 }}>×</button>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <select value={cur}
+                      onChange={e => setLocal(p => ({ ...p, [c.key]: e.target.value }))}
+                      style={{ width: '100%', padding: '6px 24px 6px 10px',
+                        border: `1.5px solid ${cur !== 'all' ? A.a : M.divider}`,
+                        borderRadius: 7, fontSize: 10.5, outline: 'none',
+                        appearance: 'none', cursor: 'pointer',
+                        background: cur !== 'all' ? A.al : M.inputBg,
+                        color: M.textA, fontFamily: uff }}>
+                      <option value="all">— All —</option>
+                      {(c.options || vals).map(v => (
+                        <option key={v} value={String(v)}>{String(v)}</option>
+                      ))}
+                    </select>
+                    <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                      color: M.textD, fontSize: 10, pointerEvents: 'none' }}>▾</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {filterableCols.length === 0 && (
+            <div style={{ padding: '28px 0', textAlign: 'center', color: M.textD, fontSize: 11, fontFamily: uff }}>
+              No filterable columns visible.<br />Switch to a view with more columns.
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: '10px 14px', borderTop: `1px solid ${M.divider}`, display: 'flex', gap: 8 }}>
+          <button onClick={clear} style={{ flex: 1, padding: '7px', border: `1px solid ${M.divider}`,
+            borderRadius: 7, background: M.surfMid, color: M.textB,
+            fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>Clear All</button>
+          <button onClick={apply} style={{ flex: 2, padding: '7px', border: 'none',
+            borderRadius: 7, background: A.a, color: '#fff',
+            fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>Apply Filters</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── V2 New View Modal ──
+function NewViewModalV2({ allFields, existingNames, onSave, onClose, editView, M, A, uff }) {
+  const isEdit = !!editView;
+  const allKeys = allFields.map(f => f.key);
+  const [name, setName] = useState(editView?.name || '');
+  const [selCols, setSelCols] = useState(new Set(editView?.cols || allKeys));
+  const [err, setErr] = useState('');
+
+  const toggleCol = k => setSelCols(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
+
+  const handleSave = () => {
+    const t = name.trim();
+    if (!t) { setErr('View name is required'); return; }
+    if (!isEdit && existingNames.includes(t)) { setErr('Name already exists'); return; }
+    if (selCols.size === 0) { setErr('Select at least one column'); return; }
+    onSave({ name: t, cols: [...selCols], icon: '📌', color: '#6c3fc5', isSystem: false,
+      id: editView?.id || `cv_${Date.now()}` });
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(15,23,42,.48)', backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: M.surfHigh, borderRadius: 13, width: 490, maxHeight: '88vh',
+        boxShadow: '0 24px 64px rgba(0,0,0,.22)',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+        <div style={{ padding: '14px 18px 12px', borderBottom: `1px solid ${M.divider}`,
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: 'linear-gradient(135deg,#faf7ff,#fff)' }}>
+          <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0eeff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>📌</div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 900, color: M.textA, fontFamily: uff }}>
+              {isEdit ? `Edit View — "${editView.name}"` : 'Create New Column View'}
+            </div>
+            <div style={{ fontSize: 9, color: M.textD, marginTop: 1, fontFamily: uff }}>Choose which columns are visible in this view</div>
+          </div>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 18, color: M.textD, cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ padding: '12px 18px 6px' }}>
+          <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, textTransform: 'uppercase',
+            letterSpacing: .5, marginBottom: 5, fontFamily: uff }}>View Name</div>
+          <input value={name} onChange={e => { setName(e.target.value); setErr(''); }}
+            placeholder="e.g. Buyer View, QC Columns, Season Check…"
+            style={{ width: '100%', padding: '7px 11px',
+              border: `1.5px solid ${err ? CC_RED : M.divider}`,
+              borderRadius: 7, fontSize: 12, outline: 'none',
+              background: err ? '#fff0f0' : M.inputBg, color: M.textA, fontFamily: uff }} />
+          {err && <div style={{ fontSize: 9, color: CC_RED, marginTop: 4, fontWeight: 700, fontFamily: uff }}>⚠ {err}</div>}
+        </div>
+
+        <div style={{ padding: '4px 18px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 9, fontWeight: 900, color: M.textD, textTransform: 'uppercase', letterSpacing: .5, fontFamily: uff }}>
+            Columns <span style={{ color: '#6c3fc5' }}>({selCols.size} selected)</span>
+          </div>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {[
+              { l: 'All', fn: () => setSelCols(new Set(allKeys)), c: M.textB },
+              { l: 'Clear', fn: () => setSelCols(new Set()), c: M.textD },
+            ].map(b => (
+              <button key={b.l} onClick={b.fn} style={{ padding: '2px 9px',
+                border: `1px solid ${M.divider}`, borderRadius: 6,
+                background: M.surfMid, color: b.c, fontSize: 8.5, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>
+                {b.l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 16px' }}>
+          {allFields.map(c => {
+            const on = selCols.has(c.key);
+            return (
+              <button key={c.key} onClick={() => toggleCol(c.key)} style={{
+                padding: '3px 9px', borderRadius: 9, fontSize: 9, fontWeight: 700,
+                cursor: 'pointer', transition: 'all .12s', margin: '0 4px 4px 0',
+                border: `1.5px solid ${on ? '#6c3fc570' : M.divider}`,
+                background: on ? '#f0eeff' : M.surfMid,
+                color: on ? '#6c3fc5' : M.textD,
+                display: 'inline-flex', alignItems: 'center', gap: 4, fontFamily: uff }}>
+                {c.auto && <span style={{ fontSize: 7, color: '#6c3fc5' }}>←</span>}
+                {c.header}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '10px 18px', borderTop: `1px solid ${M.divider}`,
+          display: 'flex', alignItems: 'center', gap: 8, background: M.surfMid }}>
+          <span style={{ fontSize: 9, color: M.textD, flex: 1, fontFamily: uff }}>
+            {selCols.size} column{selCols.size !== 1 ? 's' : ''} selected
+          </span>
+          <button onClick={onClose} style={{ padding: '7px 14px',
+            border: `1.5px solid ${M.divider}`, borderRadius: 7,
+            background: M.surfMid, color: M.textB, fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>Cancel</button>
+          <button onClick={handleSave} style={{ padding: '7px 20px', border: 'none',
+            borderRadius: 7, background: '#6c3fc5', color: '#fff',
+            fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>
+            {isEdit ? 'Update View' : 'Create View'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── V2 Manage Panel (right drawer) ──
+function ManagePanelV2({ systemViews, customViews, activeViewId, onEdit, onDelete, onDuplicate, onClose, M, A, uff }) {
+  const [confirm, setConfirm] = useState(null);
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+      background: 'rgba(15,23,42,.3)', backdropFilter: 'blur(2px)' }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 370,
+        background: M.surfHigh, boxShadow: '-10px 0 40px rgba(0,0,0,.14)',
+        display: 'flex', flexDirection: 'column', animation: 'slideFromRight .22s ease' }}>
+
+        <div style={{ padding: '14px 16px 12px', borderBottom: `1px solid ${M.divider}`,
+          background: '#1e293b', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 16 }}>🔖</span>
+          <span style={{ fontSize: 11, fontWeight: 900, color: '#e2e8f0', flex: 1, fontFamily: uff }}>Manage Views</span>
+          <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 16, color: '#94a3b8', cursor: 'pointer' }}>×</button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+          <div style={{ fontSize: 8, fontWeight: 900, color: M.textD, textTransform: 'uppercase',
+            letterSpacing: .8, marginBottom: 6, padding: '0 4px', fontFamily: uff }}>System Views (locked)</div>
+          {systemViews.map(v => (
+            <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 9,
+              padding: '8px 10px', borderRadius: 8, marginBottom: 4,
+              background: M.surfMid, border: `1px solid ${M.divider}` }}>
+              <span style={{ fontSize: 15 }}>{v.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: M.textA, fontFamily: uff }}>{v.name}</div>
+                <div style={{ fontSize: 8.5, color: M.textD, marginTop: 1, fontFamily: uff }}>{v.desc}</div>
+              </div>
+              <span style={{ fontSize: 7.5, padding: '2px 6px', borderRadius: 5,
+                background: M.surfMid, color: M.textD, fontWeight: 900, fontFamily: uff }}>LOCKED</span>
+            </div>
+          ))}
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 8px' }}>
+            <div style={{ flex: 1, height: 1, background: M.divider }} />
+            <span style={{ fontSize: 8, fontWeight: 900, color: M.textD, textTransform: 'uppercase', letterSpacing: .8, fontFamily: uff }}>
+              Custom Views ({customViews.length})
+            </span>
+            <div style={{ flex: 1, height: 1, background: M.divider }} />
+          </div>
+
+          {customViews.length === 0 && (
+            <div style={{ padding: '28px 0', textAlign: 'center', color: M.textD }}>
+              <div style={{ fontSize: 28, marginBottom: 8 }}>📌</div>
+              <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4, fontFamily: uff }}>No custom views yet</div>
+              <div style={{ fontSize: 9, fontFamily: uff }}>Use <b style={{ color: A.a }}>+ New View</b> to create one.</div>
+            </div>
+          )}
+
+          {customViews.map(v => {
+            const isActive = activeViewId === v.id;
+            const isDel = confirm === v.id;
+            return (
+              <div key={v.id} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 5,
+                border: `1.5px solid ${isActive ? '#6c3fc555' : M.divider}`,
+                background: isActive ? '#f0eeff' : M.surfHigh, transition: 'all .15s' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>{v.icon || '📌'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 800, color: isActive ? '#6c3fc5' : M.textA, fontFamily: uff }}>{v.name}</span>
+                      {isActive && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4,
+                        background: '#6c3fc5', color: '#fff', fontWeight: 900 }}>ACTIVE</span>}
+                    </div>
+                    <div style={{ fontSize: 8.5, color: M.textD, marginTop: 1, fontFamily: uff }}>{v.cols?.length || 0} columns</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 4 }}>
+                    <button onClick={() => onEdit(v)} style={{ padding: '3px 8px',
+                      border: `1px solid ${M.divider}`, borderRadius: 5,
+                      background: M.surfMid, color: M.textB, fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>Edit</button>
+                    <button onClick={() => onDuplicate(v)} style={{ padding: '3px 8px',
+                      border: `1px solid ${M.divider}`, borderRadius: 5,
+                      background: M.surfMid, color: M.textB, fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>⧉</button>
+                    <button onClick={() => setConfirm(isDel ? null : v.id)} style={{ padding: '3px 8px',
+                      border: `1px solid ${isDel ? '#fca5a5' : M.divider}`, borderRadius: 5,
+                      background: isDel ? '#fff1f1' : M.surfMid,
+                      color: isDel ? CC_RED : M.textD, fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>×</button>
+                  </div>
+                </div>
+                {isDel && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8,
+                    padding: '6px 8px', borderRadius: 7, background: '#fff1f1', border: '1px solid #fca5a5' }}>
+                    <span style={{ fontSize: 9, color: CC_RED, flex: 1, fontFamily: uff }}>
+                      Delete "<b>{v.name}</b>"?
+                    </span>
+                    <button onClick={() => { onDelete(v.id); setConfirm(null); }} style={{ padding: '3px 10px',
+                      border: 'none', borderRadius: 5, background: CC_RED,
+                      color: '#fff', fontSize: 9, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>Delete</button>
+                    <button onClick={() => setConfirm(null)} style={{ padding: '3px 8px',
+                      border: `1px solid ${M.divider}`, borderRadius: 5,
+                      background: M.surfHigh, color: M.textB, fontSize: 9, cursor: 'pointer', fontFamily: uff }}>Keep</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: '10px 12px', borderTop: `1px solid ${M.divider}`,
+          background: M.surfMid, fontSize: 9, color: M.textD, textAlign: 'center', fontFamily: uff }}>
+          {systemViews.length} system · {customViews.length} custom · {systemViews.length + customViews.length} total
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── V2 Export Menu ──
+function ExportMenuV2({ count, onClose, onToast, M, A, uff }) {
+  const opts = [
+    { icon: '📄', label: 'Export as PDF', sub: 'Formatted A4 layout', col: CC_RED },
+    { icon: '📊', label: 'Export as Excel (.xlsx)', sub: 'Full sheet with all cols', col: '#15803d' },
+    { icon: '📋', label: 'Copy to Google Sheet', sub: 'Opens in new tab', col: '#1d6fa4' },
+    { icon: '🖨️', label: 'Print view', sub: 'Browser print dialog', col: M.textB },
+  ];
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 500 }} onClick={onClose}>
+      <div style={{ position: 'absolute', right: 12, top: 90,
+        background: M.surfHigh, borderRadius: 10, width: 240,
+        boxShadow: '0 12px 40px rgba(0,0,0,.18)', border: `1px solid ${M.divider}`,
+        overflow: 'hidden' }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ padding: '8px 12px 6px', borderBottom: `1px solid ${M.divider}`,
+          fontSize: 9, fontWeight: 900, color: M.textD, textTransform: 'uppercase', letterSpacing: .8, fontFamily: uff }}>
+          Export {count} records
+        </div>
+        {opts.map(o => (
+          <button key={o.label} onClick={() => { onToast(`${o.label}…`); onClose(); }}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+              padding: '9px 14px', border: 'none', background: 'transparent',
+              cursor: 'pointer', textAlign: 'left', transition: 'background .1s', fontFamily: uff }}
+            onMouseEnter={e => e.currentTarget.style.background = M.hoverBg}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <span style={{ fontSize: 18, flexShrink: 0 }}>{o.icon}</span>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: o.col }}>{o.label}</div>
+              <div style={{ fontSize: 8.5, color: M.textD }}>{o.sub}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── V2 Split View ──
+function SplitViewPanel({ sorted, visCols, schema, codeKey, onEdit, M, A, uff, fz }) {
+  const [sel, setSel] = useState(sorted[0] || null);
+  const [tab, setTab] = useState('details');
+  const [srch, setSrch] = useState('');
+
+  const visRows = useMemo(() => {
+    if (!srch) return sorted;
+    const q = srch.toLowerCase();
+    return sorted.filter(r => Object.values(r).some(v => String(v || '').toLowerCase().includes(q)));
+  }, [sorted, srch]);
+
+  const effSel = (sel && visRows.find(r => r[codeKey] === sel[codeKey])) ? sel : (visRows[0] || null);
+
+  return (
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* LEFT LIST */}
+      <div style={{ width: 285, flexShrink: 0, display: 'flex', flexDirection: 'column',
+        borderRight: `2px solid ${M.divider}`, background: M.surfHigh }}>
+        <div style={{ padding: '7px 10px', borderBottom: `1px solid ${M.divider}`, flexShrink: 0 }}>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+              fontSize: 12, color: M.textD, pointerEvents: 'none' }}>⌕</span>
+            <input value={srch} onChange={e => setSrch(e.target.value)}
+              placeholder="Search list…"
+              style={{ width: '100%', padding: '5px 24px', border: `1.5px solid ${M.divider}`,
+                borderRadius: 6, fontSize: 10.5, outline: 'none',
+                background: M.inputBg, fontFamily: uff, color: M.textA }} />
+            {srch && <button onClick={() => setSrch('')} style={{ position: 'absolute', right: 7,
+              top: '50%', transform: 'translateY(-50%)',
+              border: 'none', background: 'none', color: M.textD, cursor: 'pointer', fontSize: 12 }}>×</button>}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          {visRows.map(r => {
+            const on = effSel?.[codeKey] === r[codeKey];
+            const firstField = visCols[0];
+            const secondField = visCols.find(f => !f.thumb && f.key !== codeKey);
+            return (
+              <div key={r[codeKey]} onClick={() => { setSel(r); setTab('details'); }}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                  borderBottom: '1px solid #f1f4f9',
+                  background: on ? A.al : M.surfHigh,
+                  borderLeft: `3px solid ${on ? A.a : 'transparent'}`,
+                  cursor: 'pointer', transition: 'background .1s' }}
+                onMouseEnter={e => { if (!on) e.currentTarget.style.background = M.hoverBg; }}
+                onMouseLeave={e => { e.currentTarget.style.background = on ? A.al : M.surfHigh; }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                    <span style={{ fontSize: 10, fontWeight: 900, color: A.a,
+                      fontFamily: "'IBM Plex Mono',monospace" }}>{r[codeKey]}</span>
+                  </div>
+                  {secondField && (
+                    <div style={{ fontSize: 11, fontWeight: 700, color: M.textA, lineHeight: 1.3,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r[secondField.key] || '—'}</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+          {visRows.length === 0 && (
+            <div style={{ padding: 32, textAlign: 'center', color: M.textD, fontSize: 11, fontFamily: uff }}>No results</div>
+          )}
+        </div>
+        <div style={{ padding: '5px 10px', borderTop: `1px solid ${M.divider}`,
+          background: M.surfMid, fontSize: 9, color: M.textD, fontFamily: uff }}>{visRows.length} records</div>
+      </div>
+
+      {/* RIGHT DETAIL */}
+      {effSel ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: M.bg }}>
+          <div style={{ padding: '16px 20px', background: M.surfHigh, borderBottom: `2px solid ${M.divider}`, flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontSize: 22, fontWeight: 900, color: A.a,
+                fontFamily: "'IBM Plex Mono',monospace" }}>{effSel[codeKey]}</span>
+              {effSel.status && (() => {
+                const sc = STATUS_COLORS[effSel.status] || { bg: '#f3f4f6', color: '#9ca3af' };
+                return <span style={{ fontSize: 9, fontWeight: 800, padding: '2px 8px', borderRadius: 12, background: sc.bg, color: sc.color }}>{effSel.status}</span>;
+              })()}
+            </div>
+            <button onClick={() => onEdit(effSel)} style={{ padding: '5px 16px',
+              border: `1.5px solid ${A.a}`, borderRadius: 6,
+              background: A.al, color: A.a,
+              fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>Edit Record</button>
+          </div>
+
+          <div style={{ padding: '14px 18px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 14px' }}>
+              {schema.filter(f => !f.hidden && f.w !== '0' && !f.thumb).map(f => (
+                <div key={f.key} style={{ background: M.surfHigh, borderRadius: 7, padding: '8px 12px',
+                  border: `1px solid ${M.divider}` }}>
+                  <div style={{ fontSize: 8, fontWeight: 900, color: f.auto ? '#6c3fc5' : M.textD,
+                    textTransform: 'uppercase', letterSpacing: .5, marginBottom: 4, fontFamily: uff }}>{f.header}</div>
+                  <div style={{ fontSize: 12, fontWeight: 700,
+                    fontFamily: f.mono ? "'IBM Plex Mono',monospace" : uff,
+                    color: f.auto ? '#6c3fc5' : (effSel[f.key] ? M.textA : M.textD) }}>
+                    {effSel[f.key] || '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', color: M.textD, gap: 8 }}>
+          <div style={{ fontSize: 32 }}>📋</div>
+          <div style={{ fontSize: 13, fontFamily: uff }}>Select a record to view details</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /**
  * RecordsTab — full-featured data table with sort, grouping, column management,
  * aggregation footer, views system, record detail modal.
@@ -371,6 +876,22 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   const [showAdvFilters, setShowAdvFilters] = useState(false);
   const [showAdvSorts,   setShowAdvSorts]   = useState(false);
 
+  // === V2 STATE ===
+  const [sysViewId, setSysViewId] = useState('all');
+  const [viewMode, setViewMode] = useState('table');   // 'table' | 'split'
+  const [showFiltPnl, setShowFiltPnl] = useState(false);
+  const [colFilters, setColFilters] = useState({});
+  const [showNewViewV2, setShowNewViewV2] = useState(false);
+  const [editingViewV2, setEditingViewV2] = useState(null);
+  const [showManageV2, setShowManageV2] = useState(false);
+  const [showExportV2, setShowExportV2] = useState(false);
+  const [customViewsV2, setCustomViewsV2] = useState([]);
+
+  const systemViews = getSystemViews(sheet.key);
+  const allViewsV2 = useMemo(() => [...systemViews, ...customViewsV2], [systemViews, customViewsV2]);
+  const activeViewV2 = allViewsV2.find(v => v.id === sysViewId) || systemViews[0];
+  const sysVisKeys = activeViewV2?.cols || null; // null = show all
+
   const schema     = SCHEMA_MAP[sheet.key] || FALLBACK_SCHEMA;
   const codeKey    = schema[0]?.key || 'code';
   const allFields  = schema.filter(c => !c.hidden && c.w !== '0');
@@ -432,8 +953,12 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   // ── Derived: visible columns ──
   const visCols = useMemo(() => {
     const order = colOrder.length > 0 ? colOrder : allFields.map(f => f.key);
-    return order.filter(k => !hiddenC.includes(k)).map(k => allFields.find(f => f.key === k)).filter(Boolean);
-  }, [colOrder, hiddenC, allFields]);
+    return order
+      .filter(k => !hiddenC.includes(k))
+      .filter(k => !sysVisKeys || sysVisKeys.includes(k))
+      .map(k => allFields.find(f => f.key === k))
+      .filter(Boolean);
+  }, [colOrder, hiddenC, allFields, sysVisKeys]);
 
   // ── Derived: filtered → sorted → render list ──
   const filtered = useMemo(() => {
@@ -448,13 +973,24 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         result = result.filter(r => String(r[col] ?? '').toLowerCase().includes(q));
       }
     }
+    // V2 column filters (from FilterPanelV2)
+    Object.entries(colFilters).forEach(([k, v]) => {
+      if (!v || v === 'all') return;
+      const f = allFields.find(c => c.key === k);
+      const isEnum = f?.type === 'select' || f?.badge || f?.options;
+      if (isEnum) {
+        result = result.filter(r => String(r[k] || '') === v);
+      } else {
+        result = result.filter(r => String(r[k] || '').toLowerCase().includes(v.toLowerCase()));
+      }
+    });
     // Advanced operator-based filters
     advFilters.forEach(fil => {
       if (fil.value !== '' || recAdvFieldType(schema.find(x => x.key === fil.field)) === 'num')
         result = result.filter(r => evalRecAdvFilter(r, fil, schema));
     });
     return result;
-  }, [rows, search, filters, advFilters]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [rows, search, filters, colFilters, advFilters]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sorted = useMemo(() => {
     const base = applySort(filtered, sorts, schema);
@@ -744,6 +1280,22 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
 
   const viewDirty = getViewDirty();
 
+  // ── V2 View CRUD ──
+  const handleSaveViewV2 = (vd) => {
+    if (editingViewV2) {
+      setCustomViewsV2(p => p.map(v => v.id === vd.id ? vd : v));
+    } else {
+      setCustomViewsV2(p => [...p, vd]);
+      setSysViewId(vd.id);
+    }
+    setShowNewViewV2(false);
+    setEditingViewV2(null);
+  };
+  const handleDeleteViewV2 = (id) => { setCustomViewsV2(p => p.filter(v => v.id !== id)); if (sysViewId === id) setSysViewId('all'); };
+  const handleDuplicateViewV2 = (v) => setCustomViewsV2(p => [...p, { ...v, id: `cv_${Date.now()}`, name: `${v.name} (copy)`, isSystem: false }]);
+  const existingViewNames = allViewsV2.map(v => v.name);
+  const hasColFilter = Object.values(colFilters).some(v => v && v !== 'all');
+
   // ── Render a data row ──
   const renderDataRow = (row, rowIdx) => {
     const isSelected = selectedRows.has(row[codeKey]);
@@ -841,6 +1393,9 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
   // =====================================================================
   return (
     <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <style>{`
+        @keyframes slideFromRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+      `}</style>
 
       {/* ── Toolbar ── */}
       <div style={{ background: M.surfMid, borderBottom: `1px solid ${M.divider}`, padding: '6px 16px', display: 'flex', alignItems: 'center', gap: 7, minHeight: 44, flexShrink: 0, flexWrap: 'wrap' }}>
@@ -955,6 +1510,23 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
           </select>
         )}
 
+        {/* Table / Split view switcher */}
+        <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden',
+          border: `1.5px solid ${M.divider}`, flexShrink: 0 }}>
+          {[{ id: 'table', icon: '⊟', label: 'Table' }, { id: 'split', icon: '◫', label: 'Split' }].map(v => (
+            <button key={v.id} onClick={() => setViewMode(v.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '5px 11px', border: 'none', cursor: 'pointer',
+              background: viewMode === v.id ? '#1e293b' : M.surfMid,
+              color: viewMode === v.id ? '#fff' : M.textB,
+              fontSize: fz - 3, fontWeight: 900, transition: 'all .15s',
+              borderRight: v.id === 'table' ? `1px solid ${M.divider}` : 'none',
+              fontFamily: uff }}>
+              <span style={{ fontSize: 12 }}>{v.icon}</span>{v.label}
+            </button>
+          ))}
+        </div>
+
         {/* Export dropdown */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button onClick={() => setShowExportMenu(p => !p)} style={{ padding: '5px 11px', border: `1px solid ${M.inputBd}`, borderRadius: 6, background: M.inputBg, color: M.textB, fontSize: fz - 3, fontWeight: 800, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap' }}>
@@ -990,134 +1562,121 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         </button>
       </div>
 
-      {/* ── Views Bar (§C) ── */}
-      <div style={{ background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, padding: '5px 14px', display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0, flexWrap: 'wrap', minHeight: 34 }}>
-        <span style={{ fontSize: 8, fontWeight: 900, color: M.textD, letterSpacing: 0.6, textTransform: 'uppercase', fontFamily: uff, marginRight: 2 }}>VIEWS:</span>
+      {/* ── V2 Views Bar ── */}
+      <div style={{ background: M.surfHigh, borderBottom: `2px solid ${M.divider}`,
+        flexShrink: 0, padding: '0 12px',
+        display: 'flex', alignItems: 'center', gap: 4,
+        minHeight: 40, overflowX: 'auto' }}>
 
-        {/* Default pill — CC_RED when active */}
-        <div
-          onClick={() => handleViewClick('Default')}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', borderRadius: 14,
-            border: `1px solid ${activeViewName === 'Default' ? CC_RED : M.inputBd}`,
-            background: activeViewName === 'Default' ? '#CC000015' : M.surfMid,
-            cursor: 'pointer', fontSize: 9, fontWeight: 800,
-            color: activeViewName === 'Default' ? CC_RED : M.textB, fontFamily: uff,
-          }}
-        >
-          {activeViewName === 'Default' && <span style={{ width: 6, height: 6, borderRadius: '50%', background: CC_RED, flexShrink: 0 }} />}
-          Default
-          <span style={{ fontSize: 7.5, fontWeight: 900, padding: '1px 4px', borderRadius: 4, background: M.textD, color: '#fff' }}>LOCKED</span>
-          {activeViewName === 'Default' && viewDirty && (
-            <span style={{ fontSize: 7.5, fontWeight: 900, padding: '1px 4px', borderRadius: 4, background: '#f59e0b', color: '#fff' }}>MODIFIED</span>
-          )}
-        </div>
+        <span style={{ fontSize: 8, fontWeight: 900, color: M.textD, letterSpacing: 1,
+          textTransform: 'uppercase', flexShrink: 0, marginRight: 4, fontFamily: uff }}>VIEWS:</span>
 
-        {/* Saved view pills */}
-        {savedViews.map(view => {
-          const isActive    = activeViewName === view.name;
-          const isRenaming  = renamingView === view.name;
+        {allViewsV2.map(v => {
+          const isActive = sysViewId === v.id;
           return (
-            <div key={view.name}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-                padding: '3px 8px', borderRadius: 14,
-                border: `1px solid ${isActive ? A.a : M.inputBd}`,
-                background: isActive ? A.al : M.surfMid,
-                fontSize: 9, fontWeight: 700,
-                color: isActive ? A.a : M.textB, fontFamily: uff,
-              }}
-            >
-              {/* Inline rename input or label */}
-              {isRenaming ? (
-                <input
-                  autoFocus
-                  value={renameVal}
-                  onChange={e => setRenameVal(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                      const n = renameVal.trim();
-                      if (n && n !== view.name && !savedViews.some(v => v.name === n) && n !== 'Default') {
-                        setSavedViews(prev => prev.map(v => v.name === view.name ? { ...v, name: n } : v));
-                        if (activeViewName === view.name) setActiveViewName(n);
-                        showToast(`View renamed to "${n}"`, 'view');
-                      }
-                      setRenamingView(null);
-                    }
-                    if (e.key === 'Escape') setRenamingView(null);
-                  }}
-                  onBlur={() => setRenamingView(null)}
-                  onClick={e => e.stopPropagation()}
-                  style={{ width: 80, fontSize: 9, padding: '1px 4px', border: `1px solid ${A.a}`, borderRadius: 4, fontFamily: uff, outline: 'none', background: M.inputBg, color: M.textA }}
-                />
-              ) : (
-                <span onClick={() => handleViewClick(view.name)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 3 }}>
-                  {isActive && <span style={{ width: 6, height: 6, borderRadius: '50%', background: A.a, flexShrink: 0 }} />}
-                  {view.name}
-                  {isActive && viewDirty && (
-                    <span style={{ fontSize: 7.5, fontWeight: 900, padding: '1px 4px', borderRadius: 4, background: '#f59e0b', color: '#fff' }}>MODIFIED</span>
-                  )}
-                </span>
-              )}
-              {!isRenaming && (
+            <button key={v.id}
+              onClick={() => setSysViewId(isActive ? 'all' : v.id)}
+              title={v.desc ? `${v.name} — ${v.desc}` : v.name}
+              style={{ display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 11px', borderRadius: 8, flexShrink: 0, cursor: 'pointer',
+                transition: 'all .15s', fontFamily: uff,
+                border: `1.5px solid ${isActive ? v.color : M.divider}`,
+                background: isActive ? v.color + '18' : M.surfMid }}>
+              <span style={{ fontSize: 11 }}>{v.icon}</span>
+              <span style={{ fontSize: 9.5, fontWeight: isActive ? 900 : 700,
+                color: isActive ? v.color : M.textB, whiteSpace: 'nowrap' }}>{v.name}</span>
+              {isActive ? (
                 <>
-                  {/* Inline rename ✎ */}
-                  <span
-                    onClick={e => { e.stopPropagation(); setRenamingView(view.name); setRenameVal(view.name); }}
-                    title="Rename view" style={{ cursor: 'pointer', fontSize: 10, color: M.textD, padding: '0 2px' }}>✎</span>
-                  {/* Duplicate */}
-                  <span
-                    onClick={e => { e.stopPropagation(); setShowViewEdit({ mode: 'duplicate', view }); }}
-                    title="Duplicate view" style={{ cursor: 'pointer', fontSize: 10, color: M.textD, padding: '0 2px' }}>⧉</span>
-                  {/* Delete */}
-                  <span
-                    onClick={e => { e.stopPropagation(); handleDeleteView(view.name); }}
-                    title="Delete view" style={{ cursor: 'pointer', fontSize: 11, color: '#ef4444', padding: '0 2px' }}>×</span>
-                  {/* Update if active + dirty */}
-                  {isActive && viewDirty && (
-                    <span
-                      onClick={e => { e.stopPropagation(); handleUpdateView(); }}
-                      title="Save changes to this view"
-                      style={{ cursor: 'pointer', fontSize: 8, fontWeight: 900, padding: '1px 5px', background: '#f59e0b', color: '#fff', borderRadius: 4, marginLeft: 2 }}>💾 Update</span>
-                  )}
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: v.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 6,
+                    background: v.color + '22', color: v.color, fontWeight: 900 }}>
+                    {visCols.length}c
+                  </span>
                 </>
-              )}
-            </div>
+              ) : v.isSystem ? (
+                <span style={{ fontSize: 7, padding: '0 3px', borderRadius: 3,
+                  background: M.surfMid, color: M.textD, fontWeight: 900 }}>SYS</span>
+              ) : null}
+            </button>
           );
         })}
 
-        {/* + Save View — inline text input row */}
-        {showInlineSave ? (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <input
-              autoFocus
-              value={inlineSaveName}
-              onChange={e => setInlineSaveName(e.target.value)}
-              placeholder="View name…"
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  const n = inlineSaveName.trim();
-                  if (n && n !== 'Default' && !savedViews.some(v => v.name === n)) {
-                    handleViewSave({ name: n, ...getCurrentViewSnapshot() });
-                  }
-                  setShowInlineSave(false); setInlineSaveName('');
-                }
-                if (e.key === 'Escape') { setShowInlineSave(false); setInlineSaveName(''); }
-              }}
-              onBlur={() => { setShowInlineSave(false); setInlineSaveName(''); }}
-              style={{ width: 100, fontSize: 9, padding: '3px 6px', border: '1px solid #7C3AED', borderRadius: 10, fontFamily: uff, outline: 'none', background: M.inputBg, color: M.textA }}
-            />
-            <span style={{ fontSize: 8.5, color: M.textD, fontFamily: uff }}>↵ Enter</span>
-          </div>
-        ) : (
-          <button
-            onClick={() => { setShowInlineSave(true); setInlineSaveName(''); }}
-            style={{ padding: '3px 9px', border: '1px dashed #7C3AED', borderRadius: 14, background: 'rgba(124,58,237,.05)', color: '#7C3AED', fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>
-            + Save View
-          </button>
-        )}
+        <div style={{ width: 1, height: 22, background: M.divider, flexShrink: 0, margin: '0 3px' }} />
+
+        {/* Filter */}
+        <button onClick={() => setShowFiltPnl(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${hasColFilter ? A.a : M.divider}`,
+          background: hasColFilter ? A.al : M.surfMid,
+          color: hasColFilter ? A.a : M.textB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s' }}>
+          ⊟ Filter
+          {hasColFilter && <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 8,
+            background: A.a, color: '#fff', fontWeight: 900 }}>ON</span>}
+        </button>
+
+        {/* Sort */}
+        <button onClick={() => setShowSortPanel(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${sorts.length > 0 ? '#1e293b' : M.divider}`,
+          background: sorts.length > 0 ? '#1e293b' : M.surfMid,
+          color: sorts.length > 0 ? '#fff' : M.textB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s' }}>
+          ↕ Sort
+          {sorts.length > 0 && <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 8,
+            background: 'rgba(255,255,255,.25)', color: '#fff', fontWeight: 900 }}>{sorts.length}</span>}
+        </button>
+
+        <div style={{ flex: 1 }} />
+
+        {/* + New View */}
+        <button onClick={() => { setEditingViewV2(null); setShowNewViewV2(true); }} style={{
+          display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px dashed ${A.a}`,
+          background: A.al, color: A.a,
+          fontSize: 9.5, fontWeight: 900, transition: 'all .15s' }}>
+          + New View
+        </button>
+
+        {/* Manage */}
+        <button onClick={() => setShowManageV2(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${M.divider}`,
+          background: M.surfMid, color: M.textB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s' }}>
+          Manage
+        </button>
       </div>
+
+      {/* ── V2 active filter chips ── */}
+      {hasColFilter && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          padding: '5px 12px', borderBottom: `1px solid ${M.divider}`,
+          background: A.al, flexShrink: 0 }}>
+          <span style={{ fontSize: 8.5, fontWeight: 900, color: A.a, fontFamily: uff }}>⊟ Active filters:</span>
+          {Object.entries(colFilters).filter(([, v]) => v && v !== 'all').map(([k, v]) => {
+            const col = allFields.find(c => c.key === k);
+            return (
+              <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 8.5, padding: '2px 8px', borderRadius: 8,
+                background: A.a + '18', color: A.a, fontWeight: 700, fontFamily: uff }}>
+                <b>{col?.header || k}</b>: {v}
+                <button onClick={() => setColFilters(p => ({ ...p, [k]: 'all' }))} style={{
+                  border: 'none', background: 'none', color: A.a,
+                  cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: 0 }}>×</button>
+              </span>
+            );
+          })}
+          <button onClick={() => setColFilters({})} style={{ padding: '2px 8px', border: 'none',
+            background: 'transparent', color: M.textD, fontSize: 8.5, cursor: 'pointer', fontWeight: 700, fontFamily: uff }}>
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* ── Active sort strip ── */}
       {sorts.length > 0 && (
@@ -1339,8 +1898,12 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         );
       })()}
 
-      {/* ── Table area ── */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* ── Table area / Split View ── */}
+      {viewMode === 'split' ? (
+        <SplitViewPanel sorted={sorted} visCols={visCols} schema={schema} codeKey={codeKey}
+          onEdit={openEdit} M={M} A={A} uff={uff} fz={fz} />
+      ) : null}
+      <div style={{ flex: 1, display: viewMode === 'split' ? 'none' : 'flex', overflow: 'hidden' }}>
         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'auto' }}>
           {fetchError ? (
             <div style={{ margin: 16, textAlign: 'center', padding: 60, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 8 }}>
@@ -1754,6 +2317,40 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
             </div>
           </div>
         </>
+      )}
+
+      {/* ── V2 Filter Panel ── */}
+      {showFiltPnl && (
+        <FilterPanelV2 data={rows} colFilters={colFilters} setColFilters={setColFilters}
+          visCols={visCols} allFields={allFields} onClose={() => setShowFiltPnl(false)}
+          M={M} A={A} uff={uff} fz={fz} />
+      )}
+
+      {/* ── V2 New View Modal ── */}
+      {showNewViewV2 && (
+        <NewViewModalV2 allFields={allFields}
+          existingNames={existingViewNames}
+          editView={editingViewV2}
+          onSave={handleSaveViewV2}
+          onClose={() => { setShowNewViewV2(false); setEditingViewV2(null); }}
+          M={M} A={A} uff={uff} />
+      )}
+
+      {/* ── V2 Manage Panel ── */}
+      {showManageV2 && (
+        <ManagePanelV2 systemViews={systemViews} customViews={customViewsV2} activeViewId={sysViewId}
+          onEdit={v => { setEditingViewV2(v); setShowManageV2(false); setShowNewViewV2(true); }}
+          onDelete={handleDeleteViewV2} onDuplicate={handleDuplicateViewV2}
+          onClose={() => setShowManageV2(false)}
+          M={M} A={A} uff={uff} />
+      )}
+
+      {/* ── V2 Export Menu ── */}
+      {showExportV2 && (
+        <ExportMenuV2 count={sorted.length}
+          onClose={() => setShowExportV2(false)}
+          onToast={(msg) => showToast(msg, 'info')}
+          M={M} A={A} uff={uff} />
       )}
 
       {/* ── Toast — bottom:24 right:24, color-aware (§COMMON) ── */}
