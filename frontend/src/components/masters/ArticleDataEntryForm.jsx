@@ -1113,7 +1113,7 @@ export default function ArticleDataEntryForm({
       fontFamily:"'Nunito Sans',sans-serif", background:C.bg, color:C.text }}>
 
       {/* ══ TOP BAR — breadcrumb + progress ══ */}
-      <div style={{ height:38, flexShrink:0, background:C.slate,
+      <div style={{ height:44, flexShrink:0, background:C.slate,
         display:"flex", alignItems:"center", padding:"0 14px", gap:8,
         borderBottom:`1px solid ${C.slate3}` }}>
         <div style={{ width:22, height:22, borderRadius:5, background:C.red,
@@ -1231,51 +1231,6 @@ export default function ArticleDataEntryForm({
           fontSize:9.5, fontWeight:800, transition:"all .15s" }}>
           Manage
         </button>
-      </div>
-
-      {/* ── SECTION TAB STRIP ── */}
-      <div style={{ background:C.surface, borderBottom:`2px solid ${C.border}`,
-        flexShrink:0, padding:"0 12px", display:"flex", alignItems:"center", gap:0 }}>
-        {SECTIONS.map(s => {
-          const mf   = s.fields.filter(f=>!f.auto);
-          const done = mf.filter(f=>form[f.key]).length;
-          const miss = s.fields.filter(f=>f.req&&!f.auto&&!form[f.key]).length;
-          const isOn = open[s.id];
-          return (
-            <button key={s.id} onClick={()=>toggle(s.id)} style={{
-              padding:"9px 11px 8px", border:"none", background:"transparent",
-              cursor:"pointer", display:"flex", alignItems:"center", gap:5,
-              borderBottom:`3px solid ${isOn ? s.acc : "transparent"}`,
-              transition:"all .15s", fontFamily:"'Nunito Sans',sans-serif",
-            }}>
-              <span style={{ fontSize:12 }}>{s.icon}</span>
-              <span style={{ fontSize:9.5, fontWeight:isOn?900:700,
-                color:isOn?s.acc:C.sub, whiteSpace:"nowrap" }}>{s.label}</span>
-              <div style={{ width:5, height:5, borderRadius:"50%", flexShrink:0,
-                background: miss>0?"#f59e0b":done>0&&done===mf.length?"#22c55e":done>0?s.acc:C.border,
-                transition:"background .2s" }}/>
-            </button>
-          );
-        })}
-        <div style={{ flex:1 }}/>
-        {reqLeft.length>0 && (
-          <div style={{ display:"flex", alignItems:"center", gap:4,
-            padding:"3px 8px", borderRadius:6,
-            background:C.amberSoft, border:"1px solid #fde68a",
-            animation:shake?"ccShake .5s ease":"none" }}>
-            <span style={{ fontSize:8, fontWeight:900, color:C.amber }}>⚠ {reqLeft.length}:</span>
-            {reqLeft.slice(0,3).map(f=>(
-              <button key={f.key} onClick={()=>{
-                const sec=SECTIONS.find(s=>s.fields.find(x=>x.key===f.key));
-                if(sec) setOpen(p=>({...p,[sec.id]:true}));
-                setTimeout(()=>setFoc(f.key),60);
-              }} style={{ fontSize:7.5, padding:"1px 6px", borderRadius:8,
-                border:"none", background:"#fde68a", color:C.amber, fontWeight:800, cursor:"pointer" }}>
-                {f.label}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* ══ BODY ══ */}
