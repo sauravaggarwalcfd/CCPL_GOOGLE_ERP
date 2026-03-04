@@ -945,7 +945,7 @@ export default function ArticleDataEntryForm({
   setL1Division, setL2Category, setL3Style,
   HSN_GST_MAP, data,
 }) {
-  const [open,  setOpen]  = useState({ identity:true, details:true, fabric:false, pricing:false, status:false });
+  const [open,  setOpen]  = useState({ identity:true, details:true, fabric:true, pricing:true, status:true });
   const [focus, setFoc]   = useState(null);
   const [shake, setShk]   = useState(false);
   const [ok,    setOk]    = useState(false);
@@ -1118,33 +1118,6 @@ export default function ArticleDataEntryForm({
   return (
     <div style={{ display:"flex", flexDirection:"column", flex:1, minHeight:0, overflow:"hidden",
       fontFamily:"'Nunito Sans',sans-serif", background:C.bg, color:C.text }}>
-
-      {/* ══ TOP BAR — breadcrumb + progress ══ */}
-      <div style={{ height:44, flexShrink:0, background:C.slate,
-        display:"flex", alignItems:"center", padding:"0 14px", gap:8,
-        borderBottom:`1px solid ${C.slate3}` }}>
-        <div style={{ width:22, height:22, borderRadius:5, background:C.red,
-          display:"flex", alignItems:"center", justifyContent:"center", fontSize:11 }}>👕</div>
-        <span style={{ fontSize:10, fontWeight:900, color:"#e2e8f0" }}>
-          {editItem ? `✏️ Editing ${editItem.code}` : '➕ New Article'}
-        </span>
-        <span style={{ color:C.slate3 }}>›</span>
-        <span style={{ fontSize:9, color:"#64748b" }}>ARTICLE_MASTER</span>
-        <span style={{ color:C.slate3 }}>›</span>
-        <span style={{ fontSize:9, fontWeight:900, color:C.orange }}>Data Entry</span>
-        <div style={{ flex:1 }}/>
-        <div style={{ display:"flex", alignItems:"center", gap:6,
-          padding:"3px 9px", borderRadius:20, background:C.slate2, border:`1px solid ${C.slate3}` }}>
-          <div style={{ width:56, height:4, background:"#1e293b", borderRadius:2, overflow:"hidden" }}>
-            <div style={{ height:"100%", borderRadius:2, background:C.orange,
-              width:(filled/MAN.length*100)+"%", transition:"width .3s" }}/>
-          </div>
-          <span style={{ fontSize:8.5, fontWeight:800, color:"#94a3b8" }}>
-            {filled}<span style={{ color:"#4d6070" }}>/{MAN.length}</span>
-          </span>
-        </div>
-        {isDirty && <span style={{ fontSize:8, color:"#f59e0b", fontWeight:900 }}>● Unsaved</span>}
-      </div>
 
       {/* ══ SINGLE VIEWS BAR ══ */}
       <div style={{ background:C.surface, borderBottom:`2px solid ${C.border}`,

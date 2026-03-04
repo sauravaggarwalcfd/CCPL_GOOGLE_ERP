@@ -32,7 +32,7 @@ export default function DataEntryTab({
   const handleConfirmSave = () => { setShowConfirm(false); onSave(); };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
       {/* ── Preview Switcher Bar ── */}
       {entryMode === 'form' && (
@@ -71,7 +71,7 @@ export default function DataEntryTab({
       )}
 
       {/* ── Main content area ── */}
-      <div style={{ flex: 1, overflowY: 'auto', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {entryMode === 'form' ? (
           formLayout === 'A' ? (
             <FormViewA enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
@@ -122,7 +122,7 @@ function FormViewA({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
   const errCount     = Object.keys(errors).length;
 
   return (
-    <div style={{ flex: 1, overflowY: 'auto' }}>
+    <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
       {/* Mini progress bar */}
       <div style={{ padding: '8px 16px 4px', display: 'flex', alignItems: 'center', gap: 10, background: M.surfHigh, borderBottom: `1px solid ${M.divider}`, flexShrink: 0 }}>
         <div style={{ flex: 1, height: 5, background: M.divider, borderRadius: 4, overflow: 'hidden' }}>
@@ -245,7 +245,7 @@ function FormViewB({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
   };
 
   return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', overflow: 'hidden' }}>
 
       {/* ── Left Sidebar ── */}
       <div style={{ width: 180, borderRight: `1px solid ${M.divider}`, background: M.surfHigh, flexShrink: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
@@ -373,7 +373,7 @@ function FormViewC({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
   const errCount     = Object.keys(errors).length;
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
 
       {/* Toolbar */}
       <div style={{ padding: '8px 16px', borderBottom: `1px solid ${M.divider}`, display: 'flex', alignItems: 'center', gap: 8, background: M.surfHigh, flexShrink: 0 }}>
@@ -401,7 +401,7 @@ function FormViewC({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
       </div>
 
       {/* Field list */}
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {filtered.length === 0 ? (
           <div style={{ padding: 32, textAlign: 'center', color: M.textD, fontSize: 12, fontFamily: uff }}>No fields match "{search}"</div>
         ) : filtered.map((f, i) => {
@@ -552,7 +552,7 @@ function InlineView({ enriched, formData, onChange, errors, visibleKeys, M, A, u
   const filledCount = manualCount.filter(f => formData[f.key]).length;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <div style={{ padding: '6px 14px', borderBottom: `1px solid ${M.divider}`, display: 'flex', alignItems: 'center', gap: 8, background: CC_RED, flexShrink: 0 }}>
         <div style={{ fontSize: 9, fontWeight: 900, color: '#fff', letterSpacing: 0.5, fontFamily: uff }}>⚡ INLINE ENTRY</div>
         <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,.3)' }} />
@@ -562,7 +562,7 @@ function InlineView({ enriched, formData, onChange, errors, visibleKeys, M, A, u
           {filledCount} / {manualCount.length} filled
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
           <colgroup>
             <col style={{ width: 36 }} /><col style={{ width: 30 }} />
