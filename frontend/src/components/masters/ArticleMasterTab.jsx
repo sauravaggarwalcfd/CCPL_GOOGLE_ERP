@@ -94,9 +94,29 @@ const AM_DATA = AM_SEED_DATA.map(r => ({
 const CC_RED = '#CC0000';
 const TOAST_COLORS = { success: '#15803d', delete: '#dc2626', view: '#7C3AED', info: '#0078D4' };
 
+// ── Drive link → direct image URL ──
+function driveThumbUrl(link) {
+  if (!link) return null;
+  // Handle multiple pipe-separated links — use the first one
+  const url = link.split('|')[0].trim();
+  if (!url) return null;
+  // Google Drive file link: /file/d/FILE_ID/...
+  const m1 = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (m1) return `https://drive.google.com/thumbnail?id=${m1[1]}&sz=w200`;
+  // Google Drive open?id= link
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m2) return `https://drive.google.com/thumbnail?id=${m2[1]}&sz=w200`;
+  // Already a direct image URL
+  if (/\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/i.test(url)) return url;
+  // Fallback: return as-is (might work for public URLs)
+  return url;
+}
+
 // ── Fields schema for records table ──
 const AM_FIELDS = [
   { key: 'code',       label: '🔑 Article Code',      w: 120, mono: true },
+  { key: 'imageLink',  label: 'Image',                 w: 52,  thumb: true },
+  { key: 'sketchLink', label: 'Sketch',                w: 52,  thumb: true },
   { key: 'desc',       label: 'Article Description',   w: 200 },
   { key: 'l1Division', label: 'L1 Division',           w: 130 },
   { key: 'l2Category', label: 'L2 Product Category',   w: 140 },
@@ -230,13 +250,29 @@ function ToggleSwitch({ on, onChange, A }) {
   );
 }
 
+// ── Table thumbnail cell (image/sketch column) ──
+function ThumbCell({ url, label, code, M, uff, onZoom }) {
+  const [err, setErr] = useState(false);
+  const src = driveThumbUrl(url);
+  if (!src || err) {
+    return <span style={{ display: 'inline-flex', width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 5, background: M.mid, color: M.tD, fontSize: 9, fontFamily: uff }}>—</span>;
+  }
+  return (
+    <img src={src} alt={label} referrerPolicy="no-referrer"
+      onClick={e => { e.stopPropagation(); onZoom({ src: src.replace(/sz=w\d+/, 'sz=w800'), title: `${code} — ${label}` }); }}
+      onError={() => setErr(true)}
+      style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 5, cursor: 'zoom-in', border: `1px solid ${M.div}`, display: 'block', margin: '0 auto' }} />
+  );
+}
+
 // ── Thumbnail placeholder (initials avatar or real img) ──
 function ArtThumbnail({ art, size, color, cover = false }) {
   const initials = (art.shortName || art.desc || art.code || "AX").slice(0, 2).toUpperCase();
+  const imgSrc = driveThumbUrl(art.imageLink);
   if (cover) {
     const h = size === "sm" ? 62 : size === "lg" ? 128 : 90;
-    return art.imageLink
-      ? <img src={art.imageLink} alt="" style={{ width: '100%', height: h, objectFit: 'cover', display: 'block' }} />
+    return imgSrc
+      ? <img src={imgSrc} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: h, objectFit: 'cover', display: 'block' }} />
       : <div style={{ width: '100%', height: h, background: `linear-gradient(135deg,${color}28,${color}0c)`, display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
           <span style={{ fontSize: h * 0.38, fontWeight: 900, color: color + '55', fontFamily: 'monospace', letterSpacing: 4 }}>{initials}</span>
           <span style={{ position: 'absolute', right: 8, bottom: 6, fontSize: 8, fontWeight: 900, color, background: color + '18', padding: '1px 6px', borderRadius: 5, fontFamily: 'monospace' }}>{art.code}</span>
@@ -244,8 +280,8 @@ function ArtThumbnail({ art, size, color, cover = false }) {
   }
   const sz = size === "sm" ? 30 : size === "lg" ? 58 : 42;
   const fs = size === "sm" ? 9 : size === "lg" ? 18 : 13;
-  return art.imageLink
-    ? <img src={art.imageLink} alt="" style={{ width: sz, height: sz, objectFit: 'cover', borderRadius: size === "sm" ? 4 : 8, flexShrink: 0 }} />
+  return imgSrc
+    ? <img src={imgSrc} alt="" referrerPolicy="no-referrer" style={{ width: sz, height: sz, objectFit: 'cover', borderRadius: size === "sm" ? 4 : 8, flexShrink: 0 }} />
     : <div style={{ width: sz, height: sz, borderRadius: size === "sm" ? 4 : 8, background: color + '1a', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `1.5px solid ${color}30` }}>
         <span style={{ fontSize: fs, fontWeight: 900, color, fontFamily: 'monospace' }}>{initials}</span>
       </div>;
@@ -742,6 +778,7 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
 function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
   const [search,  setSearch]  = useState('');
   const [sortCol, setSortCol] = useState('code');
+  const [lightbox, setLightbox] = useState(null); // { src, title }
   const [sortDir, setSortDir] = useState('asc');
   const [filterDiv, setFilterDiv] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
@@ -826,7 +863,7 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
     borderRight: `1px solid ${M.div}`,
   });
 
-  const colW = { code: 90, desc: 200, l1Division: 130, l2Category: 120, gender: 70, season: 72, wsp: 72, mrp: 72, hsnCode: 62, status: 90 };
+  const colW = { code: 90, imageLink: 52, sketchLink: 52, desc: 200, l1Division: 130, l2Category: 120, gender: 70, season: 72, wsp: 72, mrp: 72, hsnCode: 62, status: 90 };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -980,8 +1017,10 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
                 onMouseEnter={e => { e.currentTarget.style.background = M.hov; }}
                 onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? M.tev : M.tod; }}>
                 {AM_FIELDS.map(f => (
-                  <td key={f.key} style={{ padding: '7px 12px', fontSize: fz - 2, borderRight: `1px solid ${M.div}` }}>
-                    {f.key === 'code'
+                  <td key={f.key} style={{ padding: f.thumb ? '3px 4px' : '7px 12px', fontSize: fz - 2, borderRight: `1px solid ${M.div}`, textAlign: f.thumb ? 'center' : 'left', verticalAlign: 'middle' }}>
+                    {f.thumb
+                      ? <ThumbCell url={row[f.key]} label={f.label} code={row.code} M={M} uff={uff} onZoom={setLightbox} />
+                      : f.key === 'code'
                       ? <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: fz - 3, fontWeight: 700, color: divColor(row.l1Division) }}>{row[f.key]}</span>
                       : f.key === 'status'
                         ? <StatusBadge status={row.status} />
@@ -1007,6 +1046,19 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13 }) {
           </tbody>
         </table>
       </div>
+
+      {/* ── Image Lightbox ── */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
+          <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '85vw', maxHeight: '85vh', background: M.hi, borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 48px rgba(0,0,0,.4)' }}>
+            <div style={{ padding: '8px 14px', borderBottom: `1px solid ${M.div}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: M.tA, fontFamily: uff }}>{lightbox.title}</span>
+              <button onClick={() => setLightbox(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, color: M.tC, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+            </div>
+            <img src={lightbox.src} alt="" referrerPolicy="no-referrer" style={{ display: 'block', maxWidth: '85vw', maxHeight: 'calc(85vh - 40px)', objectFit: 'contain' }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
