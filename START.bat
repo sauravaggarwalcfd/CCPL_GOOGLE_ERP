@@ -189,6 +189,31 @@ call pm2 save
 echo.
 
 :: ═══════════════════════════════════════════════
+:: STEP 7 — Open browser
+:: ═══════════════════════════════════════════════
+echo [7/7] Waiting for server to start...
+
+:: Wait up to 30 seconds for server to respond
+set RETRIES=0
+:wait_loop
+if !RETRIES! geq 15 (
+    echo [WARN] Server did not respond in 30s. Opening browser anyway...
+    goto open_browser
+)
+timeout /t 2 /nobreak >nul
+curl -s -o nul -w "" http://localhost:%PORT% >nul 2>&1
+if errorlevel 1 (
+    set /a RETRIES+=1
+    echo       Waiting... (!RETRIES!/15)
+    goto wait_loop
+)
+
+:open_browser
+echo       Server is up! Opening browser...
+start "" http://localhost:%PORT%
+echo.
+
+:: ═══════════════════════════════════════════════
 :: DONE — Show status
 :: ═══════════════════════════════════════════════
 echo.
