@@ -370,8 +370,8 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
           })}
 
           <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6, paddingBottom: 6, paddingRight: 2 }}>
-            {/* Entry mode toggle */}
-            {mainTab === "entry" && (
+            {/* Entry mode toggle — hidden for article_master (uses its own V3 UI) */}
+            {mainTab === "entry" && !isArticleMaster && (
               <>
                 <div style={{ width: 1, height: 16, background: M.divider }} />
                 <div style={{ display: "flex", background: M.surfLow || M.bg, border: `1px solid ${M.inputBd}`, borderRadius: 5, overflow: "hidden" }}>
@@ -470,16 +470,18 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
         )}
       </div>
 
-      {/* ── Status Bar ── */}
-      <StatusBar
-        enriched={enriched}
-        currentView={currentView}
-        visibleKeys={visibleKeys}
-        mainTab={mainTab}
-        entryMode={entryMode}
-        formData={formData}
-        M={M} A={A} uff={uff} dff={dff}
-      />
+      {/* ── Status Bar — hidden for article_master entry (V3 form has own footer) ── */}
+      {!(isArticleMaster && mainTab === "entry") && (
+        <StatusBar
+          enriched={enriched}
+          currentView={currentView}
+          visibleKeys={visibleKeys}
+          mainTab={mainTab}
+          entryMode={entryMode}
+          formData={formData}
+          M={M} A={A} uff={uff} dff={dff}
+        />
+      )}
 
       {/* ── Views Panel ── */}
       {showViewsPanel && (

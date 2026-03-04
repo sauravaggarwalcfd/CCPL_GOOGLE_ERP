@@ -133,7 +133,7 @@ const SYSTEM_VIEWS = [
     fields: ALL.map(f => f.key) },
   { id:"quick",   name:"Quick Entry",   icon:"⚡", color:C.orange,  isSystem:true,
     desc:"Required fields only — fastest possible entry",
-    fields: ["code","desc","l2Category","gender","status"] },
+    fields: ["code","desc","l1Division","l2Category","gender","status"] },
   { id:"pricing", name:"Pricing & Tax", icon:"₹",  color:C.green,   isSystem:true,
     desc:"Article code + all pricing, HSN, GST fields",
     fields: ["code","desc","wsp","mrp","markupPct","markdownPct","hsnCode","gstPct"] },
@@ -954,7 +954,7 @@ export default function ArticleDataEntryForm({
   const [activeViewId,  setActiveViewId] = useState("all");
   const [customViews,   setCustomViews]  = useState([
     { id:"cv_buyer", name:"Buyer Entry", icon:"🏷️", color:"#0891b2", isSystem:false,
-      fields:["code","desc","shortName","buyerStyle","l2Category","gender","season","status"] },
+      fields:["code","desc","shortName","buyerStyle","l1Division","l2Category","gender","season","status"] },
   ]);
   const [showNewView,  setShowNewView]  = useState(false);
   const [editingView,  setEditingView]  = useState(null);
@@ -1096,11 +1096,16 @@ export default function ArticleDataEntryForm({
   const isDirty = filled > 0;
   const visibleAll = ALL.filter(f => visibleFieldKeys.has(f.key));
 
-  // Save wrapper
-  const onSave = useCallback(() => {
-    if (reqLeft.length > 0) { setShk(true); setTimeout(()=>setShk(false),600); }
-    else { setOk(true); setTimeout(()=>setOk(false),2500); }
-    handleSave();
+  // Save wrapper — awaits GAS call, shows ok only on success
+  const onSave = useCallback(async () => {
+    if (reqLeft.length > 0) { setShk(true); setTimeout(()=>setShk(false),600); return; }
+    try {
+      await handleSave();
+      setOk(true); setTimeout(()=>setOk(false),2500);
+    } catch {
+      // handleSave already set formErrors; shake to signal failure
+      setShk(true); setTimeout(()=>setShk(false),600);
+    }
   }, [reqLeft.length, handleSave]);
 
   // Clear wrapper
@@ -1622,18 +1627,16 @@ export function ArticleDataEntryWrapper({ M, A, uff, dff }) {
     setForm(f => ({ ...f, l3Style: v }));
   }, []);
 
-  // Save handler — posts to GAS
+  // Save handler — posts to GAS. Throws on failure so ArticleDataEntryForm.onSave can react.
   const handleSave = useCallback(async () => {
     const errs = {};
     if (!form.code?.trim()) errs.code = "Required";
     if (!form.l1Division)   errs.l1Division = "Required";
     if (!form.l2Category)   errs.l2Category = "Required";
     if (!form.desc?.trim()) errs.desc = "Required";
-    if (Object.keys(errs).length) { setFormErrors(errs); return; }
-    try {
-      await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, false);
-      setData(prev => [...prev, { ...form, code: form.code.trim() }]);
-    } catch (e) { console.warn('Save failed:', e); }
+    if (Object.keys(errs).length) { setFormErrors(errs); throw new Error('validation'); }
+    await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, false);
+    setData(prev => [...prev, { ...form, code: form.code.trim() }]);
   }, [form]);
 
   const handleClear = useCallback(() => {
