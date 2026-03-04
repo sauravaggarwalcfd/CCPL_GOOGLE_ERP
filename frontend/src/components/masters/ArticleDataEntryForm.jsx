@@ -1216,9 +1216,10 @@ export default function ArticleDataEntryForm({
       {/* ══ BODY ══ */}
       <div style={{ flex:1, minHeight:0, display:"flex", overflow:"hidden" }}>
 
-        {/* ── FORM AREA ── */}
-        <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 12px",
-          display:"flex", flexDirection:"column", gap:7 }}>
+        {/* ── FORM AREA (scroll wrapper) ── */}
+        <div style={{ flex:1, minHeight:0, overflowY:"auto" }}>
+        {/* inner column — grows to content, does NOT have a height constraint */}
+        <div style={{ display:"flex", flexDirection:"column", gap:7, padding:"10px 12px", paddingBottom:24 }}>
 
           {/* Required field warning bar */}
           {reqLeft.length > 0 && (
@@ -1396,8 +1397,8 @@ export default function ArticleDataEntryForm({
               </button>
             </div>
           )}
-          <div style={{ height:12 }}/>
-        </div>
+        </div>{/* end inner column */}
+        </div>{/* end scroll wrapper */}
 
         {/* ── PREVIEW ── */}
         <Preview fd={form}/>
