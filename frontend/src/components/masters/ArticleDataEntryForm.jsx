@@ -762,7 +762,7 @@ function Preview({ fd }) {
 
   return (
     <div style={{
-      width:220, flexShrink:0, background:C.slate,
+      width:220, flexShrink:0, minHeight:0, background:C.slate,
       borderLeft:`1px solid ${C.slate3}`,
       display:"flex", flexDirection:"column", overflow:"hidden",
     }}>
@@ -773,7 +773,7 @@ function Preview({ fd }) {
         <span style={{ fontSize:9, fontWeight:900, color:C.orange }}>{pct}%</span>
       </div>
 
-      <div style={{ flex:1, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
+      <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:12, display:"flex", flexDirection:"column", gap:8 }}>
 
         {/* Image card */}
         <div style={{ height:120, borderRadius:9,
@@ -1116,7 +1116,7 @@ export default function ArticleDataEntryForm({
 
   // ─── RENDER ───
   return (
-    <div style={{ display:"flex", flexDirection:"column", flex:1, overflow:"hidden",
+    <div style={{ display:"flex", flexDirection:"column", flex:1, minHeight:0, overflow:"hidden",
       fontFamily:"'Nunito Sans',sans-serif", background:C.bg, color:C.text }}>
 
       {/* ══ TOP BAR — breadcrumb + progress ══ */}
@@ -1241,10 +1241,10 @@ export default function ArticleDataEntryForm({
       </div>
 
       {/* ══ BODY ══ */}
-      <div style={{ flex:1, display:"flex", overflow:"hidden" }}>
+      <div style={{ flex:1, minHeight:0, display:"flex", overflow:"hidden" }}>
 
         {/* ── FORM AREA ── */}
-        <div style={{ flex:1, overflowY:"auto", padding:"10px 12px",
+        <div style={{ flex:1, minHeight:0, overflowY:"auto", padding:"10px 12px",
           display:"flex", flexDirection:"column", gap:7 }}>
 
           {/* Required field warning bar */}
