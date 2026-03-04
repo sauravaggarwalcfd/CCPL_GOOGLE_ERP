@@ -189,29 +189,32 @@ call pm2 save
 echo.
 
 :: ═══════════════════════════════════════════════
-:: STEP 7 — Open browser
+:: STEP 7 — Open Chrome browser
 :: ═══════════════════════════════════════════════
-echo [7/7] Waiting for server to start...
+echo [7/7] Opening CC ERP in Chrome...
+echo       Waiting 5 seconds for server to start...
+timeout /t 5 /nobreak >nul
 
-:: Wait up to 30 seconds for server to respond
-set RETRIES=0
-:wait_loop
-if !RETRIES! geq 15 (
-    echo [WARN] Server did not respond in 30s. Opening browser anyway...
-    goto open_browser
+:: Try Chrome at common install locations
+set "CHROME="
+if exist "C:\Program Files\Google\Chrome\Application\chrome.exe" (
+    set "CHROME=C:\Program Files\Google\Chrome\Application\chrome.exe"
 )
-timeout /t 2 /nobreak >nul
-curl -s -o nul -w "" http://localhost:%PORT% >nul 2>&1
-if errorlevel 1 (
-    set /a RETRIES+=1
-    echo       Waiting... (!RETRIES!/15)
-    goto wait_loop
+if exist "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" (
+    set "CHROME=C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"
+)
+if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" (
+    set "CHROME=%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"
 )
 
-:open_browser
-echo       Server is up! Opening browser...
-start "" http://localhost:%PORT%
-echo.
+if defined CHROME (
+    echo       Found Chrome: !CHROME!
+    start "" "!CHROME!" "http://localhost:%PORT%"
+) else (
+    echo       Chrome not found at default locations, opening in default browser...
+    start http://localhost:%PORT%
+)
+echo       Browser opened!
 
 :: ═══════════════════════════════════════════════
 :: DONE — Show status
