@@ -787,6 +787,8 @@ export default function ArticleMasterTab({ M: rawM, A, uff, dff, canEdit = true 
 }
 
 
+
+
 // ── Tags pill rendering (records view) ──
 function TagsPills({ v, M }) {
   if (!v) return <span style={{ color: M.tD, fontSize: 10 }}>—</span>;
@@ -802,126 +804,145 @@ function TagsPills({ v, M }) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// AM RECORDS VIEW — Table + Split view with column manager,
-// sorting, filtering, status bar (matches reference design)
+// AM RECORDS VIEW — V2 Design
+// Views Bar + Table/Split + Column Filter/Sort panels
+// Detail modal + Export + Column Manager + Status bar
 // ════════════════════════════════════════════════════════════════
+
+// ── System views constant (used by AM_RecordsView) ──
+const ALL_AM_KEYS = AM_FIELDS.map(c => c.key);
+const AM_SYSTEM_VIEWS = [
+  { id: 'sys_all',      name: 'All Columns',      icon: '\u229E', color: '#64748b', isSystem: true,
+    desc: 'Every column across all 27 fields',
+    cols: ALL_AM_KEYS },
+  { id: 'sys_overview', name: 'Article Overview',  icon: '\uD83D\uDC41', color: '#E8690A', isSystem: true,
+    desc: 'Key identity + status at a glance',
+    cols: ['imageLink','code','desc','shortName','sketchLink','l2Category','gender','season','status','tags'] },
+  { id: 'sys_pricing',  name: 'Pricing & Tax',     icon: '\u20B9', color: '#15803d', isSystem: true,
+    desc: 'Article code + all pricing columns',
+    cols: ['code','desc','wsp','mrp','markupPct','markdownPct','hsnCode','gstPct','status'] },
+  { id: 'sys_fabric',   name: 'Fabric Focus',      icon: '\uD83E\uDDF5', color: '#6c3fc5', isSystem: true,
+    desc: 'Fabric, colour and size columns',
+    cols: ['code','desc','mainFabric','fabricName','colorCodes','sizeRange','status'] },
+];
+
 function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13, divisions = INIT_DIVISIONS, statusOpts = INIT_STATUS_OPTS }) {
-  // ── View mode ──
-  const [view, setView] = useState('table'); // "table" | "split"
 
-  // ── Search / Sort / Filter ──
-  const [search, setSearch]       = useState('');
-  const [sortCol, setSortCol]     = useState('code');
-  const [sortDir, setSortDir]     = useState('asc');
-  const [filterDiv, setFilterDiv] = useState('ALL');
-  const [filterStatus, setFilterStatus] = useState('ALL');
+  // ═══ STATE ═══
+  const [viewMode,      setViewMode]      = useState('table'); // 'table' | 'split'
+  const [search,        setSearch]        = useState('');
+  const [lightbox,      setLightbox]      = useState(null);
+  const [detailRow,     setDetailRow]     = useState(null);
 
-  // ── Column manager (table view) ──
-  const [hidden, setHidden] = useState(['buyerStyle', 'remarks']);
-  const [colMgr, setColMgr] = useState(false);
+  // ── Views ──
+  const [activeViewId,  setActiveViewId]  = useState('sys_all');
+  const [customViews,   setCustomViews]   = useState([]);
+  const [showNewView,   setShowNewView]   = useState(false);
+  const [editingView,   setEditingView]   = useState(null);
+  const [showManage,    setShowManage]    = useState(false);
 
-  // ── Split view state ──
-  const [selRow, setSelRow]       = useState(null);
-  const [detailTab, setDetailTab] = useState('details');
+  // ── Sort (multi-level) ──
+  const [sorts, setSorts] = useState([{ id: 1, key: 'code', dir: 'asc' }]);
 
-  // ── Image lightbox ──
-  const [lightbox, setLightbox] = useState(null);
+  // ── Column filter panel ──
+  const [showFilter,  setShowFilter]  = useState(false);
+  const [colFilters,  setColFilters]  = useState({});
 
-  // ── Advanced filter / sort (Layout View style) ──
-  const [advFilters, setAdvFilters]       = useState([]);
-  const [advSorts, setAdvSorts]           = useState([]);
-  const [showAdvFilters, setShowAdvFilters] = useState(false);
-  const [showAdvSorts, setShowAdvSorts]     = useState(false);
+  // ── Sort panel ──
+  const [showSort, setShowSort] = useState(false);
 
-  // ── Derived field values / frequency maps ──
-  const fieldVals = useMemo(() => {
-    const m = {};
-    CARD_FIELDS.filter(f => f.type === 'cat').forEach(f => {
-      m[f.key] = [...new Set(data.map(d => d[f.key]).filter(Boolean))].sort();
-    });
-    return m;
-  }, [data]);
+  // ── Export menu ──
+  const [showExport, setShowExport] = useState(false);
 
-  const freqMaps = useMemo(() => {
-    const m = {};
-    CARD_FIELDS.forEach(f => {
-      const counts = {};
-      data.forEach(d => { const v = String(d[f.key] ?? ''); counts[v] = (counts[v] || 0) + 1; });
-      m[f.key] = counts;
-    });
-    return m;
-  }, [data]);
+  // ── Column manager ──
+  const [colMgr,       setColMgr]       = useState(false);
+  const [manualHidden, setManualHidden] = useState([]);
 
-  // ── Advanced filter/sort handlers ──
-  const addAdvFilter    = () => setAdvFilters(p => [...p, { id: Date.now(), field: 'l1Division', op: 'is', value: '' }]);
-  const removeAdvFilter = (id) => setAdvFilters(p => p.filter(f => f.id !== id));
-  const updateAdvFilter = (id, patch) => setAdvFilters(p => p.map(f => {
-    if (f.id !== id) return f;
-    const merged = { ...f, ...patch };
-    if (patch.field && patch.field !== f.field) {
-      const newType = CARD_FIELDS.find(x => x.key === patch.field)?.type || 'cat';
-      merged.op = FILTER_OPS[newType][0]; merged.value = '';
-    }
-    return merged;
-  }));
-  const addAdvSort    = () => setAdvSorts(p => [...p, { id: Date.now(), field: 'code', mode: 'a_z', value: '' }]);
-  const removeAdvSort = (id) => setAdvSorts(p => p.length > 1 ? p.filter(s => s.id !== id) : p);
-  const updateAdvSort = (id, patch) => setAdvSorts(p => p.map(s => s.id === id ? { ...s, ...patch } : s));
-  const activeAdvFilterCount = advFilters.filter(f => f.value !== '').length;
-  const isAdvSortActive = advSorts.length > 0;
+  // ── Split view ──
+  const [selRow,    setSelRow]    = useState(null);
+  const [splitTab,  setSplitTab]  = useState('details');
+  const [splitSrch, setSplitSrch] = useState('');
 
-  // ── Filtering ──
+  // ═══ DERIVED ═══
+  const allViews   = useMemo(() => [...AM_SYSTEM_VIEWS, ...customViews], [customViews]);
+  const activeView = allViews.find(v => v.id === activeViewId) || AM_SYSTEM_VIEWS[0];
+
+  // Visible columns: system view filter + manual hidden
+  const visCols = useMemo(() =>
+    AM_FIELDS.filter(c => activeView.cols.includes(c.key) && !manualHidden.includes(c.key)),
+    [activeView, manualHidden]
+  );
+
+  // Filter helpers
+  const hasFilter = Object.values(colFilters).some(v => v && v !== 'all');
+  const hasSort   = sorts.length > 0;
+
+  // Filter data
   const filtered = useMemo(() => {
-    let r = data;
-    if (filterDiv !== 'ALL') r = r.filter(d => d.l1Division === filterDiv);
-    if (filterStatus !== 'ALL') r = r.filter(d => d.status === filterStatus);
+    let rows = data;
     if (search) {
       const q = search.toLowerCase();
-      r = r.filter(d => Object.values(d).some(v => String(v || '').toLowerCase().includes(q)));
+      rows = rows.filter(r => Object.values(r).some(v => String(v || '').toLowerCase().includes(q)));
     }
-    advFilters.forEach(fil => {
-      if (fil.value !== '' || CARD_FIELDS.find(x => x.key === fil.field)?.type === 'num')
-        r = r.filter(art => evalFilter(art, fil));
+    Object.entries(colFilters).forEach(([k, v]) => {
+      if (!v || v === 'all') return;
+      if (['code','desc','shortName','buyerStyle','colorCodes','tags','remarks'].includes(k)) {
+        rows = rows.filter(r => String(r[k] || '').toLowerCase().includes(v.toLowerCase()));
+      } else {
+        rows = rows.filter(r => String(r[k] || '') === v);
+      }
     });
-    return r;
-  }, [data, search, filterDiv, filterStatus, advFilters]);
+    return rows;
+  }, [data, search, colFilters]);
 
-  // ── Sorting ──
+  // Sort data (multi-level)
   const sorted = useMemo(() => {
-    if (advSorts.length > 0) return applyMultiSort(filtered, advSorts, freqMaps);
+    if (!sorts.length) return filtered;
     return [...filtered].sort((a, b) => {
-      const av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
-      const d = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: 'base' });
-      return sortDir === 'asc' ? d : -d;
+      for (const s of sorts) {
+        const col = AM_FIELDS.find(c => c.key === s.key);
+        let av = a[s.key], bv = b[s.key];
+        let cmp = 0;
+        if (col?.num) { cmp = (+(av || 0)) - (+(bv || 0)); }
+        else          { cmp = String(av || '').localeCompare(String(bv || '')); }
+        if (cmp !== 0) return s.dir === 'asc' ? cmp : -cmp;
+      }
+      return 0;
     });
-  }, [filtered, sortCol, sortDir, advSorts, freqMaps]);
+  }, [filtered, sorts]);
 
-  // ── Split view: keep selection valid ──
-  const sel = useMemo(() => {
-    if (view !== 'split') return null;
-    if (selRow) {
-      const match = sorted.find(r => r.code === selRow.code);
-      if (match) return match;
-    }
-    return sorted[0] || null;
-  }, [sorted, selRow, view]);
+  const primarySort = sorts[0] || null;
 
-  // ── Visible columns ──
-  const visCols = AM_FIELDS.filter(c => !hidden.includes(c.key));
-
-  // ── Sort handler ──
-  const handleSort = (key) => {
-    const col = AM_FIELDS.find(c => c.key === key);
-    if (!col?.sortable) return;
-    if (sortCol === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
-    else { setSortCol(key); setSortDir('asc'); }
+  // Col header click sort
+  const handleColSort = col => {
+    if (!col.sortable) return;
+    setSorts(prev => {
+      if (prev.length > 0 && prev[0].key === col.key) {
+        return [{ ...prev[0], dir: prev[0].dir === 'asc' ? 'desc' : 'asc' }, ...prev.slice(1)];
+      }
+      return [{ id: Date.now(), key: col.key, dir: 'asc' }, ...prev.filter(s => s.key !== col.key)];
+    });
   };
 
-  // ── Shared styles ──
-  const ctrlSel = { fontSize: 10, border: `1px solid ${M.div}`, borderRadius: 5, padding: '3px 7px', background: M.inBg, color: M.tA, fontFamily: uff, cursor: 'pointer', outline: 'none' };
-  const ctrlBtn = (on) => ({ padding: '3px 10px', border: `1px solid ${on ? A.a : M.div}`, borderRadius: 5, background: on ? A.al : 'transparent', color: on ? A.a : M.tB, fontSize: 10, fontWeight: on ? 800 : 600, cursor: 'pointer', fontFamily: uff, whiteSpace: 'nowrap' });
+  // View CRUD
+  const existingNames = allViews.map(v => v.name);
+  const handleSaveView = vd => {
+    if (editingView) setCustomViews(p => p.map(v => v.id === vd.id ? vd : v));
+    else { setCustomViews(p => [...p, vd]); setActiveViewId(vd.id); }
+    setShowNewView(false); setEditingView(null);
+    showToast('View saved', 'view');
+  };
+  const handleDeleteView = id => {
+    setCustomViews(p => p.filter(v => v.id !== id));
+    if (activeViewId === id) setActiveViewId('sys_all');
+    showToast('View deleted', 'delete');
+  };
+  const handleDuplicateView = v => {
+    setCustomViews(p => [...p, { ...v, id: `cv_${Date.now()}`, name: `${v.name} (copy)`, isSystem: false }]);
+    showToast('View duplicated', 'view');
+  };
 
-  // ── Cell renderer ──
+  // Cell renderer
   const renderCell = (col, row) => {
     if (col.special === 'thumb')  return <ThumbCell url={row.imageLink}  label="Image"  code={row.code} M={M} uff={uff} onZoom={setLightbox} />;
     if (col.special === 'sketch') return <ThumbCell url={row.sketchLink} label="Sketch" code={row.code} M={M} uff={uff} onZoom={setLightbox} />;
@@ -933,7 +954,7 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13, divi
     return (
       <span style={{
         fontSize: fz - 2,
-        fontFamily: col.mono ? "'IBM Plex Mono',monospace" : 'inherit',
+        fontFamily: col.mono ? `${dff},monospace` : 'inherit',
         fontWeight: col.bold ? 800 : col.auto ? 700 : 400,
         color: col.key === 'code' ? A.a
              : col.key === 'l1Division' ? divColor(row.l1Division)
@@ -944,460 +965,1186 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13, divi
     );
   };
 
+  // Split view: keep selection valid
+  const splitFiltered = useMemo(() => {
+    if (!splitSrch) return sorted;
+    const q = splitSrch.toLowerCase();
+    return sorted.filter(r => String(r.code + r.desc + r.l2Category + r.gender).toLowerCase().includes(q));
+  }, [sorted, splitSrch]);
+
+  const sel = useMemo(() => {
+    if (viewMode !== 'split') return null;
+    if (selRow) {
+      const match = splitFiltered.find(r => r.code === selRow.code);
+      if (match) return match;
+    }
+    return splitFiltered[0] || null;
+  }, [splitFiltered, selRow, viewMode]);
+
+  // ═════════════════════════════════════════════════════════
+  // SUB-COMPONENTS (defined inside AM_RecordsView)
+  // ═════════════════════════════════════════════════════════
+
+  // ── NewViewModal ──
+  function NewViewModal({ existingNames: exNames, onSave, onClose, editView = null }) {
+    const isEdit = !!editView;
+    const [name,    setName]    = useState(editView?.name || '');
+    const [selCols, setSelCols] = useState(new Set(editView?.cols || ALL_AM_KEYS));
+    const [err,     setErr]     = useState('');
+    const RESERVED = AM_SYSTEM_VIEWS.map(v => v.name);
+    const toggleCol = k => setSelCols(p => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n; });
+
+    const doSave = () => {
+      const t = name.trim();
+      if (!t) { setErr('View name is required'); return; }
+      if (RESERVED.includes(t)) { setErr(`"${t}" is reserved`); return; }
+      if (!isEdit && exNames.includes(t)) { setErr('Name already exists'); return; }
+      if (selCols.size === 0) { setErr('Select at least one column'); return; }
+      onSave({ name: t, cols: [...selCols], icon: '\uD83D\uDCCC', color: '#6c3fc5', isSystem: false,
+        id: editView?.id || `cv_${Date.now()}` });
+    };
+
+    const groups = [
+      { label: '\uD83D\uDCCB Identity',     keys: ['imageLink','code','desc','shortName','sketchLink','buyerStyle'] },
+      { label: '\uD83D\uDC55 Item Details',  keys: ['l1Division','l2Category','l3Style','season','gender','fitType','neckline','sleeveType'] },
+      { label: '\uD83E\uDDF5 Fabric',        keys: ['mainFabric','fabricName','colorCodes','sizeRange'] },
+      { label: '\u20B9 Pricing',              keys: ['wsp','mrp','markupPct','markdownPct','hsnCode','gstPct'] },
+      { label: '\uD83C\uDFF7\uFE0F Status',  keys: ['status','tags','remarks'] },
+    ];
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(15,23,42,.48)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={e => e.target === e.currentTarget && onClose()}>
+        <div style={{ background: '#fff', borderRadius: 13, width: 490, maxHeight: '88vh',
+          boxShadow: '0 24px 64px rgba(0,0,0,.22)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          {/* Header */}
+          <div style={{ padding: '14px 18px 12px', borderBottom: `1px solid ${M.div}`,
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: 'linear-gradient(135deg,#faf7ff,#fff)' }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#f0eeff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>{'\uD83D\uDCCC'}</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontWeight: 900, color: M.tA }}>
+                {isEdit ? `Edit View \u2014 "${editView.name}"` : 'Create New Column View'}
+              </div>
+              <div style={{ fontSize: 9, color: M.tC, marginTop: 1 }}>Choose which columns are visible in this view</div>
+            </div>
+            <button onClick={onClose} style={{ border: 'none', background: 'none', fontSize: 18, color: M.tC, cursor: 'pointer' }}>{'\u00D7'}</button>
+          </div>
+
+          {/* Name */}
+          <div style={{ padding: '12px 18px 6px' }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase',
+              letterSpacing: .5, marginBottom: 5 }}>View Name</div>
+            <input value={name} onChange={e => { setName(e.target.value); setErr(''); }}
+              placeholder="e.g. Buyer View, QC Columns, Season Check\u2026"
+              style={{ width: '100%', padding: '7px 11px',
+                border: `1.5px solid ${err ? CC_RED : M.div}`,
+                borderRadius: 7, fontSize: 12, outline: 'none',
+                background: err ? '#fff0f0' : M.inBg, color: M.tA, fontFamily: uff }} />
+            {err && <div style={{ fontSize: 9, color: CC_RED, marginTop: 4, fontWeight: 700 }}>{'\u26A0'} {err}</div>}
+          </div>
+
+          {/* Column picker header */}
+          <div style={{ padding: '4px 18px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase', letterSpacing: .5 }}>
+              Columns <span style={{ color: '#6c3fc5' }}>({selCols.size} selected)</span>
+            </div>
+            <div style={{ display: 'flex', gap: 5 }}>
+              {[
+                { l: 'All',   fn: () => setSelCols(new Set(ALL_AM_KEYS)),      c: M.tB },
+                { l: 'Key',   fn: () => setSelCols(new Set(['imageLink','code','desc','status','l2Category','gender'])), c: A.a },
+                { l: 'Clear', fn: () => setSelCols(new Set()),                  c: M.tC },
+              ].map(b => (
+                <button key={b.l} onClick={b.fn} style={{ padding: '2px 9px',
+                  border: `1px solid ${M.div}`, borderRadius: 6,
+                  background: M.hi, color: b.c, fontSize: 8.5, fontWeight: 800, cursor: 'pointer' }}>
+                  {b.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Groups scroll */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '0 18px 16px' }}>
+            {groups.map(g => {
+              const gCols  = g.keys.map(k => AM_FIELDS.find(c => c.key === k)).filter(Boolean);
+              const allOn  = gCols.every(c => selCols.has(c.key));
+              const someOn = gCols.some(c => selCols.has(c.key));
+              return (
+                <div key={g.label} style={{ marginBottom: 8, border: `1px solid ${M.div}`, borderRadius: 9, overflow: 'hidden' }}>
+                  <div onClick={() => {
+                    const allOnNow = gCols.every(c => selCols.has(c.key));
+                    setSelCols(p => { const n = new Set(p); gCols.forEach(c => allOnNow ? n.delete(c.key) : n.add(c.key)); return n; });
+                  }} style={{ padding: '7px 12px', cursor: 'pointer',
+                    background: allOn ? '#f0eeff' : someOn ? M.hi : M.inBg,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    borderBottom: `1px solid ${M.div}` }}>
+                    <div style={{ width: 17, height: 17, borderRadius: 4, flexShrink: 0,
+                      border: `2px solid ${allOn ? '#6c3fc5' : someOn ? '#6c3fc560' : M.div}`,
+                      background: allOn ? '#6c3fc5' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {allOn && <span style={{ fontSize: 9, color: '#fff' }}>{'\u2713'}</span>}
+                      {!allOn && someOn && <span style={{ width: 6, height: 2, background: '#6c3fc5', borderRadius: 1, display: 'block' }} />}
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 800, flex: 1,
+                      color: allOn ? '#6c3fc5' : M.tA }}>{g.label}</span>
+                    <span style={{ fontSize: 8.5, color: M.tC }}>
+                      {gCols.filter(c => selCols.has(c.key)).length}/{gCols.length}
+                    </span>
+                  </div>
+                  <div style={{ padding: '7px 12px 9px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {gCols.map(c => {
+                      const on = selCols.has(c.key);
+                      return (
+                        <button key={c.key} onClick={() => toggleCol(c.key)} style={{
+                          padding: '3px 9px', borderRadius: 9, fontSize: 9, fontWeight: 700,
+                          cursor: 'pointer', transition: 'all .12s',
+                          border: `1.5px solid ${on ? '#6c3fc570' : M.div}`,
+                          background: on ? '#f0eeff' : M.inBg,
+                          color: on ? '#6c3fc5' : M.tC,
+                          display: 'flex', alignItems: 'center', gap: 4 }}>
+                          {c.auto && <span style={{ fontSize: 7, color: '#6c3fc5' }}>{'\u2190'}</span>}
+                          {c.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '10px 18px', borderTop: `1px solid ${M.div}`,
+            display: 'flex', alignItems: 'center', gap: 8, background: M.inBg }}>
+            <span style={{ fontSize: 9, color: M.tC, flex: 1 }}>
+              {selCols.size} column{selCols.size !== 1 ? 's' : ''} selected
+            </span>
+            <button onClick={onClose} style={{ padding: '7px 14px',
+              border: `1.5px solid ${M.div}`, borderRadius: 7,
+              background: M.hi, color: M.tB, fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>Cancel</button>
+            <button onClick={doSave} style={{ padding: '7px 20px', border: 'none',
+              borderRadius: 7, background: '#6c3fc5', color: '#fff',
+              fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>
+              {isEdit ? '\uD83D\uDCBE Update View' : '\u271A Create View'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ManagePanel ──
+  function ManagePanel({ onClose: mClose }) {
+    const [confirm, setConfirm] = useState(null);
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(15,23,42,.3)', backdropFilter: 'blur(2px)' }}
+        onClick={e => e.target === e.currentTarget && mClose()}>
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 370,
+          background: '#fff', boxShadow: '-10px 0 40px rgba(0,0,0,.14)',
+          display: 'flex', flexDirection: 'column' }}>
+
+          <div style={{ padding: '14px 16px 12px', borderBottom: `1px solid ${M.div}`,
+            background: M.thd, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 16 }}>{'\uD83D\uDD16'}</span>
+            <span style={{ fontSize: 11, fontWeight: 900, color: '#e2e8f0', flex: 1 }}>Manage Views</span>
+            <button onClick={mClose} style={{ border: 'none', background: 'none', fontSize: 16, color: '#94a3b8', cursor: 'pointer' }}>{'\u00D7'}</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+            <div style={{ fontSize: 8, fontWeight: 900, color: M.tC, textTransform: 'uppercase',
+              letterSpacing: .8, marginBottom: 6, padding: '0 4px' }}>System Views (locked)</div>
+            {AM_SYSTEM_VIEWS.map(v => (
+              <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 9,
+                padding: '8px 10px', borderRadius: 8, marginBottom: 4,
+                background: M.inBg, border: `1px solid ${M.div}` }}>
+                <span style={{ fontSize: 15 }}>{v.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, color: M.tA }}>{v.name}</div>
+                  <div style={{ fontSize: 8.5, color: M.tC, marginTop: 1 }}>{v.desc} {'\u00B7'} <b>{v.cols.length}</b> cols</div>
+                </div>
+                <span style={{ fontSize: 7.5, padding: '2px 6px', borderRadius: 5,
+                  background: M.mid, color: '#94a3b8', fontWeight: 900 }}>LOCKED</span>
+              </div>
+            ))}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '14px 0 8px' }}>
+              <div style={{ flex: 1, height: 1, background: M.div }} />
+              <span style={{ fontSize: 8, fontWeight: 900, color: M.tC, textTransform: 'uppercase', letterSpacing: .8 }}>
+                Custom Views ({customViews.length})
+              </span>
+              <div style={{ flex: 1, height: 1, background: M.div }} />
+            </div>
+
+            {customViews.length === 0 && (
+              <div style={{ padding: '28px 0', textAlign: 'center', color: M.tC }}>
+                <div style={{ fontSize: 28, marginBottom: 8 }}>{'\uD83D\uDCCC'}</div>
+                <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 4 }}>No custom views yet</div>
+                <div style={{ fontSize: 9 }}>Use <b style={{ color: A.a }}>+ New View</b> to create one.</div>
+              </div>
+            )}
+
+            {customViews.map(v => {
+              const isActive = activeViewId === v.id;
+              const isDel    = confirm === v.id;
+              return (
+                <div key={v.id} style={{ padding: '8px 10px', borderRadius: 8, marginBottom: 5,
+                  border: `1.5px solid ${isActive ? '#6c3fc555' : M.div}`,
+                  background: isActive ? '#f0eeff' : '#fff', transition: 'all .15s' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{v.icon || '\uD83D\uDCCC'}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 800, color: isActive ? '#6c3fc5' : M.tA }}>{v.name}</span>
+                        {isActive && <span style={{ fontSize: 7, padding: '1px 5px', borderRadius: 4,
+                          background: '#6c3fc5', color: '#fff', fontWeight: 900 }}>ACTIVE</span>}
+                      </div>
+                      <div style={{ fontSize: 8.5, color: M.tC, marginTop: 1 }}>{v.cols.length} columns</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      <button onClick={() => { setEditingView(v); setShowManage(false); setShowNewView(true); }} style={{ padding: '3px 8px',
+                        border: `1px solid ${M.div}`, borderRadius: 5,
+                        background: M.inBg, color: M.tB, fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>{'\u270E'} Edit</button>
+                      <button onClick={() => handleDuplicateView(v)} style={{ padding: '3px 8px',
+                        border: `1px solid ${M.div}`, borderRadius: 5,
+                        background: M.inBg, color: M.tB, fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>{'\u29C9'}</button>
+                      <button onClick={() => setConfirm(isDel ? null : v.id)} style={{ padding: '3px 8px',
+                        border: `1px solid ${isDel ? '#fca5a5' : M.div}`, borderRadius: 5,
+                        background: isDel ? '#fff1f1' : M.inBg,
+                        color: isDel ? CC_RED : M.tC, fontSize: 9, fontWeight: 800, cursor: 'pointer' }}>{'\u00D7'}</button>
+                    </div>
+                  </div>
+                  {isDel && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8,
+                      padding: '6px 8px', borderRadius: 7, background: '#fff1f1', border: '1px solid #fca5a5' }}>
+                      <span style={{ fontSize: 9, color: CC_RED, flex: 1 }}>
+                        Delete "<b>{v.name}</b>"?
+                      </span>
+                      <button onClick={() => { handleDeleteView(v.id); setConfirm(null); }} style={{ padding: '3px 10px',
+                        border: 'none', borderRadius: 5, background: CC_RED,
+                        color: '#fff', fontSize: 9, fontWeight: 900, cursor: 'pointer' }}>Delete</button>
+                      <button onClick={() => setConfirm(null)} style={{ padding: '3px 8px',
+                        border: `1px solid ${M.div}`, borderRadius: 5,
+                        background: '#fff', color: M.tB, fontSize: 9, cursor: 'pointer' }}>Keep</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '10px 12px', borderTop: `1px solid ${M.div}`,
+            background: M.inBg, fontSize: 9, color: M.tC, textAlign: 'center' }}>
+            {AM_SYSTEM_VIEWS.length} system {'\u00B7'} {customViews.length} custom {'\u00B7'} {AM_SYSTEM_VIEWS.length + customViews.length} total
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── FilterPanel ──
+  function FilterPanel({ onClose: fClose }) {
+    const [local, setLocal] = useState({ ...colFilters });
+    const filterableCols = visCols.filter(c => !c.special && c.sortable);
+
+    const uniqueVals = col => {
+      const vals = [...new Set(data.map(r => r[col.key]).filter(v => v !== undefined && v !== ''))];
+      return vals.sort((a, b) => String(a).localeCompare(String(b)));
+    };
+
+    const apply = () => { setColFilters(local); fClose(); };
+    const clear = () => { setColFilters({}); fClose(); };
+    const activeCount = Object.values(local).filter(v => v && v !== 'all').length;
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(15,23,42,.28)', backdropFilter: 'blur(2px)' }}
+        onClick={e => e.target === e.currentTarget && fClose()}>
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 320,
+          background: '#fff', boxShadow: '-10px 0 40px rgba(0,0,0,.12)',
+          display: 'flex', flexDirection: 'column' }}>
+
+          <div style={{ padding: '13px 14px 11px', borderBottom: `1px solid ${M.div}`,
+            background: M.thd, display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 900, color: '#e2e8f0', flex: 1 }}>
+              {'\u229E'} Column Filters
+              {activeCount > 0 && <span style={{ marginLeft: 6, fontSize: 9, padding: '1px 6px',
+                borderRadius: 8, background: A.a, color: '#fff', fontWeight: 900 }}>{activeCount} ON</span>}
+            </span>
+            <button onClick={fClose} style={{ border: 'none', background: 'none', fontSize: 16, color: '#94a3b8', cursor: 'pointer' }}>{'\u00D7'}</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+            {filterableCols.map(c => {
+              const vals = uniqueVals(c);
+              const cur  = local[c.key] || 'all';
+              return (
+                <div key={c.key} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase',
+                    letterSpacing: .5, marginBottom: 5,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    {c.label}
+                    {cur !== 'all' && (
+                      <button onClick={() => setLocal(p => ({ ...p, [c.key]: 'all' }))} style={{
+                        border: 'none', background: 'none', color: A.a,
+                        fontSize: 8.5, fontWeight: 800, cursor: 'pointer' }}>{'\u00D7'} clear</button>
+                    )}
+                  </div>
+                  {['code','desc','shortName','buyerStyle','colorCodes','tags','remarks'].includes(c.key) ? (
+                    <div style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                        fontSize: 12, color: M.tC, pointerEvents: 'none' }}>{'\u2315'}</span>
+                      <input value={cur === 'all' ? '' : cur}
+                        onChange={e => setLocal(p => ({ ...p, [c.key]: e.target.value || 'all' }))}
+                        placeholder={`Search ${c.label.toLowerCase()}\u2026`}
+                        style={{ width: '100%', padding: '6px 10px 6px 26px',
+                          border: `1.5px solid ${cur !== 'all' ? A.a : M.div}`,
+                          borderRadius: 7, fontSize: 10.5, outline: 'none',
+                          background: cur !== 'all' ? A.al : M.inBg,
+                          fontFamily: uff, color: M.tA }} />
+                      {cur !== 'all' && (
+                        <button onClick={() => setLocal(p => ({ ...p, [c.key]: 'all' }))} style={{
+                          position: 'absolute', right: 7, top: '50%', transform: 'translateY(-50%)',
+                          border: 'none', background: 'none', color: M.tC, cursor: 'pointer', fontSize: 13 }}>{'\u00D7'}</button>
+                      )}
+                    </div>
+                  ) : (
+                    <div style={{ position: 'relative' }}>
+                      <select value={cur}
+                        onChange={e => setLocal(p => ({ ...p, [c.key]: e.target.value }))}
+                        style={{ width: '100%', padding: '6px 24px 6px 10px',
+                          border: `1.5px solid ${cur !== 'all' ? A.a : M.div}`,
+                          borderRadius: 7, fontSize: 10.5, outline: 'none',
+                          appearance: 'none', cursor: 'pointer',
+                          background: cur !== 'all' ? A.al : M.inBg,
+                          color: M.tA, fontFamily: uff }}>
+                        <option value="all">{'\u2014'} All {'\u2014'}</option>
+                        {vals.map(v => (
+                          <option key={v} value={String(v)}>{String(v)}</option>
+                        ))}
+                      </select>
+                      <span style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                        color: M.tC, fontSize: 10, pointerEvents: 'none' }}>{'\u25BE'}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {filterableCols.length === 0 && (
+              <div style={{ padding: '28px 0', textAlign: 'center', color: M.tC, fontSize: 11 }}>
+                No filterable columns visible.<br />Switch to a view with more columns.
+              </div>
+            )}
+          </div>
+
+          <div style={{ padding: '10px 14px', borderTop: `1px solid ${M.div}`, display: 'flex', gap: 8 }}>
+            <button onClick={clear} style={{ flex: 1, padding: '7px', border: `1px solid ${M.div}`,
+              borderRadius: 7, background: M.inBg, color: M.tB,
+              fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>Clear All</button>
+            <button onClick={apply} style={{ flex: 2, padding: '7px', border: 'none',
+              borderRadius: 7, background: A.a, color: '#fff',
+              fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>Apply Filters</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── SortPanel ──
+  function SortPanel({ onClose: sClose }) {
+    const sortableCols = AM_FIELDS.filter(c => c.sortable);
+    const [local, setLocal] = useState(sorts.length ? sorts.map(s => ({ ...s })) : []);
+    const dragIdx = useRef(null);
+
+    const addSort = () => {
+      const used = local.map(s => s.key);
+      const next = sortableCols.find(c => !used.includes(c.key));
+      if (!next) return;
+      setLocal(p => [...p, { id: Date.now(), key: next.key, dir: 'asc' }]);
+    };
+
+    const SP = [
+      { l: 'Code A\u2192Z',     s: [{ id: 1, key: 'code',       dir: 'asc' }] },
+      { l: 'Code Z\u2192A',     s: [{ id: 1, key: 'code',       dir: 'desc' }] },
+      { l: 'MRP Low\u2192High', s: [{ id: 1, key: 'mrp',        dir: 'asc' }] },
+      { l: 'MRP High\u2192Low', s: [{ id: 1, key: 'mrp',        dir: 'desc' }] },
+      { l: 'Status',            s: [{ id: 1, key: 'status',     dir: 'asc' }] },
+      { l: 'Category',          s: [{ id: 1, key: 'l2Category', dir: 'asc' }] },
+    ];
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(15,23,42,.28)', backdropFilter: 'blur(2px)' }}
+        onClick={e => e.target === e.currentTarget && sClose()}>
+        <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 340,
+          background: '#fff', boxShadow: '-10px 0 40px rgba(0,0,0,.12)',
+          display: 'flex', flexDirection: 'column' }}>
+
+          <div style={{ padding: '13px 14px 11px', borderBottom: `1px solid ${M.div}`,
+            background: M.thd, display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: 11, fontWeight: 900, color: '#e2e8f0', flex: 1 }}>{'\u2195'} Sort Columns</span>
+            <button onClick={sClose} style={{ border: 'none', background: 'none', fontSize: 16, color: '#94a3b8', cursor: 'pointer' }}>{'\u00D7'}</button>
+          </div>
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px' }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase',
+              letterSpacing: .5, marginBottom: 8 }}>Quick Presets</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 16 }}>
+              {SP.map(p => (
+                <button key={p.l} onClick={() => setLocal(p.s.map((s, i) => ({ ...s, id: Date.now() + i })))} style={{
+                  padding: '4px 10px', borderRadius: 8, fontSize: 9.5, fontWeight: 700, cursor: 'pointer',
+                  border: `1.5px solid ${M.div}`, background: M.inBg, color: M.tB,
+                  fontFamily: uff }}>{p.l}</button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div style={{ fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase', letterSpacing: .5 }}>
+                Sort Rules {local.length > 0 && <span style={{ color: A.a }}>({local.length})</span>}
+              </div>
+              <button onClick={addSort} disabled={local.length >= sortableCols.length} style={{
+                padding: '3px 9px', border: `1.5px dashed ${A.a}`, borderRadius: 6,
+                background: A.al, color: A.a,
+                fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>+ Add Rule</button>
+            </div>
+
+            {local.length === 0 && (
+              <div style={{ padding: '18px 0', textAlign: 'center', color: M.tC, fontSize: 10 }}>
+                No sort rules. Add one or pick a preset.
+              </div>
+            )}
+
+            {local.map((s, i) => {
+              const col = AM_FIELDS.find(c => c.key === s.key);
+              return (
+                <div key={s.id} draggable
+                  onDragStart={() => { dragIdx.current = i; }}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={() => {
+                    if (dragIdx.current === null || dragIdx.current === i) return;
+                    const arr = [...local]; const [item] = arr.splice(dragIdx.current, 1);
+                    arr.splice(i, 0, item); setLocal(arr); dragIdx.current = null;
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 10px',
+                    marginBottom: 5, borderRadius: 7, border: `1.5px solid ${M.div}`,
+                    background: '#fff', cursor: 'grab',
+                    boxShadow: '0 1px 4px rgba(0,0,0,.04)' }}>
+                  <div style={{ width: 19, height: 19, borderRadius: '50%', flexShrink: 0,
+                    background: A.a, color: '#fff', fontSize: 9, fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</div>
+                  <span style={{ fontSize: 11, color: M.tC, cursor: 'grab' }}>{'\u2807'}</span>
+                  <select value={s.key} onChange={e => setLocal(p => p.map(r => r.id === s.id ? { ...r, key: e.target.value } : r))}
+                    style={{ flex: 1, padding: '4px 6px', border: `1px solid ${M.div}`,
+                      borderRadius: 5, fontSize: 10, outline: 'none',
+                      background: M.inBg, fontFamily: uff }}>
+                    {sortableCols.map(c => (
+                      <option key={c.key} value={c.key}
+                        disabled={local.some(ls => ls.id !== s.id && ls.key === c.key)}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button onClick={() => setLocal(p => p.map(r => r.id === s.id ? { ...r, dir: r.dir === 'asc' ? 'desc' : 'asc' } : r))} style={{
+                    padding: '4px 9px', border: `1.5px solid ${M.div}`,
+                    borderRadius: 5, background: M.inBg, color: M.tB,
+                    fontSize: 9, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: uff }}>
+                    {s.dir === 'asc' ? (col?.num ? '1\u21929' : 'A\u2192Z') : (col?.num ? '9\u21921' : 'Z\u2192A')}
+                  </button>
+                  <button onClick={() => setLocal(p => p.filter(r => r.id !== s.id))} style={{
+                    border: 'none', background: 'none', color: M.tC, cursor: 'pointer', fontSize: 15, padding: '0 2px' }}>{'\u00D7'}</button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ padding: '10px 14px', borderTop: `1px solid ${M.div}`, display: 'flex', gap: 8 }}>
+            <button onClick={() => { setSorts([]); setLocal([]); sClose(); }} style={{
+              flex: 1, padding: '7px', border: `1px solid ${M.div}`,
+              borderRadius: 7, background: M.inBg, color: M.tB,
+              fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>Clear All</button>
+            <button onClick={() => { setSorts(local); sClose(); }} style={{
+              flex: 2, padding: '7px', border: 'none',
+              borderRadius: 7, background: M.thd, color: '#fff',
+              fontSize: 10, fontWeight: 900, cursor: 'pointer' }}>{'\u2195'} Apply Sort</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ExportMenu ──
+  function ExportMenu({ onClose: eClose }) {
+    const opts = [
+      { icon: '\uD83D\uDCC4', label: 'Export as PDF',           sub: 'Formatted A4 layout',      col: CC_RED  },
+      { icon: '\uD83D\uDCCA', label: 'Export as Excel (.xlsx)', sub: 'Full sheet with all cols',  col: '#15803d' },
+      { icon: '\uD83D\uDCCB', label: 'Copy to Google Sheet',   sub: 'Opens in new tab',          col: '#1d6fa4' },
+      { icon: '\uD83D\uDDA8\uFE0F', label: 'Print view',       sub: 'Browser print dialog',      col: M.tB },
+    ];
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 500 }} onClick={eClose}>
+        <div style={{ position: 'absolute', right: 12, top: 90,
+          background: '#fff', borderRadius: 10, width: 240,
+          boxShadow: '0 12px 40px rgba(0,0,0,.18)', border: `1px solid ${M.div}`,
+          overflow: 'hidden' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ padding: '8px 12px 6px', borderBottom: `1px solid ${M.div}`,
+            fontSize: 9, fontWeight: 900, color: M.tC, textTransform: 'uppercase', letterSpacing: .8 }}>
+            Export {sorted.length} records
+          </div>
+          {opts.map(o => (
+            <button key={o.label} onClick={() => { showToast(`${o.label}\u2026`, 'info'); eClose(); }}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 14px', border: 'none', background: 'transparent',
+                cursor: 'pointer', textAlign: 'left', transition: 'background .1s', fontFamily: uff }}
+              onMouseEnter={e => e.currentTarget.style.background = M.hi}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <span style={{ fontSize: 18, flexShrink: 0 }}>{o.icon}</span>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: o.col }}>{o.label}</div>
+                <div style={{ fontSize: 8.5, color: M.tC }}>{o.sub}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── DetailModal ──
+  function DetailModal({ row, onClose: dClose }) {
+    const [dTab, setDTab] = useState('details');
+    return (
+      <div style={{ position: 'fixed', inset: 0, zIndex: 400,
+        background: 'rgba(15,23,42,.48)', backdropFilter: 'blur(4px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        onClick={e => e.target === e.currentTarget && dClose()}>
+        <div style={{ background: M.lo, borderRadius: 13, width: 820, maxHeight: '88vh',
+          boxShadow: '0 24px 64px rgba(0,0,0,.22)',
+          display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+
+          {/* Hero */}
+          <div style={{ display: 'flex', background: M.hi, borderBottom: `2px solid ${M.div}`, flexShrink: 0, position: 'relative' }}>
+            <div style={{ width: 180, height: 180, flexShrink: 0, overflow: 'hidden' }}>
+              <ArtThumbnail art={row} size="lg" color={divColor(row.l1Division)} cover />
+            </div>
+            <div style={{ flex: 1, padding: '16px 18px', minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ fontSize: 22, fontWeight: 900, color: A.a, fontFamily: `${dff},monospace` }}>{row.code}</span>
+                <StatusBadge status={row.status} />
+              </div>
+              {row.shortName && <div style={{ fontSize: 9.5, color: M.tC, marginBottom: 5 }}>"{row.shortName}"</div>}
+              <div style={{ fontSize: 13, fontWeight: 800, color: M.tA, lineHeight: 1.4, marginBottom: 9 }}>{row.desc}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+                {[row.gender, row.l2Category, row.l3Style, row.fitType, row.neckline, row.sleeveType]
+                  .filter(Boolean).map((v, i) => (
+                  <span key={i} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8,
+                    background: M.mid, color: M.tB, fontWeight: 700 }}>{v}</span>
+                ))}
+                {row.season && String(row.season).split(',').map(s => (
+                  <span key={s} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8,
+                    background: `${A.a}14`, color: A.a, fontWeight: 700 }}>{s.trim()}</span>
+                ))}
+              </div>
+              {row.buyerStyle && <div style={{ fontSize: 9.5, color: M.tC }}>
+                Buyer Style: <b style={{ color: M.tB }}>{row.buyerStyle}</b></div>}
+            </div>
+            <button onClick={dClose} style={{ position: 'absolute', right: 16, top: 12,
+              border: 'none', background: 'rgba(0,0,0,.06)', width: 28, height: 28,
+              borderRadius: '50%', cursor: 'pointer', fontSize: 16, color: M.tB,
+              display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{'\u00D7'}</button>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ background: M.hi, borderBottom: `1px solid ${M.div}`,
+            display: 'flex', padding: '0 18px', flexShrink: 0, alignItems: 'center' }}>
+            {[{ id: 'details', l: '\uD83D\uDCCB Item Details' }, { id: 'pricing', l: '\u20B9 Pricing & Tax' }, { id: 'fabric', l: '\uD83E\uDDF5 Fabric' }].map(t => (
+              <button key={t.id} onClick={() => setDTab(t.id)} style={{
+                padding: '9px 14px', border: 'none', background: 'transparent',
+                borderBottom: `2.5px solid ${dTab === t.id ? A.a : 'transparent'}`,
+                fontSize: 10.5, fontWeight: dTab === t.id ? 900 : 700,
+                color: dTab === t.id ? A.a : M.tC, cursor: 'pointer', transition: 'all .15s', fontFamily: uff }}>{t.l}</button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <button onClick={() => { onEdit(row); dClose(); }} style={{ padding: '5px 16px',
+              border: `1.5px solid ${A.a}`, borderRadius: 6,
+              background: A.al, color: A.a,
+              fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>{'\u270E'} Edit Record</button>
+          </div>
+
+          {/* Tab content */}
+          <div style={{ padding: '14px 18px', overflowY: 'auto' }}>
+            {dTab === 'details' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 14px' }}>
+                {[
+                  { l: 'L1 Division', v: row.l1Division }, { l: 'L2 Product Category', v: row.l2Category }, { l: 'L3 Style', v: row.l3Style },
+                  { l: 'Gender', v: row.gender }, { l: 'Fit Type', v: row.fitType }, { l: 'Neckline', v: row.neckline },
+                  { l: 'Sleeve Type', v: row.sleeveType }, { l: 'Size Range', v: row.sizeRange },
+                  { l: '\u27F7 Tags', v: row.tags, wide: true }, { l: 'Remarks', v: row.remarks, wide: true },
+                ].map(f => (
+                  <div key={f.l} style={{ gridColumn: f.wide ? '1/-1' : 'auto',
+                    background: M.hi, borderRadius: 7, padding: '8px 12px',
+                    border: `1px solid ${M.div}` }}>
+                    <div style={{ fontSize: 8, fontWeight: 900, color: M.tD, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 4, fontFamily: uff }}>{f.l}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: f.v ? M.tA : M.tD, fontFamily: uff }}>{f.v || '\u2014'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {dTab === 'pricing' && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 14px' }}>
+                {[
+                  { l: 'W.S.P (Rs)', v: row.wsp ? `\u20B9${row.wsp}` : '\u2014', mono: true },
+                  { l: 'MRP (Rs)', v: row.mrp ? `\u20B9${row.mrp}` : '\u2014', mono: true },
+                  { l: '\u2211 Final Markup %', v: row.markupPct ? `${row.markupPct}%` : '\u2014', mono: true, auto: true },
+                  { l: '\u2211 Final Markdown %', v: row.markdownPct ? `${row.markdownPct}%` : '\u2014', mono: true, auto: true },
+                  { l: '\u2192 HSN Code', v: row.hsnCode || '\u2014', mono: true },
+                  { l: '\u2190 GST % (Auto)', v: row.gstPct ? `${row.gstPct}%` : '\u2014', mono: true, auto: true },
+                ].map(f => (
+                  <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
+                    <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5,
+                      color: f.auto ? '#7c3aed' : M.tD, fontFamily: uff }}>{f.l}</div>
+                    <div style={{ fontSize: 22, fontWeight: 900, fontFamily: `${dff},monospace`,
+                      color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {dTab === 'fabric' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
+                {[
+                  { l: '\u2192 Main Fabric Code', v: row.mainFabric || '\u2014', mono: true },
+                  { l: '\u2190 Fabric Name (Auto)', v: row.fabricName || '\u2014', auto: true },
+                  { l: 'Colour Name(s)', v: row.colorCodes || '\u2014' },
+                  { l: 'Size Range', v: row.sizeRange || '\u2014' },
+                ].map(f => (
+                  <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
+                    <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5,
+                      color: f.auto ? '#7c3aed' : M.tD, fontFamily: uff }}>{f.l}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700,
+                      fontFamily: f.mono ? `${dff},monospace` : 'inherit',
+                      color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ═════════════════════════════════════════════════════════
+  // RENDER
+  // ═════════════════════════════════════════════════════════
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
 
-      {/* ═══ TOOLBAR ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px', background: M.hi, borderBottom: `1.5px solid ${M.div}`, flexShrink: 0, flexWrap: 'wrap' }}>
+      {/* ══ VIEWS BAR ══ */}
+      <div style={{
+        background: M.lo, borderBottom: `2px solid ${M.div}`,
+        display: 'flex', alignItems: 'center', gap: 4,
+        padding: '0 12px', minHeight: 40, overflowX: 'auto', flexShrink: 0,
+      }}>
+        <span style={{ fontSize: 8, fontWeight: 900, color: M.tD,
+          letterSpacing: 1, textTransform: 'uppercase', flexShrink: 0, marginRight: 4 }}>
+          VIEWS:
+        </span>
 
-        {/* Left: label + controls */}
-        <span style={{ fontSize: 9, fontWeight: 900, color: M.tD, letterSpacing: 0.5, fontFamily: uff, flexShrink: 0 }}>📊 ARTICLES</span>
-        <div style={{ width: 1, height: 16, background: M.div, flexShrink: 0 }} />
+        {/* System + custom views */}
+        {allViews.map(v => {
+          const isActive = activeViewId === v.id;
+          return (
+            <button key={v.id}
+              onClick={() => setActiveViewId(isActive ? 'sys_all' : v.id)}
+              title={v.desc ? `${v.name} \u2014 ${v.desc} \u00B7 ${v.cols.length} cols` : `${v.name} \u00B7 ${v.cols.length} cols`}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '5px 11px', borderRadius: 8, flexShrink: 0, cursor: 'pointer',
+                transition: 'all .15s', fontFamily: uff,
+                border: `1.5px solid ${isActive ? v.color : M.div}`,
+                background: isActive ? v.color + '18' : M.inBg,
+              }}>
+              <span style={{ fontSize: 11 }}>{v.icon}</span>
+              <span style={{ fontSize: 9.5, fontWeight: isActive ? 900 : 700,
+                color: isActive ? v.color : M.tB, whiteSpace: 'nowrap' }}>{v.name}</span>
+              {isActive ? (
+                <>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: v.color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 6,
+                    background: v.color + '22', color: v.color, fontWeight: 900 }}>
+                    {visCols.length}c
+                  </span>
+                </>
+              ) : v.isSystem ? (
+                <span style={{ fontSize: 7, padding: '0 3px', borderRadius: 3,
+                  background: M.mid, color: '#b0bac5', fontWeight: 900 }}>SYS</span>
+              ) : null}
+            </button>
+          );
+        })}
 
-        {/* Filter + Sort + Columns */}
-        <button onClick={() => { setShowAdvFilters(v => !v); setShowAdvSorts(false); }}
-          style={{ ...ctrlBtn(showAdvFilters || activeAdvFilterCount > 0), flexShrink: 0 }}>
-          ＋ Filter{activeAdvFilterCount > 0 ? ` (${activeAdvFilterCount})` : ''}
+        <div style={{ width: 1, height: 22, background: M.div, flexShrink: 0, margin: '0 3px' }} />
+
+        {/* Filter button */}
+        <button onClick={() => setShowFilter(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${hasFilter ? A.a : M.div}`,
+          background: hasFilter ? A.al : M.inBg,
+          color: hasFilter ? A.a : M.tB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s',
+        }}>
+          {'\u229E'} Filter
+          {hasFilter && (
+            <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 8,
+              background: A.a, color: '#fff', fontWeight: 900 }}>ON</span>
+          )}
         </button>
-        <button onClick={() => { setShowAdvSorts(v => !v); setShowAdvFilters(false); }}
-          style={{ ...ctrlBtn(showAdvSorts || isAdvSortActive), flexShrink: 0 }}>
-          ↑ Sort{isAdvSortActive ? ` (${advSorts.length})` : ''}
+
+        {/* Sort button */}
+        <button onClick={() => setShowSort(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${hasSort ? M.tA : M.div}`,
+          background: hasSort ? M.tA : M.inBg,
+          color: hasSort ? '#fff' : M.tB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s',
+        }}>
+          {'\u2195'} Sort
+          {hasSort && (
+            <span style={{ fontSize: 7.5, padding: '1px 5px', borderRadius: 8,
+              background: 'rgba(255,255,255,.25)', color: '#fff', fontWeight: 900 }}>{sorts.length}</span>
+          )}
         </button>
-        {view === 'table' && (
-          <button onClick={() => setColMgr(p => !p)} style={{
-            padding: '3px 10px',
-            border: `1px solid ${colMgr ? '#7c3aed' : M.div}`,
-            borderRadius: 5,
-            background: colMgr ? '#7c3aed12' : 'transparent',
-            color: colMgr ? '#7c3aed' : M.tB,
-            fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff, flexShrink: 0,
-          }}>⊟ Columns ({visCols.length})</button>
-        )}
-        {(activeAdvFilterCount > 0 || isAdvSortActive) && (
-          <button onClick={() => { setAdvFilters([]); setAdvSorts([]); setShowAdvFilters(false); setShowAdvSorts(false); }}
-            style={{ ...ctrlBtn(false), color: '#dc2626', borderColor: '#dc262640', fontSize: 9, flexShrink: 0 }}>✕ Reset</button>
-        )}
 
         <div style={{ flex: 1 }} />
 
+        {/* + New View */}
+        <button onClick={() => { setEditingView(null); setShowNewView(true); }} style={{
+          display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px dashed ${A.a}`,
+          background: A.al, color: A.a,
+          fontSize: 9.5, fontWeight: 900, transition: 'all .15s',
+        }}>
+          + New View
+        </button>
+
+        {/* Manage */}
+        <button onClick={() => setShowManage(true)} style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: '5px 12px',
+          borderRadius: 8, cursor: 'pointer', flexShrink: 0, fontFamily: uff,
+          border: `1.5px solid ${M.div}`, background: M.inBg, color: M.tB,
+          fontSize: 9.5, fontWeight: 800, transition: 'all .15s',
+        }}>
+          Manage
+        </button>
+      </div>
+
+      {/* ══ TOOLBAR ══ */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8,
+        padding: '7px 12px', background: M.hi,
+        borderBottom: `1.5px solid ${M.div}`, flexShrink: 0 }}>
+
         {/* Search */}
-        <div style={{ position: 'relative', flexShrink: 0 }}>
-          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 13, color: M.tD, pointerEvents: 'none' }}>⌕</span>
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 13, color: M.tC, pointerEvents: 'none' }}>{'\u2315'}</span>
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder={`Search ${data.length} articles…`}
-            style={{ padding: '5px 28px', border: `1.5px solid ${M.div}`, borderRadius: 7, fontSize: 11, outline: 'none', width: 200, background: M.inBg, fontFamily: uff, color: M.tA, transition: 'border-color .15s' }}
+            placeholder={`Search ${data.length} articles\u2026`}
+            style={{ padding: '6px 28px', border: `1.5px solid ${M.div}`,
+              borderRadius: 7, fontSize: 11, outline: 'none', width: 210,
+              background: M.inBg, fontFamily: uff, color: M.tA }}
             onFocus={e => e.target.style.borderColor = A.a}
             onBlur={e => e.target.style.borderColor = M.div} />
           {search && (
-            <button onClick={() => setSearch('')} style={{
-              position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-              border: 'none', background: 'none', color: M.tD, cursor: 'pointer', fontSize: 13,
-            }}>×</button>
+            <button onClick={() => setSearch('')} style={{ position: 'absolute', right: 8,
+              top: '50%', transform: 'translateY(-50%)',
+              border: 'none', background: 'none', color: M.tC, cursor: 'pointer', fontSize: 13 }}>{'\u00D7'}</button>
           )}
         </div>
 
-        {/* Quick filters */}
-        <select value={filterDiv} onChange={e => setFilterDiv(e.target.value)}
-          style={{ padding: '4px 7px', border: `1px solid ${filterDiv !== 'ALL' ? A.a : M.div}`, borderRadius: 6, background: M.inBg, color: filterDiv !== 'ALL' ? A.a : M.tB, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
-          <option value="ALL">All Divisions</option>
-          {divisions.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding: '4px 7px', border: `1px solid ${filterStatus !== 'ALL' ? A.a : M.div}`, borderRadius: 6, background: M.inBg, color: filterStatus !== 'ALL' ? A.a : M.tB, fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: uff, outline: 'none', flexShrink: 0 }}>
-          <option value="ALL">All Status</option>
-          {statusOpts.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
+        {/* Column manager toggle */}
+        <button onClick={() => setColMgr(p => !p)} style={{ padding: '5px 10px',
+          border: `1.5px solid ${colMgr ? '#6c3fc5' : M.div}`,
+          borderRadius: 6, background: colMgr ? '#f0eeff' : M.inBg,
+          color: colMgr ? '#6c3fc5' : M.tB,
+          fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>
+          {'\u229E'} Columns ({visCols.length})
+        </button>
 
-        {/* Record count */}
-        <span style={{ fontSize: 9, color: M.tD, fontWeight: 700, fontFamily: uff }}>
-          {sorted.length}<span style={{ opacity: 0.5 }}>/{data.length}</span>
+        <div style={{ flex: 1 }} />
+
+        <span style={{ fontSize: 9, color: M.tC, fontWeight: 700, fontFamily: uff }}>
+          {sorted.length}<span style={{ color: M.tD }}>/{data.length}</span> records
         </span>
 
-        {/* View switcher */}
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1.5px solid ${M.div}` }}>
-          {[
-            { id: 'table', icon: '⊟', label: 'Table' },
-            { id: 'split', icon: '◫', label: 'Split' },
-          ].map((v, i) => (
-            <button key={v.id} onClick={() => { setView(v.id); if (v.id === 'split' && !selRow && sorted.length) setSelRow(sorted[0]); }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '4px 11px', border: 'none', cursor: 'pointer',
-                background: view === v.id ? M.thd : M.inBg,
-                color: view === v.id ? '#fff' : M.tC,
-                fontSize: 10, fontWeight: 900, transition: 'all .15s',
-                borderRight: i === 0 ? `1px solid ${M.div}` : 'none',
-              }}>
+        {/* Table / Split switcher */}
+        <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden',
+          border: `1.5px solid ${M.div}`, flexShrink: 0 }}>
+          {[{ id: 'table', icon: '\u229E', label: 'Table' }, { id: 'split', icon: '\u25EB', label: 'Split' }].map(v => (
+            <button key={v.id} onClick={() => setViewMode(v.id)} style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '5px 11px', border: 'none', cursor: 'pointer',
+              background: viewMode === v.id ? M.tA : M.inBg,
+              color: viewMode === v.id ? '#fff' : M.tB,
+              fontSize: 10, fontWeight: 900, transition: 'all .15s',
+              borderRight: v.id === 'table' ? `1px solid ${M.div}` : 'none',
+              fontFamily: uff,
+            }}>
               <span style={{ fontSize: 12 }}>{v.icon}</span>{v.label}
             </button>
           ))}
         </div>
 
-        {/* Add New */}
-        <button onClick={() => showToast('Use "➕ Create Article" tab to add a new article', 'info')}
-          style={{ padding: '5px 13px', background: CC_RED, border: 'none', borderRadius: 6, fontSize: 10, fontWeight: 900, color: '#fff', cursor: 'pointer', fontFamily: uff, flexShrink: 0 }}>
-          + Add New
+        {/* Export */}
+        <button onClick={() => setShowExport(p => !p)} style={{
+          display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+          border: `1.5px solid ${M.div}`, borderRadius: 7,
+          background: M.inBg, color: M.tB,
+          fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff,
+          transition: 'all .15s' }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = '#15803d'; e.currentTarget.style.color = '#15803d'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = M.div; e.currentTarget.style.color = M.tB; }}>
+          {'\u2B07'} Export
         </button>
       </div>
 
-      {/* ═══ COLUMN MANAGER ═══ */}
-      {colMgr && view === 'table' && (
-        <div style={{ padding: '7px 12px', borderBottom: `1px solid ${M.div}`, background: M.mid, display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0 }}>
+      {/* Column manager strip */}
+      {colMgr && (
+        <div style={{ padding: '7px 12px', borderBottom: `1px solid ${M.div}`,
+          background: M.mid, display: 'flex', flexWrap: 'wrap', gap: 4, flexShrink: 0 }}>
           {AM_FIELDS.filter(c => !c.special).map(c => {
-            const off = hidden.includes(c.key);
+            const off = manualHidden.includes(c.key) || !activeView.cols.includes(c.key);
+            const isViewHidden = !activeView.cols.includes(c.key);
             return (
               <button key={c.key}
-                onClick={() => setHidden(p => off ? p.filter(x => x !== c.key) : [...p, c.key])}
+                onClick={() => {
+                  if (isViewHidden) return; // can't toggle system-view hidden cols
+                  setManualHidden(p => off ? p.filter(x => x !== c.key) : [...p, c.key]);
+                }}
                 style={{
-                  padding: '2px 9px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: 'pointer',
-                  border: `1.5px solid ${off ? M.div : '#7c3aed55'}`,
-                  background: off ? M.inBg : '#7c3aed12',
-                  color: off ? M.tD : '#7c3aed',
+                  padding: '2px 9px', borderRadius: 10, fontSize: 9, fontWeight: 700, cursor: isViewHidden ? 'not-allowed' : 'pointer',
+                  border: `1.5px solid ${off ? M.div : '#6c3fc555'}`,
+                  background: off ? M.inBg : '#f0eeff',
+                  color: off ? M.tD : '#6c3fc5',
                   textDecoration: off ? 'line-through' : 'none', fontFamily: uff,
+                  opacity: isViewHidden ? 0.4 : 1,
                 }}>{c.label}</button>
             );
           })}
-        </div>
-      )}
-
-      {/* ═══ ADVANCED FILTER PANEL ═══ */}
-      {showAdvFilters && (
-        <div style={{ padding: '8px 14px 10px', borderBottom: `1px solid ${M.div}`, background: M.mid, flexShrink: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {advFilters.map((fil, fi) => {
-              const fMeta = CARD_FIELDS.find(f => f.key === fil.field);
-              const ops   = FILTER_OPS[fMeta?.type || 'cat'];
-              const vals  = fieldVals[fil.field];
-              const isAct = fil.value !== '';
-              return (
-                <div key={fil.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, color: M.tD, fontFamily: uff, minWidth: 34, textAlign: 'right', fontWeight: 600 }}>{fi === 0 ? 'Where' : 'And'}</span>
-                  <select value={fil.field} onChange={e => updateAdvFilter(fil.id, { field: e.target.value })}
-                    style={{ ...ctrlSel, fontWeight: 700, color: A.a, borderColor: `${A.a}70`, background: A.al }}>
-                    {CARD_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                  </select>
-                  <select value={fil.op} onChange={e => updateAdvFilter(fil.id, { op: e.target.value })} style={ctrlSel}>
-                    {ops.map(op => <option key={op} value={op}>{op}</option>)}
-                  </select>
-                  {fMeta?.type === 'cat' && vals ? (
-                    <select value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
-                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? `${A.a}70` : M.div, color: isAct ? A.a : M.tA }}>
-                      <option value="">Select value…</option>
-                      {vals.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                  ) : (
-                    <input value={fil.value} onChange={e => updateAdvFilter(fil.id, { value: e.target.value })}
-                      placeholder={fMeta?.type === 'num' ? 'Enter number…' : 'Enter text…'}
-                      type={fMeta?.type === 'num' ? 'number' : 'text'}
-                      style={{ ...ctrlSel, minWidth: 110, fontWeight: 700, borderColor: isAct ? `${A.a}70` : M.div, color: isAct ? A.a : M.tA }} />
-                  )}
-                  <button onClick={() => removeAdvFilter(fil.id)}
-                    style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
-                </div>
-              );
-            })}
-            <button onClick={addAdvFilter}
-              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: A.a, fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: uff, padding: 0 }}>
-              ＋ Add filter
+          {manualHidden.length > 0 && (
+            <button onClick={() => setManualHidden([])} style={{ padding: '2px 9px',
+              borderRadius: 10, fontSize: 9, fontWeight: 800, cursor: 'pointer',
+              border: `1px solid ${A.a}`, background: A.al, color: A.a }}>
+              Show all
             </button>
-          </div>
+          )}
         </div>
       )}
 
-      {/* ═══ ADVANCED SORT PANEL ═══ */}
-      {showAdvSorts && (
-        <div style={{ padding: '8px 14px 10px', borderBottom: `1px solid ${M.div}`, background: M.mid, flexShrink: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {advSorts.map((srt, si) => {
-              const fMeta   = CARD_FIELDS.find(f => f.key === srt.field);
-              const needVal = srt.mode === 'val_first' || srt.mode === 'val_last';
-              const catVals = needVal && fMeta?.type === 'cat' ? fieldVals[srt.field] : null;
-              return (
-                <div key={srt.id} style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 9, color: M.tD, fontFamily: uff, minWidth: 34, textAlign: 'right', fontWeight: 600 }}>{si === 0 ? 'Sort' : 'Then'}</span>
-                  <select value={srt.field} onChange={e => updateAdvSort(srt.id, { field: e.target.value, value: '' })}
-                    style={{ ...ctrlSel, fontWeight: 700, color: '#7c3aed', borderColor: '#7c3aed70', background: '#7c3aed10' }}>
-                    {CARD_FIELDS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                  </select>
-                  <select value={srt.mode} onChange={e => updateAdvSort(srt.id, { mode: e.target.value, value: '' })} style={ctrlSel}>
-                    {SORT_MODES.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                  </select>
-                  {needVal && (catVals ? (
-                    <select value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
-                      style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }}>
-                      <option value="">Pick value…</option>
-                      {catVals.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                  ) : (
-                    <input value={srt.value} onChange={e => updateAdvSort(srt.id, { value: e.target.value })}
-                      placeholder="Enter value…" style={{ ...ctrlSel, minWidth: 120, fontWeight: 700 }} />
-                  ))}
-                  {advSorts.length > 1 && (
-                    <button onClick={() => removeAdvSort(srt.id)}
-                      style={{ border: 'none', background: 'transparent', color: '#dc2626', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '0 3px', fontWeight: 900 }}>×</button>
-                  )}
-                </div>
-              );
-            })}
-            <button onClick={addAdvSort}
-              style={{ alignSelf: 'flex-start', marginLeft: 40, border: 'none', background: 'transparent', color: '#7c3aed', fontSize: 9, fontWeight: 700, cursor: 'pointer', fontFamily: uff, padding: 0 }}>
-              ＋ Add sort
-            </button>
-          </div>
+      {/* Active filter chips */}
+      {hasFilter && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+          padding: '5px 12px', borderBottom: `1px solid ${M.div}`,
+          background: M.hi, flexShrink: 0 }}>
+          <span style={{ fontSize: 8.5, fontWeight: 900, color: A.a }}>{'\u229E'} Active filters:</span>
+          {Object.entries(colFilters).filter(([, v]) => v && v !== 'all').map(([k, v]) => {
+            const col = AM_FIELDS.find(f => f.key === k);
+            return (
+              <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 8.5, padding: '2px 8px', borderRadius: 8,
+                background: A.a + '18', color: A.a, fontWeight: 700 }}>
+                <b>{col?.label}</b>: {v}
+                <button onClick={() => setColFilters(p => ({ ...p, [k]: 'all' }))} style={{
+                  border: 'none', background: 'none', color: A.a, cursor: 'pointer',
+                  fontSize: 12, lineHeight: 1, padding: 0 }}>{'\u00D7'}</button>
+              </span>
+            );
+          })}
+          <button onClick={() => setColFilters({})} style={{ padding: '2px 8px', border: 'none',
+            background: 'transparent', color: M.tD, fontSize: 8.5, cursor: 'pointer', fontWeight: 700 }}>
+            Clear all
+          </button>
         </div>
       )}
 
-      {/* ═══ MAIN CONTENT ═══ */}
-      <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-
-        {/* ──── TABLE VIEW ──── */}
-        {view === 'table' && (
-          <div style={{ flex: 1, overflow: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: visCols.reduce((a, c) => a + c.w, 0) + 76 }}>
-              <colgroup>
-                {visCols.map(c => <col key={c.key} style={{ width: c.w }} />)}
-                <col style={{ width: 76 }} />
-              </colgroup>
-              <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
-                <tr style={{ background: M.thd }}>
-                  {visCols.map(c => (
-                    <th key={c.key} onClick={() => handleSort(c.key)}
-                      style={{
-                        padding: '8px 9px', textAlign: 'left',
-                        fontSize: 8.5, fontWeight: 900,
-                        color: c.auto ? '#a78bfa' : sortCol === c.key ? A.a : M.tD,
-                        borderRight: `1px solid ${M.div}40`,
-                        whiteSpace: 'nowrap', letterSpacing: 0.4, textTransform: 'uppercase',
-                        cursor: c.sortable ? 'pointer' : 'default', userSelect: 'none', fontFamily: uff,
-                      }}>
-                      {c.label}
-                      {c.sortable && sortCol === c.key && (
-                        <span style={{ marginLeft: 3, color: A.a }}>{sortDir === 'asc' ? '↑' : '↓'}</span>
-                      )}
-                    </th>
-                  ))}
-                  <th style={{ padding: '8px 9px', fontSize: 8.5, fontWeight: 900, color: M.tD, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4, fontFamily: uff }}>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((row, ri) => (
-                  <tr key={row.code}
-                    style={{
-                      background: ri % 2 === 0 ? M.tev : M.tod,
-                      borderBottom: `1px solid ${M.div}30`,
-                      cursor: 'pointer', transition: 'background .08s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = M.hov; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? M.tev : M.tod; }}
-                    onClick={() => onEdit(row)}>
-                    {visCols.map(c => (
-                      <td key={c.key} style={{
-                        padding: c.special ? '4px 6px' : '5px 9px',
-                        overflow: 'hidden', verticalAlign: 'middle',
-                        background: c.auto ? '#7c3aed06' : 'transparent',
-                        borderRight: `1px solid ${M.div}18`,
-                      }}>
-                        {renderCell(c, row)}
-                      </td>
-                    ))}
-                    <td style={{ padding: '4px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
-                      <button onClick={e => { e.stopPropagation(); onEdit(row); }} style={{
-                        padding: '3px 11px', border: `1px solid ${A.a}`,
-                        borderRadius: 5, background: A.al, color: A.a,
-                        fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff,
-                      }}>✎ Edit</button>
-                    </td>
-                  </tr>
-                ))}
-                {sorted.length === 0 && (
-                  <tr><td colSpan={visCols.length + 1} style={{
-                    padding: 48, textAlign: 'center', color: M.tD, fontSize: 12, fontFamily: uff,
-                  }}>No articles match "{search}"</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ──── SPLIT VIEW ──── */}
-        {view === 'split' && (
-          <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-
-            {/* Left list */}
-            <div style={{ width: 290, flexShrink: 0, display: 'flex', flexDirection: 'column', borderRight: `2px solid ${M.div}`, background: M.hi }}>
-              <div style={{ flex: 1, overflowY: 'auto' }}>
-                {sorted.map(r => {
-                  const on = sel?.code === r.code;
-                  return (
-                    <div key={r.code} onClick={() => { setSelRow(r); setDetailTab('details'); }}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
-                        borderBottom: `1px solid ${M.div}30`,
-                        background: on ? A.al : M.hi,
-                        borderLeft: `3px solid ${on ? A.a : 'transparent'}`,
-                        cursor: 'pointer', transition: 'background .1s',
-                      }}
-                      onMouseEnter={e => { if (!on) e.currentTarget.style.background = M.hov; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = on ? A.al : M.hi; }}>
-                      <ArtThumbnail art={r} size="sm" color={divColor(r.l1Division)} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-                          <span style={{ fontSize: 10, fontWeight: 900, color: A.a, fontFamily: dff }}>{r.code}</span>
-                          <StatusBadge status={r.status} />
-                        </div>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: M.tA, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: uff }}>{r.desc}</div>
-                        <div style={{ fontSize: 8.5, color: M.tD, marginTop: 1, fontFamily: uff }}>
-                          {r.l2Category}{r.gender ? ` · ${r.gender}` : ''}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {sorted.length === 0 && (
-                  <div style={{ padding: 32, textAlign: 'center', color: M.tD, fontSize: 11, fontFamily: uff }}>No results</div>
-                )}
+      {/* ══ CONTENT: TABLE or SPLIT ══ */}
+      {viewMode === 'split' ? (
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+          {/* ── LEFT LIST ── */}
+          <div style={{ width: 285, flexShrink: 0, display: 'flex', flexDirection: 'column',
+            borderRight: `2px solid ${M.div}`, background: M.hi }}>
+            {/* list search */}
+            <div style={{ padding: '7px 10px', borderBottom: `1px solid ${M.div}`, flexShrink: 0 }}>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)',
+                  fontSize: 12, color: M.tC, pointerEvents: 'none' }}>{'\u2315'}</span>
+                <input value={splitSrch} onChange={e => setSplitSrch(e.target.value)}
+                  placeholder="Search list\u2026"
+                  style={{ width: '100%', padding: '5px 24px', border: `1.5px solid ${M.div}`,
+                    borderRadius: 6, fontSize: 10.5, outline: 'none',
+                    background: M.inBg, fontFamily: uff, color: M.tA }} />
+                {splitSrch && <button onClick={() => setSplitSrch('')} style={{ position: 'absolute', right: 7,
+                  top: '50%', transform: 'translateY(-50%)',
+                  border: 'none', background: 'none', color: M.tC, cursor: 'pointer', fontSize: 12 }}>{'\u00D7'}</button>}
               </div>
-              <div style={{ padding: '5px 10px', borderTop: `1px solid ${M.div}`, background: M.mid, fontSize: 9, color: M.tD, fontFamily: uff }}>{sorted.length} articles</div>
             </div>
 
-            {/* Right detail */}
-            {sel ? (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: M.lo || M.mid }}>
-
-                {/* Hero */}
-                <div style={{ display: 'flex', background: M.hi, borderBottom: `2px solid ${M.div}`, flexShrink: 0 }}>
-                  {/* Main image */}
-                  <div style={{ width: 180, height: 180, flexShrink: 0, overflow: 'hidden' }}>
-                    <ArtThumbnail art={sel} size="lg" color={divColor(sel.l1Division)} cover />
+            <div style={{ flex: 1, overflowY: 'auto' }}>
+              {splitFiltered.map(r => {
+                const on = sel?.code === r.code;
+                return (
+                  <div key={r.code} onClick={() => { setSelRow(r); setSplitTab('details'); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '8px 10px',
+                      borderBottom: `1px solid ${M.div}30`,
+                      background: on ? A.al : M.hi,
+                      borderLeft: `3px solid ${on ? A.a : 'transparent'}`,
+                      cursor: 'pointer', transition: 'background .1s' }}
+                    onMouseEnter={e => { if (!on) e.currentTarget.style.background = M.hov; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = on ? A.al : M.hi; }}>
+                    <ArtThumbnail art={r} size="sm" color={divColor(r.l1Division)} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                        <span style={{ fontSize: 10, fontWeight: 900, color: A.a, fontFamily: `${dff},monospace` }}>{r.code}</span>
+                        <StatusBadge status={r.status} />
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: M.tA, lineHeight: 1.3,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: uff }}>{r.desc}</div>
+                      <div style={{ fontSize: 8.5, color: M.tD, marginTop: 1, fontFamily: uff }}>
+                        {r.l2Category}{r.gender ? ` \u00B7 ${r.gender}` : ''}
+                      </div>
+                    </div>
                   </div>
-                  {/* Header info */}
-                  <div style={{ flex: 1, padding: '16px 18px', minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-                      <span style={{ fontSize: 22, fontWeight: 900, color: A.a, fontFamily: dff, lineHeight: 1 }}>{sel.code}</span>
-                      <StatusBadge status={sel.status} />
-                    </div>
-                    {sel.shortName && (
-                      <div style={{ fontSize: 10, color: M.tD, marginBottom: 6, fontFamily: uff }}>"{sel.shortName}"</div>
-                    )}
-                    <div style={{ fontSize: 14, fontWeight: 800, color: M.tA, lineHeight: 1.4, marginBottom: 10, fontFamily: uff }}>{sel.desc}</div>
-                    {/* Attribute chips */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
-                      {[sel.gender, sel.l2Category, sel.l3Style, sel.fitType, sel.neckline, sel.sleeveType].filter(Boolean).map((v, i) => (
-                        <span key={i} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8, background: M.mid, color: M.tB, fontWeight: 700, fontFamily: uff }}>{v}</span>
-                      ))}
-                      {sel.season && String(sel.season).split(',').map(s => (
-                        <span key={s} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8, background: `${A.a}14`, color: A.a, fontWeight: 700, fontFamily: uff }}>{s.trim()}</span>
-                      ))}
-                    </div>
-                    {sel.buyerStyle && (
-                      <div style={{ fontSize: 9.5, color: M.tD, fontFamily: uff }}>Buyer Style: <b style={{ color: M.tB }}>{sel.buyerStyle}</b></div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Detail tabs */}
-                <div style={{ background: M.hi, borderBottom: `1px solid ${M.div}`, display: 'flex', padding: '0 16px', flexShrink: 0, alignItems: 'center' }}>
-                  {[
-                    { id: 'details', label: '📋 Item Details' },
-                    { id: 'pricing', label: '₹ Pricing & Tax' },
-                    { id: 'fabric',  label: '🧵 Fabric' },
-                  ].map(t => (
-                    <button key={t.id} onClick={() => setDetailTab(t.id)} style={{
-                      padding: '9px 14px', border: 'none', background: 'transparent',
-                      borderBottom: `2.5px solid ${detailTab === t.id ? A.a : 'transparent'}`,
-                      fontSize: 10.5, fontWeight: detailTab === t.id ? 900 : 700,
-                      color: detailTab === t.id ? A.a : M.tC,
-                      cursor: 'pointer', transition: 'all .15s', fontFamily: uff,
-                    }}>{t.label}</button>
-                  ))}
-                  <div style={{ flex: 1 }} />
-                  <button onClick={() => onEdit(sel)} style={{
-                    padding: '5px 16px', border: `1.5px solid ${A.a}`, borderRadius: 6,
-                    background: A.al, color: A.a,
-                    fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff,
-                  }}>✎ Edit Record</button>
-                </div>
-
-                {/* Tab content */}
-                <div style={{ padding: '14px 18px' }}>
-
-                  {detailTab === 'details' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 14px' }}>
-                      {[
-                        { l: 'L1 Division', v: sel.l1Division },
-                        { l: 'L2 Product Category', v: sel.l2Category },
-                        { l: 'L3 Style', v: sel.l3Style },
-                        { l: 'Gender', v: sel.gender },
-                        { l: 'Fit Type', v: sel.fitType },
-                        { l: 'Neckline', v: sel.neckline },
-                        { l: 'Sleeve Type', v: sel.sleeveType },
-                        { l: 'Size Range', v: sel.sizeRange },
-                        { l: '⟷ Tags', v: sel.tags, wide: true },
-                        { l: 'Remarks', v: sel.remarks, wide: true },
-                      ].map(f => (
-                        <div key={f.l} style={{
-                          gridColumn: f.wide ? '1/-1' : 'auto',
-                          background: M.hi, borderRadius: 7,
-                          padding: '8px 12px', border: `1px solid ${M.div}`,
-                        }}>
-                          <div style={{ fontSize: 8, fontWeight: 900, color: M.tD, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4, fontFamily: uff }}>{f.l}</div>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: f.v ? M.tA : M.tD, fontFamily: uff }}>{f.v || '—'}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {detailTab === 'pricing' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px 14px' }}>
-                      {[
-                        { l: 'W.S.P (Rs)', v: sel.wsp ? `₹${sel.wsp}` : '—', mono: true },
-                        { l: 'MRP (Rs)', v: sel.mrp ? `₹${sel.mrp}` : '—', mono: true },
-                        { l: '∑ Final Markup %', v: sel.markupPct ? `${sel.markupPct}%` : '—', mono: true, auto: true },
-                        { l: '∑ Final Markdown %', v: sel.markdownPct ? `${sel.markdownPct}%` : '—', mono: true, auto: true },
-                        { l: '→ HSN Code', v: sel.hsnCode || '—', mono: true },
-                        { l: '← GST % (Auto)', v: sel.gstPct ? `${sel.gstPct}%` : '—', mono: true, auto: true },
-                      ].map(f => (
-                        <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
-                          <div style={{ fontSize: 8, fontWeight: 900, color: f.auto ? '#7c3aed' : M.tD, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, fontFamily: uff }}>{f.l}</div>
-                          <div style={{ fontSize: 22, fontWeight: 900, fontFamily: "'IBM Plex Mono',monospace", color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {detailTab === 'fabric' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
-                      {[
-                        { l: '→ Main Fabric Code', v: sel.mainFabric || '—', mono: true },
-                        { l: '← Fabric Name (Auto)', v: sel.fabricName || '—', auto: true },
-                        { l: 'Colour Name(s)', v: sel.colorCodes || '—' },
-                        { l: 'Size Range', v: sel.sizeRange || '—' },
-                      ].map(f => (
-                        <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
-                          <div style={{ fontSize: 8, fontWeight: 900, color: f.auto ? '#7c3aed' : M.tD, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 5, fontFamily: uff }}>{f.l}</div>
-                          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: f.mono ? "'IBM Plex Mono',monospace" : 'inherit', color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                </div>
-              </div>
-            ) : (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: M.tD, gap: 8 }}>
-                <div style={{ fontSize: 32 }}>👕</div>
-                <div style={{ fontSize: 13, fontFamily: uff }}>Select an article to view details</div>
-              </div>
-            )}
+                );
+              })}
+              {splitFiltered.length === 0 && (
+                <div style={{ padding: 32, textAlign: 'center', color: M.tC, fontSize: 11 }}>No results</div>
+              )}
+            </div>
+            <div style={{ padding: '5px 10px', borderTop: `1px solid ${M.div}`,
+              background: M.mid, fontSize: 9, color: M.tD, fontFamily: uff }}>{splitFiltered.length} articles</div>
           </div>
-        )}
-      </div>
 
-      {/* ═══ STATUS BAR ═══ */}
-      <div style={{ padding: '4px 12px', borderTop: `1px solid ${M.div}`, background: M.mid, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+          {/* ── RIGHT DETAIL ── */}
+          {sel ? (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto', background: M.lo }}>
+              {/* Hero */}
+              <div style={{ display: 'flex', background: M.hi, borderBottom: `2px solid ${M.div}`, flexShrink: 0 }}>
+                <div style={{ width: 210, height: 210, flexShrink: 0, overflow: 'hidden' }}>
+                  <ArtThumbnail art={sel} size="lg" color={divColor(sel.l1Division)} cover />
+                </div>
+                <div style={{ flex: 1, padding: '18px 20px', minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5 }}>
+                    <span style={{ fontSize: 24, fontWeight: 900, color: A.a, fontFamily: `${dff},monospace` }}>{sel.code}</span>
+                    <StatusBadge status={sel.status} />
+                  </div>
+                  {sel.shortName && <div style={{ fontSize: 10, color: M.tC, marginBottom: 5, fontFamily: uff }}>"{sel.shortName}"</div>}
+                  <div style={{ fontSize: 14, fontWeight: 800, color: M.tA, lineHeight: 1.4, marginBottom: 9, fontFamily: uff }}>{sel.desc}</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
+                    {[sel.gender, sel.l2Category, sel.l3Style, sel.fitType, sel.neckline, sel.sleeveType]
+                      .filter(Boolean).map((v, i) => (
+                      <span key={i} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8,
+                        background: M.mid, color: M.tB, fontWeight: 700, fontFamily: uff }}>{v}</span>
+                    ))}
+                    {sel.season && String(sel.season).split(',').map(s => (
+                      <span key={s} style={{ fontSize: 9, padding: '3px 8px', borderRadius: 8,
+                        background: `${A.a}14`, color: A.a, fontWeight: 700, fontFamily: uff }}>{s.trim()}</span>
+                    ))}
+                  </div>
+                  {sel.buyerStyle && <div style={{ fontSize: 9.5, color: M.tC, fontFamily: uff }}>
+                    Buyer Style: <b style={{ color: M.tB }}>{sel.buyerStyle}</b></div>}
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <div style={{ background: M.hi, borderBottom: `1px solid ${M.div}`,
+                display: 'flex', padding: '0 18px', flexShrink: 0, alignItems: 'center' }}>
+                {[{ id: 'details', l: '\uD83D\uDCCB Item Details' }, { id: 'pricing', l: '\u20B9 Pricing & Tax' }, { id: 'fabric', l: '\uD83E\uDDF5 Fabric' }].map(t => (
+                  <button key={t.id} onClick={() => setSplitTab(t.id)} style={{
+                    padding: '9px 14px', border: 'none', background: 'transparent',
+                    borderBottom: `2.5px solid ${splitTab === t.id ? A.a : 'transparent'}`,
+                    fontSize: 10.5, fontWeight: splitTab === t.id ? 900 : 700,
+                    color: splitTab === t.id ? A.a : M.tC, cursor: 'pointer',
+                    transition: 'all .15s', fontFamily: uff }}>{t.l}</button>
+                ))}
+                <div style={{ flex: 1 }} />
+                <button onClick={() => onEdit(sel)} style={{ padding: '5px 16px',
+                  border: `1.5px solid ${A.a}`, borderRadius: 6,
+                  background: A.al, color: A.a,
+                  fontSize: 10, fontWeight: 900, cursor: 'pointer', fontFamily: uff }}>{'\u270E'} Edit Record</button>
+              </div>
+
+              {/* Tab content */}
+              <div style={{ padding: '14px 18px' }}>
+                {splitTab === 'details' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 14px' }}>
+                    {[
+                      { l: 'L1 Division', v: sel.l1Division }, { l: 'L2 Product Category', v: sel.l2Category }, { l: 'L3 Style', v: sel.l3Style },
+                      { l: 'Gender', v: sel.gender }, { l: 'Fit Type', v: sel.fitType }, { l: 'Neckline', v: sel.neckline },
+                      { l: 'Sleeve Type', v: sel.sleeveType }, { l: 'Size Range', v: sel.sizeRange },
+                      { l: '\u27F7 Tags', v: sel.tags, wide: true }, { l: 'Remarks', v: sel.remarks, wide: true },
+                    ].map(f => (
+                      <div key={f.l} style={{ gridColumn: f.wide ? '1/-1' : 'auto',
+                        background: M.hi, borderRadius: 7, padding: '8px 12px',
+                        border: `1px solid ${M.div}` }}>
+                        <div style={{ fontSize: 8, fontWeight: 900, color: M.tD, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 4, fontFamily: uff }}>{f.l}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: f.v ? M.tA : M.tD, fontFamily: uff }}>{f.v || '\u2014'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {splitTab === 'pricing' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px 14px' }}>
+                    {[
+                      { l: 'W.S.P (Rs)', v: sel.wsp ? `\u20B9${sel.wsp}` : '\u2014', mono: true },
+                      { l: 'MRP (Rs)', v: sel.mrp ? `\u20B9${sel.mrp}` : '\u2014', mono: true },
+                      { l: '\u2211 Final Markup %', v: sel.markupPct ? `${sel.markupPct}%` : '\u2014', mono: true, auto: true },
+                      { l: '\u2211 Final Markdown %', v: sel.markdownPct ? `${sel.markdownPct}%` : '\u2014', mono: true, auto: true },
+                      { l: '\u2192 HSN Code', v: sel.hsnCode || '\u2014', mono: true },
+                      { l: '\u2190 GST % (Auto)', v: sel.gstPct ? `${sel.gstPct}%` : '\u2014', mono: true, auto: true },
+                    ].map(f => (
+                      <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
+                        <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5,
+                          color: f.auto ? '#7c3aed' : M.tD, fontFamily: uff }}>{f.l}</div>
+                        <div style={{ fontSize: 22, fontWeight: 900, fontFamily: `${dff},monospace`,
+                          color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {splitTab === 'fabric' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 14px' }}>
+                    {[
+                      { l: '\u2192 Main Fabric Code', v: sel.mainFabric || '\u2014', mono: true },
+                      { l: '\u2190 Fabric Name (Auto)', v: sel.fabricName || '\u2014', auto: true },
+                      { l: 'Colour Name(s)', v: sel.colorCodes || '\u2014' },
+                      { l: 'Size Range', v: sel.sizeRange || '\u2014' },
+                    ].map(f => (
+                      <div key={f.l} style={{ background: M.hi, borderRadius: 7, padding: '10px 14px', border: `1px solid ${M.div}` }}>
+                        <div style={{ fontSize: 8, fontWeight: 900, textTransform: 'uppercase', letterSpacing: .5, marginBottom: 5,
+                          color: f.auto ? '#7c3aed' : M.tD, fontFamily: uff }}>{f.l}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700,
+                          fontFamily: f.mono ? `${dff},monospace` : 'inherit',
+                          color: f.auto ? '#7c3aed' : M.tA }}>{f.v}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', color: M.tC, gap: 8 }}>
+              <div style={{ fontSize: 32 }}>{'\uD83D\uDC55'}</div>
+              <div style={{ fontSize: 13, fontFamily: uff }}>Select an article to view details</div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* ══ TABLE VIEW ══ */
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <table style={{ borderCollapse: 'collapse', tableLayout: 'fixed',
+            minWidth: visCols.reduce((a, c) => a + c.w, 0) + 76 }}>
+            <colgroup>
+              {visCols.map(c => <col key={c.key} style={{ width: c.w }} />)}
+              <col style={{ width: 76 }} />
+            </colgroup>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+              <tr style={{ background: M.thd }}>
+                {visCols.map(c => (
+                  <th key={c.key}
+                    onClick={() => handleColSort(c)}
+                    title={c.sortable ? 'Click to sort' : ''}
+                    style={{ padding: '8px 9px', textAlign: 'left',
+                      fontSize: 8.5, fontWeight: 900,
+                      color: c.auto ? '#a78bfa' : (primarySort?.key === c.key ? A.a : M.tD),
+                      borderRight: `1px solid ${M.div}40`,
+                      whiteSpace: 'nowrap', letterSpacing: .4, textTransform: 'uppercase',
+                      background: primarySort?.key === c.key ? (M.thd + 'ee') : c.auto ? '#1e1a3520' : 'transparent',
+                      cursor: c.sortable ? 'pointer' : 'default', userSelect: 'none', fontFamily: uff }}>
+                    {c.label}
+                    {c.sortable && primarySort?.key === c.key && (
+                      <span style={{ marginLeft: 3, color: A.a }}>
+                        {primarySort.dir === 'asc' ? '\u2191' : '\u2193'}
+                      </span>
+                    )}
+                    {sorts.findIndex(s => s.key === c.key) > 0 && (
+                      <span style={{ marginLeft: 2, fontSize: 7, color: '#64748b', verticalAlign: 'super' }}>
+                        {sorts.findIndex(s => s.key === c.key) + 1}
+                      </span>
+                    )}
+                  </th>
+                ))}
+                <th style={{ padding: '8px 9px', fontSize: 8.5, fontWeight: 900,
+                  color: M.tD, textAlign: 'center',
+                  textTransform: 'uppercase', letterSpacing: .4, fontFamily: uff }}>ACTION</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((row, ri) => (
+                <tr key={row.code}
+                  onClick={() => setDetailRow(row)}
+                  style={{ cursor: 'pointer', transition: 'background .08s',
+                    background: ri % 2 === 0 ? M.tev : M.tod,
+                    borderBottom: `1px solid ${M.div}30` }}
+                  onMouseEnter={e => { e.currentTarget.style.background = M.hov; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = ri % 2 === 0 ? M.tev : M.tod; }}>
+                  {visCols.map(c => (
+                    <td key={c.key} style={{ padding: c.special ? '5px 8px' : '4px 9px',
+                      overflow: 'hidden', verticalAlign: 'middle',
+                      background: c.auto ? '#7c3aed06' : 'transparent',
+                      borderRight: `1px solid ${M.div}18` }}>
+                      {renderCell(c, row)}
+                    </td>
+                  ))}
+                  <td style={{ padding: '4px 8px', textAlign: 'center', verticalAlign: 'middle' }}>
+                    <button onClick={e => { e.stopPropagation(); onEdit(row); }} style={{
+                      padding: '3px 11px', border: `1px solid ${A.a}`,
+                      borderRadius: 5, background: A.al, color: A.a,
+                      fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>{'\u270E'} Edit</button>
+                  </td>
+                </tr>
+              ))}
+              {sorted.length === 0 && (
+                <tr><td colSpan={visCols.length + 1} style={{ padding: 48,
+                  textAlign: 'center', color: M.tC, fontSize: 12, fontFamily: uff }}>
+                  No articles match your search or filters.
+                  {(search || hasFilter) && (
+                    <button onClick={() => { setSearch(''); setColFilters({}); }} style={{
+                      marginLeft: 10, padding: '4px 12px',
+                      border: `1px solid ${A.a}`, borderRadius: 6,
+                      background: A.al, color: A.a,
+                      fontSize: 10, fontWeight: 800, cursor: 'pointer' }}>Clear all</button>
+                  )}
+                </td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ══ STATUS BAR ══ */}
+      <div style={{ padding: '4px 12px', borderTop: `1px solid ${M.div}`,
+        background: M.mid, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
         <span style={{ fontSize: 9, color: M.tD, fontFamily: uff }}>
-          {sorted.length} records{view === 'table' ? ` · ${visCols.length} cols` : ''} · sorted by <b style={{ color: M.tB }}>{sortCol}</b> {sortDir === 'asc' ? '↑' : '↓'}
+          {sorted.length} records {'\u00B7'} {visCols.length} cols
+          {primarySort && <> {'\u00B7'} sorted by <b style={{ color: M.tB }}>{AM_FIELDS.find(c => c.key === primarySort.key)?.label}</b> {primarySort.dir === 'asc' ? '\u2191' : '\u2193'}</>}
+          {sorts.length > 1 && <span style={{ color: M.tC }}> +{sorts.length - 1} more</span>}
         </span>
+        {/* Active view chip */}
+        {activeViewId !== 'sys_all' && (
+          <span style={{ fontSize: 8.5, padding: '2px 8px', borderRadius: 8,
+            background: activeView.color + '18', color: activeView.color, fontWeight: 800 }}>
+            {activeView.icon} {activeView.name}
+          </span>
+        )}
+        {hasFilter && <span style={{ fontSize: 8.5, color: A.a, fontWeight: 800 }}>{'\u229E'} Filtered</span>}
         <div style={{ flex: 1 }} />
         {[
           { s: 'Active', c: '#22c55e' },
@@ -1415,21 +2162,49 @@ function AM_RecordsView({ data, onEdit, showToast, M, A, uff, dff, fz = 13, divi
         })}
       </div>
 
+      {/* ══ MODALS & PANELS ══ */}
+      {detailRow && (
+        <DetailModal row={detailRow} onClose={() => setDetailRow(null)} />
+      )}
+      {showNewView && (
+        <NewViewModal existingNames={existingNames} editView={editingView}
+          onSave={handleSaveView}
+          onClose={() => { setShowNewView(false); setEditingView(null); }} />
+      )}
+      {showManage && (
+        <ManagePanel onClose={() => setShowManage(false)} />
+      )}
+      {showFilter && (
+        <FilterPanel onClose={() => setShowFilter(false)} />
+      )}
+      {showSort && (
+        <SortPanel onClose={() => setShowSort(false)} />
+      )}
+      {showExport && (
+        <ExportMenu onClose={() => setShowExport(false)} />
+      )}
+
       {/* ═══ IMAGE LIGHTBOX ═══ */}
       {lightbox && (
         <div onClick={() => setLightbox(null)} style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}>
           <div onClick={e => e.stopPropagation()} style={{ position: 'relative', maxWidth: '85vw', maxHeight: '85vh', background: M.hi, borderRadius: 12, overflow: 'hidden', boxShadow: '0 12px 48px rgba(0,0,0,.4)' }}>
             <div style={{ padding: '8px 14px', borderBottom: `1px solid ${M.div}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: 11, fontWeight: 800, color: M.tA, fontFamily: uff }}>{lightbox.title}</span>
-              <button onClick={() => setLightbox(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, color: M.tC, cursor: 'pointer', lineHeight: 1 }}>✕</button>
+              <button onClick={() => setLightbox(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, color: M.tC, cursor: 'pointer', lineHeight: 1 }}>{'\u2715'}</button>
             </div>
             <img src={lightbox.src} alt="" referrerPolicy="no-referrer" style={{ display: 'block', maxWidth: '85vw', maxHeight: 'calc(85vh - 40px)', objectFit: 'contain' }} />
           </div>
         </div>
       )}
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes slideFromRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
+      `}</style>
     </div>
   );
 }
+
 
 
 // ════════════════════════════════════════════════════════════════
