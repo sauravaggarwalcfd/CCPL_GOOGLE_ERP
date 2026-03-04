@@ -58,6 +58,9 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // ── V3 entry: record to pre-fill when editing from Records/Layout tab ──
+  const [v3EditRecord, setV3EditRecord] = useState(null);
+
   // ── Views state ──
   const [viewsMap, setViewsMap] = useState({});
   const [activeViewId, setActiveViewId] = useState(null);
@@ -221,19 +224,14 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     setIsDirty(false);
   };
 
-  // ── Edit from Layout Panel → pre-load DataEntry form and switch tab ──
+  // ── Edit from Layout Panel or Records tab → pre-fill V3 form and switch to entry ──
   const handleEditFromLayout = (art) => {
     if (!canEdit) return;
-    const fd = {};
-    enriched.fields.forEach(f => {
-      if (art[f.key] !== undefined) fd[f.key] = art[f.key];
-    });
-    setFormData(fd);
-    setErrors({});
-    setIsDirty(false);
+    setV3EditRecord(art);
     setMainTab("entry");
     setEntryMode("form");
   };
+  const handleEditFromRecords = handleEditFromLayout;
 
   // ── Bulk save handler ──
   const handleBulkSave = async (rowsData) => {
@@ -436,7 +434,8 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
       {/* ── Tab Content ── */}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden", display: "flex", flexDirection: "column" }}>
         {isV3Entry && (
-          <ArticleDataEntryWrapper M={M} A={A} uff={uff} dff={dff} />
+          <ArticleDataEntryWrapper M={M} A={A} uff={uff} dff={dff}
+            editRecord={v3EditRecord} onEditClear={() => setV3EditRecord(null)} />
         )}
         {mainTab === "entry" && !isV3Entry && (
           <DataEntryTab
@@ -475,6 +474,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
             fileLabel={fileLabel}
             M={M} A={A} uff={uff} dff={dff} fz={fz} pyV={pyV}
             sheetCounts={sheetCounts}
+            onEditRecord={isArticleMaster ? handleEditFromRecords : undefined}
           />
         )}
         {mainTab === "layout" && isArticleMaster && (

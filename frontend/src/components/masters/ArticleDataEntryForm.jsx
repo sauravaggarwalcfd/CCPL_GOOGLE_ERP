@@ -1270,6 +1270,28 @@ export default function ArticleDataEntryForm({
         {/* inner column — grows to content, does NOT have a height constraint */}
         <div style={{ display:"flex", flexDirection:"column", gap:7, padding:"10px 12px", paddingBottom:24 }}>
 
+          {/* Edit mode banner */}
+          {editItem && (
+            <div style={{ display:"flex", alignItems:"center", gap:8,
+              padding:"7px 12px", borderRadius:7,
+              background:"#eff6ff", border:"1px solid #bfdbfe",
+              flexShrink:0 }}>
+              <span style={{ fontSize:12 }}>✏️</span>
+              <span style={{ fontSize:9.5, fontWeight:900, color:"#1d4ed8" }}>
+                Editing: {editItem.code}
+              </span>
+              <span style={{ fontSize:9, color:"#3b82f6", fontWeight:600 }}>
+                — {editItem.desc || editItem.shortName}
+              </span>
+              <button onClick={onClear} style={{ marginLeft:"auto",
+                fontSize:8.5, padding:"2px 10px", borderRadius:6,
+                border:"1px solid #93c5fd", background:"transparent",
+                color:"#1d4ed8", fontWeight:800, cursor:"pointer" }}>
+                ✕ Cancel Edit
+              </button>
+            </div>
+          )}
+
           {/* Required field warning bar */}
           {reqLeft.length > 0 && (
             <div style={{ display:"flex", alignItems:"center", gap:6,
@@ -1570,11 +1592,22 @@ const _GARBAGE = new Set([
   'Active/Inactive/Development','SS25/AW26 examples','S-M-L-XL-XXL etc.',
 ]);
 
-export function ArticleDataEntryWrapper({ M, A, uff, dff }) {
+export function ArticleDataEntryWrapper({ M, A, uff, dff, editRecord, onEditClear }) {
   const [form,       setForm]       = useState({ ..._EMPTY_FORM });
   const [formErrors, setFormErrors] = useState({});
   const [editItem,   setEditItem]   = useState(null);
   const [data,       setData]       = useState([]);
+
+  // When editRecord changes (Edit clicked from Records/Layout tab), pre-fill form
+  const prevEditRef = useRef(null);
+  useEffect(() => {
+    if (editRecord && editRecord !== prevEditRef.current) {
+      prevEditRef.current = editRecord;
+      setForm({ ..._EMPTY_FORM, ...editRecord });
+      setEditItem(editRecord);
+      setFormErrors({});
+    }
+  }, [editRecord]);
 
   // Dropdown state — seeded from local data, refreshed from GAS
   const [divisions,    setDivisions]    = useState(_INIT_DIVISIONS);
@@ -1658,15 +1691,23 @@ export function ArticleDataEntryWrapper({ M, A, uff, dff }) {
     if (!form.l2Category)   errs.l2Category = "Required";
     if (!form.desc?.trim()) errs.desc = "Required";
     if (Object.keys(errs).length) { setFormErrors(errs); throw new Error('validation'); }
-    await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, false);
-    setData(prev => [...prev, { ...form, code: form.code.trim() }]);
-  }, [form]);
+    const isUpdate = !!editItem;
+    await api.saveMasterRecord('article_master', 'FILE 1A — Items', { ...form, code: form.code.trim() }, isUpdate);
+    const saved = { ...form, code: form.code.trim() };
+    if (isUpdate) {
+      setData(prev => prev.map(r => r.code === saved.code ? saved : r));
+    } else {
+      setData(prev => [...prev, saved]);
+    }
+  }, [form, editItem]);
 
   const handleClear = useCallback(() => {
     setForm({ ..._EMPTY_FORM });
     setFormErrors({});
     setEditItem(null);
-  }, []);
+    prevEditRef.current = null;
+    onEditClear?.();
+  }, [onEditClear]);
 
   return (
     <ArticleDataEntryForm

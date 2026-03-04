@@ -343,13 +343,14 @@ function V2StatusBadge({ s }) {
 function V2ImgThumb({ src, size=44, radius=6, M }) {
   const [err, setErr] = useState(false);
   const dimColor = M?.textD || '#d1d8e0';
-  if (!src || err) return (
+  const thumbSrc = src ? driveThumbUrl(src) : null;
+  if (!thumbSrc || err) return (
     <div style={{ width:size, height:size, borderRadius:radius, flexShrink:0,
       background:'#f1f5f9', border:'1px solid #e4e8ef',
       display:'flex', alignItems:'center', justifyContent:'center',
       fontSize:size>40?16:11, color:dimColor }}>{'\uD83D\uDCF7'}</div>
   );
-  return <img src={src} onError={()=>setErr(true)} alt="" style={{
+  return <img src={thumbSrc} onError={()=>setErr(true)} alt="" style={{
     width:size, height:size, borderRadius:radius, objectFit:'cover',
     flexShrink:0, border:'1px solid #e4e8ef', display:'block' }}/>;
 }
@@ -360,7 +361,8 @@ function V2SketchThumb({ src, size=38, radius=5, M }) {
   const [pos, setPos] = useState({ x:0, y:0 });
   const dimColor = M?.textD || '#d1d8e0';
   const mutedColor = M?.textD || '#9aa5b4';
-  if (!src || err) return (
+  const thumbSrc = src ? driveThumbUrl(src) : null;
+  if (!thumbSrc || err) return (
     <div style={{ width:size, height:size, borderRadius:radius, flexShrink:0,
       background:'#fafafa', border:'1px dashed #d1d8e0',
       display:'flex', alignItems:'center', justifyContent:'center',
@@ -371,7 +373,7 @@ function V2SketchThumb({ src, size=38, radius=5, M }) {
       <div style={{ position:'relative', width:size, height:size, flexShrink:0 }}
         onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
         onMouseMove={e=>setPos({x:e.clientX,y:e.clientY})}>
-        <img src={src} onError={()=>setErr(true)} alt=""
+        <img src={thumbSrc} onError={()=>setErr(true)} alt=""
           style={{ width:size, height:size, borderRadius:radius, objectFit:'cover',
             border:'1px solid #e4e8ef', display:'block',
             filter:hov?'grayscale(0%)':'grayscale(65%)', transition:'filter .18s' }}/>
@@ -381,7 +383,7 @@ function V2SketchThumb({ src, size=38, radius=5, M }) {
           top:Math.min(pos.y-80, window.innerHeight-200), zIndex:9999,
           background:'#fff', border:'1px solid #e4e8ef', borderRadius:10,
           padding:6, boxShadow:'0 12px 40px rgba(0,0,0,.18)', pointerEvents:'none' }}>
-          <img src={src} alt="" style={{ width:160, height:160, objectFit:'cover', borderRadius:7, display:'block' }}/>
+          <img src={thumbSrc} alt="" style={{ width:160, height:160, objectFit:'cover', borderRadius:7, display:'block' }}/>
           <div style={{ fontSize:8.5, color:mutedColor, textAlign:'center', padding:'4px 0 2px', fontWeight:700 }}>
             {'\u270F'} Sketch / Tech Pack
           </div>
@@ -1289,7 +1291,7 @@ function SplitViewPanel({ sorted, visCols, schema, codeKey, onEdit, M, A, uff, f
  *
  * Props: { sheet, fileKey, fileLabel, M, A, uff, dff, fz, pyV, sheetCounts }
  */
-export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, fz = 13, pyV = 7, sheetCounts }) {
+export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, fz = 13, pyV = 7, sheetCounts, onEditRecord }) {
   // === DATA ===
   const [rows, setRows]           = useState([]);
   const [loading, setLoading]     = useState(true);
@@ -1860,7 +1862,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
         })}
         {/* Actions */}
         <td style={{ padding: `${pyV}px 6px`, textAlign: 'center', whiteSpace: 'nowrap' }}>
-          <button onClick={e => { e.stopPropagation(); openEdit(row); }} style={{ fontSize: 9, fontWeight: 700, color: A.a, background: A.al, border: 'none', borderRadius: 4, padding: '3px 7px', cursor: 'pointer', fontFamily: uff, marginRight: 3 }}>Edit</button>
+          <button onClick={e => { e.stopPropagation(); onEditRecord ? onEditRecord(row) : openEdit(row); }} style={{ fontSize: 9, fontWeight: 700, color: A.a, background: A.al, border: 'none', borderRadius: 4, padding: '3px 7px', cursor: 'pointer', fontFamily: uff, marginRight: 3 }}>Edit</button>
           <button onClick={e => { e.stopPropagation(); handleDelete(row); }} style={{ fontSize: 9, fontWeight: 700, color: M.textD, background: M.surfMid, border: 'none', borderRadius: 4, padding: '3px 6px', cursor: 'pointer', fontFamily: uff }}>{'\u2715'}</button>
         </td>
       </tr>
@@ -2191,7 +2193,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
                           ))}
                           <td style={{ padding: '4px 8px', textAlign: 'center', verticalAlign: 'middle',
                             background: ri % 2 === 0 ? M.surfHigh : M.surfMid }}>
-                            <button onClick={e => { e.stopPropagation(); openEdit(row); }} style={{
+                            <button onClick={e => { e.stopPropagation(); onEditRecord ? onEditRecord(row) : openEdit(row); }} style={{
                               padding: '3px 11px',
                               border: `1px solid ${A.a}`, borderRadius: 5,
                               background: A.al, color: A.a,
@@ -3072,7 +3074,7 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
       {v2DetailRow && (
         <V2DetailModal row={v2DetailRow} visCols={visCols} schema={schema}
           onClose={() => setV2DetailRow(null)}
-          onEdit={row => { setV2DetailRow(null); openEdit(row); }}
+          onEdit={row => { setV2DetailRow(null); onEditRecord ? onEditRecord(row) : openEdit(row); }}
           M={M} A={A} uff={uff} fz={fz} />
       )}
 
