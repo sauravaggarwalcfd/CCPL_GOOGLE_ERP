@@ -292,9 +292,10 @@ function Preview({ fd }) {
         )}
 
         {/* Attribute chips */}
-        {(fd.gender||fd.l2Category||fd.l3Style||fd.fitType||fd.season) && (
+        {(fd.l1Division||fd.gender||fd.l2Category||fd.l3Style||fd.fitType||fd.season) && (
           <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
             {[
+              fd.l1Division  && [fd.l1Division,"#1a1e2e","#f97316"],
               fd.gender      && [fd.gender,    "#1e3a5f","#7dd3fc"],
               fd.l2Category  && [fd.l2Category,"#14291a","#86efac"],
               fd.l3Style     && [fd.l3Style,   "#251c35","#c4b5fd"],
