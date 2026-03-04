@@ -283,7 +283,7 @@ export default function Masters({ M, A, cfg, fz, dff, setCfg }) {
   }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: M.bg, fontFamily: uff }}>
+    <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", overflow: "hidden", background: M.bg, fontFamily: uff }}>
 
 
       {/* ── API STATUS ── */}
@@ -308,7 +308,7 @@ export default function Masters({ M, A, cfg, fz, dff, setCfg }) {
       )}
 
       {/* ── BODY: SIDEBAR + CONTENT ── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, minHeight: 0, display: "flex", overflow: "hidden" }}>
 
         {/* File sidebar — animated slide-in (width 0 → 260) */}
         <div style={{ width: fileSideOpen ? 260 : 0, flexShrink: 0, overflow: "hidden", transition: "width 0.25s cubic-bezier(.4,0,.2,1)" }}>
