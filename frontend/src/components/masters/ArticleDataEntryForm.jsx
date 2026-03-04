@@ -999,6 +999,7 @@ export default function ArticleDataEntryForm({
   const [focus, setFoc]   = useState(null);
   const [shake, setShk]   = useState(false);
   const [ok,    setOk]    = useState(false);
+  const [saveErr, setSaveErr] = useState(null);
 
   /* ── Views state ── */
   const [activeViewId,  setActiveViewId] = useState("all");
@@ -1148,13 +1149,15 @@ export default function ArticleDataEntryForm({
 
   // Save wrapper — awaits GAS call, shows ok only on success
   const onSave = useCallback(async () => {
+    setSaveErr(null);
     // Skip required-field gate when editing (record already exists in sheet)
     if (!editItem && reqLeft.length > 0) { setShk(true); setTimeout(()=>setShk(false),600); return; }
     try {
       await handleSave();
       setOk(true); setTimeout(()=>setOk(false),2500);
-    } catch {
-      // handleSave already set formErrors; shake to signal failure
+    } catch(e) {
+      const msg = e?.message || 'Unknown error';
+      setSaveErr(msg);
       setShk(true); setTimeout(()=>setShk(false),600);
     }
   }, [editItem, reqLeft.length, handleSave]);
@@ -1514,6 +1517,9 @@ export default function ArticleDataEntryForm({
         {ok && <span style={{ fontSize:10,color:C.green,fontWeight:900,animation:"ccFade .3s ease" }}>
           ✓ Saved to ARTICLE_MASTER
         </span>}
+        {saveErr && <span style={{ fontSize:9.5,color:"#dc2626",fontWeight:700,maxWidth:300,
+          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" }}
+          title={saveErr}>⚠ {saveErr}</span>}
         <div style={{ flex:1 }}/>
         <button onClick={onClear} style={{
           padding:"6px 13px", border:`1.5px solid ${C.border}`,
@@ -1701,7 +1707,9 @@ export function ArticleDataEntryWrapper({ M, A, uff, dff, editRecord, onEditClea
         rawRecord[f.header] = f.key === 'code' ? form[f.key].trim() : form[f.key];
       }
     }
+    console.log('[handleSave] isUpdate:', isUpdate, 'rawRecord:', rawRecord);
     const result = await api.saveMasterRecord('article_master', 'FILE 1A — Items', rawRecord, isUpdate);
+    console.log('[handleSave] result:', result);
     if (result && result.saved === false) throw new Error(result.message || 'Save failed');
     const saved = { ...form, code: form.code.trim() };
     if (isUpdate) {
