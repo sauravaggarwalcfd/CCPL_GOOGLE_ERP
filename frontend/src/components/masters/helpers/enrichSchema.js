@@ -7,7 +7,7 @@ const FALLBACK_SCHEMA = [
   { key: "name",     label: "Name",     w: "1fr",   required: true },
   { key: "category", label: "Category", w: "120px" },
   { key: "status",   label: "Status",   w: "90px",  badge: true, type: "select", options: ["Active","Inactive"] },
-  { key: "remarks",  label: "Remarks",  w: "0",     hidden: true, type: "textarea" },
+  { key: "remarks",  label: "Remarks",  w: "130px", hidden: true, type: "textarea" },
 ];
 
 /** Convert 0-based index to Excel-style column letter (0→A, 25→Z, 26→AA) */

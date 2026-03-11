@@ -43,7 +43,8 @@
       "mcp__ide__getDiagnostics",
       "Bash(git stash:*)",
       "Bash(git push:*)",
-      "Bash(git:*)"
+      "Bash(git:*)",
+      "Bash(node -e \"const fs=require\\(''fs''\\); let c=fs.readFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',''utf8''\\); c=c.replace\\(/,\\\\t+ype:/g,'', type:''\\); fs.writeFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',c\\); console.log\\(''type:textarea count:'',\\(c.match\\(/type:\"\"textarea\"\"/g\\)||[]\\).length\\); console.log\\(''remaining ype:'',\\(c.match\\(/\\\\ttype:/g\\)||[]\\).length + \\(c.match\\(/,\\\\t+ype:/g\\)||[]\\).length\\);\")"
     ]
   }
 }

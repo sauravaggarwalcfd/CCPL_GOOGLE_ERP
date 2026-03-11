@@ -33,7 +33,7 @@ export const SCHEMA_ARTICLE_MASTER = [
   { key:"neckline",   header:"Neckline",                label:"Neckline",      w:"80px" },
   { key:"sleeveType", header:"Sleeve Type",             label:"Sleeve",        w:"80px" },
   { key:"mainFabric", header:"→ MAIN FABRIC USED",      label:"Main Fabric",   w:"120px" },
-  { key:"fabricName", header:"← Fabric Name (Auto)",    label:"Fabric Name",   w:"0",     hidden:true, auto:true },
+  { key:"fabricName", header:"← Fabric Name (Auto)",    label:"Fabric Name",   w:"120px", hidden:true, auto:true },
   { key:"colorCodes", header:"Colour Name(s)",           label:"Colours",       w:"120px" },
   { key:"sizeRange",  header:"Size Range",              label:"Size Range",    w:"130px" },
   { key:"markupPct",  header:"∑ FINAL MARKUP %",        label:"Markup %",      w:"80px",  type:"number", auto:true },
@@ -43,7 +43,7 @@ export const SCHEMA_ARTICLE_MASTER = [
   { key:"hsnCode",    header:"→ HSN Code",              label:"HSN",           w:"80px" },
   { key:"gstPct",     header:"← GST % (Auto)",          label:"GST %",         w:"60px",  auto:true },
   { key:"status",     header:"Status",                  label:"Status",        w:"90px",  badge:true, type:"select", options:["Active","Development","Inactive"] },
-  { key:"remarks",    header:"Remarks",                 label:"Remarks",       w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",                 label:"Remarks",       w:"130px", type:"textarea" },
   { key:"tags",       header:"⟷ Tags",                  label:"Tags",          w:"100px" },
 ];
 
@@ -51,7 +51,7 @@ export const SCHEMA_RM_FABRIC = [
   { key:"code",         header:"# RM Code",              label:"RM Code",       w:"120px", mono:true, auto:true },
   { key:"fabricSku",    header:"∑ FINAL FABRIC SKU",     label:"Fabric SKU",    w:"130px", auto:true },
   { key:"knitName",     header:"KNIT NAME / STRUCTURE",  label:"Knit Name",     w:"1fr",   required:true },
-  { key:"yarnComp",     header:"← Yarn Codes (Auto)",    label:"Yarn Codes",    w:"0",     hidden:true, auto:true },
+  { key:"yarnComp",     header:"← Yarn Codes (Auto)",    label:"Yarn Codes",    w:"110px", hidden:true, auto:true },
   { key:"yarnNames",    header:"⟷ YARN COMPOSITION",     label:"Yarn Names",    w:"120px" },
   { key:"fabricType",   header:"FABRIC TYPE",            label:"Type",          w:"80px" },
   { key:"colour",       header:"COLOUR",                 label:"Colour",        w:"80px" },
@@ -62,16 +62,16 @@ export const SCHEMA_RM_FABRIC = [
   { key:"hsnCode",      header:"→ HSN Code",             label:"HSN",           w:"70px" },
   { key:"gstPct",       header:"← GST % (Auto)",         label:"GST %",         w:"60px",  auto:true },
   { key:"primarySupp",  header:"→ Primary Supplier",     label:"Supplier",      w:"100px" },
-  { key:"suppCode",     header:"Supplier Code",          label:"Supp Code",     w:"0",     hidden:true },
-  { key:"suppName",     header:"← Supplier Name (Auto)", label:"Supp Name",     w:"0",     hidden:true, auto:true },
+  { key:"suppCode",     header:"Supplier Code",          label:"Supp Code",     w:"110px", hidden:true },
+  { key:"suppName",     header:"← Supplier Name (Auto)", label:"Supp Name",     w:"110px", hidden:true, auto:true },
   { key:"leadTime",     header:"Lead Time (Days)",       label:"Lead Days",     w:"70px",  type:"number" },
   { key:"reorderLevel", header:"Reorder Level",          label:"Reorder",       w:"70px",  type:"number" },
   { key:"moq",          header:"Min Order Qty",          label:"MOQ",           w:"60px",  type:"number" },
   { key:"costPerUom",   header:"Cost per UOM",           label:"Cost/UOM",      w:"80px",  type:"number" },
   { key:"season",       header:"Season",                 label:"Season",        w:"70px" },
   { key:"status",       header:"Status",                 label:"Status",        w:"80px",  badge:true, type:"select", options:["Active","Development","Inactive"] },
-  { key:"remarks",      header:"Remarks",                label:"Remarks",       w:"0",     hidden:true, type:"textarea" },
-  { key:"finCost",      header:"← FINISHED FABRIC COST (Auto)", label:"Fin. Cost", w:"0", hidden:true, auto:true },
+  { key:"remarks",      header:"Remarks",                label:"Remarks",       w:"130px", type:"textarea" },
+  { key:"finCost",      header:"← FINISHED FABRIC COST (Auto)", label:"Fin. Cost", w:"110px", hidden:true, auto:true },
   { key:"tags",         header:"⟷ Tags",                 label:"Tags",          w:"80px" },
 ];
 
@@ -83,14 +83,14 @@ export const SCHEMA_RM_YARN = [
   { key:"hsnCode",    header:"→ HSN Code",          label:"HSN",          w:"80px" },
   { key:"gstPct",     header:"← GST % (Auto)",      label:"GST %",        w:"60px",  auto:true },
   { key:"suppCode",   header:"→ Supplier Code",     label:"Supplier",     w:"100px" },
-  { key:"primarySupp",header:"← Primary Supplier",  label:"Primary Supp", w:"0",     hidden:true, auto:true },
-  { key:"suppName",   header:"← Supplier Name (Auto)", label:"Supp Name", w:"0",    hidden:true, auto:true },
+  { key:"primarySupp",header:"← Primary Supplier",  label:"Primary Supp", w:"110px", hidden:true, auto:true },
+  { key:"suppName",   header:"← Supplier Name (Auto)", label:"Supp Name", w:"110px", hidden:true, auto:true },
   { key:"season",     header:"Season for Cost",     label:"Season",       w:"80px" },
   { key:"avgCost",    header:"Avg Cost (excl GST)", label:"Cost",         w:"80px",  type:"number" },
   { key:"gstForCost", header:"GST % for Cost",      label:"GST Cost%",    w:"70px",  type:"number" },
   { key:"totalCost",  header:"∑ Total Cost (incl GST)", label:"Total",    w:"80px",  auto:true },
   { key:"status",     header:"Status",              label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",    header:"Remarks",             label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",             label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_TRIM_MASTER = [
@@ -99,18 +99,18 @@ export const SCHEMA_TRIM_MASTER = [
   { key:"name",       header:"⚠ Trim Name",           label:"Trim Name",    w:"1fr",   required:true },
   { key:"category",   header:"⚠ Trim Category",       label:"Category",     w:"100px", required:true },
   { key:"subCat",     header:"Trim Sub-Category",     label:"Sub-Cat",      w:"90px" },
-  { key:"imageLink",  header:"IMAGE LINK",            label:"Image",        w:"0",     hidden:true },
+  { key:"imageLink",  header:"IMAGE LINK",            label:"Image",        w:"90px",  type:"url", thumb:true },
   { key:"colourCode", header:"→ COLOUR CODE",          label:"Colour",       w:"80px" },
-  { key:"colourName", header:"← Color/Shade Name (Auto)", label:"Shade",   w:"0",     hidden:true, auto:true },
+  { key:"colourName", header:"← Color/Shade Name (Auto)", label:"Shade",   w:"100px", auto:true },
   { key:"uom",        header:"UOM",                   label:"UOM",          w:"60px" },
   { key:"hsnCode",    header:"→ HSN Code",             label:"HSN",          w:"70px" },
   { key:"gstPct",     header:"← GST % (Auto)",         label:"GST %",        w:"60px",  auto:true },
   { key:"primarySupp",header:"→ Primary Supplier",     label:"Supplier",     w:"100px" },
-  { key:"suppCode",   header:"Supplier Code",          label:"Supp Code",    w:"0",     hidden:true },
+  { key:"suppCode",   header:"Supplier Code",          label:"Supp Code",    w:"90px" },
   { key:"leadTime",   header:"Lead Time (Days)",       label:"Lead Days",    w:"70px",  type:"number" },
   { key:"reorderLevel",header:"Reorder Level",          label:"Reorder",      w:"70px",  type:"number" },
   { key:"status",     header:"Status",                 label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",    header:"Remarks",                label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",                label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_CONSUMABLE_MASTER = [
@@ -123,11 +123,11 @@ export const SCHEMA_CONSUMABLE_MASTER = [
   { key:"hsnCode",     header:"→ HSN Code",             label:"HSN",          w:"70px" },
   { key:"gstPct",      header:"← GST % (Auto)",         label:"GST %",        w:"60px",  auto:true },
   { key:"primarySupp", header:"→ Primary Supplier",     label:"Supplier",     w:"100px" },
-  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",   w:"0",     hidden:true, auto:true },
+  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",   w:"110px", hidden:true, auto:true },
   { key:"costPerUom",  header:"Cost per UOM",           label:"Cost/UOM",     w:"80px",  type:"number" },
   { key:"reorderLevel",header:"Reorder Level",           label:"Reorder",      w:"70px",  type:"number" },
   { key:"status",      header:"Status",                 label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_PACKAGING_MASTER = [
@@ -140,11 +140,11 @@ export const SCHEMA_PACKAGING_MASTER = [
   { key:"hsnCode",     header:"→ HSN Code",             label:"HSN",          w:"70px" },
   { key:"gstPct",      header:"← GST % (Auto)",         label:"GST %",        w:"60px",  auto:true },
   { key:"primarySupp", header:"→ Primary Supplier",     label:"Supplier",     w:"100px" },
-  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",   w:"0",     hidden:true, auto:true },
+  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",   w:"110px", hidden:true, auto:true },
   { key:"costPerUom",  header:"Cost per UOM",           label:"Cost/UOM",     w:"80px",  type:"number" },
   { key:"reorderLevel",header:"Reorder Level",           label:"Reorder",      w:"70px",  type:"number" },
   { key:"status",      header:"Status",                 label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_COLOR_MASTER = [
@@ -213,11 +213,11 @@ export const SCHEMA_RM_WOVEN = [
   { key:"hsnCode",     header:"→ HSN Code",             label:"HSN",          w:"70px" },
   { key:"gstPct",      header:"← GST % (Auto)",         label:"GST %",        w:"60px",  auto:true },
   { key:"primarySupp", header:"→ Primary Supplier",     label:"Supplier",     w:"100px" },
-  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",    w:"0",     hidden:true, auto:true },
+  { key:"suppName",    header:"← Supplier Name (Auto)", label:"Supp Name",    w:"110px", hidden:true, auto:true },
   { key:"costPerUom",  header:"Cost per UOM",           label:"Cost/UOM",     w:"80px",  type:"number" },
   { key:"reorderLevel",header:"Reorder Level",           label:"Reorder",      w:"70px",  type:"number" },
   { key:"status",      header:"Status",                 label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_ITEM_CATEGORIES = [
@@ -228,7 +228,7 @@ export const SCHEMA_ITEM_CATEGORIES = [
   { key:"master",    header:"Item Master Sheet",    label:"Master",      w:"130px", required:true, type:"select", options:["ARTICLE","RM-FABRIC","RM-YARN","RM-WOVEN","TRIM","CONSUMABLE","PACKAGING"] },
   { key:"hsn",       header:"Default HSN",          label:"HSN",         w:"80px" },
   { key:"active",    header:"Active",               label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",   header:"Remarks",              label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",   header:"Remarks",              label:"Remarks",     w:"130px", type:"textarea" },
   { key:"behavior",  header:"L1 Behavior",          label:"Behavior",    w:"90px",  auto:true },
 ];
 
@@ -241,14 +241,14 @@ export const SCHEMA_USER_MASTER = [
   { key:"email",      header:"Email (Google)",         label:"Email",        w:"180px", required:true },
   { key:"phone",      header:"Phone",                  label:"Phone",        w:"110px" },
   { key:"deptCode",   header:"→ Department",            label:"Dept",         w:"100px" },
-  { key:"deptName",   header:"← Dept Name (Auto)",     label:"Dept Name",    w:"0",     hidden:true, auto:true },
+  { key:"deptName",   header:"← Dept Name (Auto)",     label:"Dept Name",    w:"110px", hidden:true, auto:true },
   { key:"desigCode",  header:"→ Designation",           label:"Designation",  w:"100px" },
-  { key:"desigName",  header:"← Designation Name (Auto)", label:"Desig Name", w:"0",   hidden:true, auto:true },
+  { key:"desigName",  header:"← Designation Name (Auto)", label:"Desig Name", w:"110px", hidden:true, auto:true },
   { key:"role",       header:"Role",                   label:"Role",         w:"90px",  type:"select", options:["Admin","Manager","Supervisor","Operator","View Only"] },
   { key:"reportingTo",header:"Reporting To",            label:"Reports To",   w:"100px" },
   { key:"dateJoined", header:"Date Joined",             label:"Joined",       w:"100px", type:"date" },
   { key:"status",     header:"Status",                  label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",    header:"Remarks",                 label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",                 label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_ROLE_MASTER = [
@@ -265,14 +265,14 @@ export const SCHEMA_DEPARTMENT_MASTER = [
   { key:"head",     header:"Head of Department",label:"HOD",         w:"140px" },
   { key:"location", header:"Location",          label:"Location",    w:"120px" },
   { key:"active",   header:"Active",            label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",    header:"Notes",             label:"Notes",       w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",    header:"Notes",             label:"Notes",       w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_MACHINE_MASTER = [
   { key:"code",       header:"# Machine Code",          label:"Machine Code",  w:"120px", mono:true, auto:true },
   { key:"name",       header:"⚠ Machine Name",           label:"Machine Name",  w:"1fr",   required:true },
   { key:"catCode",    header:"→ Machine Category",       label:"Category",      w:"100px" },
-  { key:"catName",    header:"← Category Name (Auto)",   label:"Cat Name",      w:"0",     hidden:true, auto:true },
+  { key:"catName",    header:"← Category Name (Auto)",   label:"Cat Name",      w:"110px", hidden:true, auto:true },
   { key:"make",       header:"Make / Brand",             label:"Make",          w:"100px" },
   { key:"model",      header:"Model",                    label:"Model",         w:"90px" },
   { key:"serialNo",   header:"Serial No",                label:"Serial No",     w:"100px", mono:true },
@@ -281,11 +281,11 @@ export const SCHEMA_MACHINE_MASTER = [
   { key:"feeders",    header:"No. of Feeders",           label:"Feeders",       w:"70px",  type:"number" },
   { key:"yearInst",   header:"Year Installed",           label:"Year",          w:"70px" },
   { key:"factCode",   header:"→ Factory Code",           label:"Factory",       w:"90px" },
-  { key:"factName",   header:"← Factory Name (Auto)",    label:"Factory Name",  w:"0",     hidden:true, auto:true },
+  { key:"factName",   header:"← Factory Name (Auto)",    label:"Factory Name",  w:"110px", hidden:true, auto:true },
   { key:"locationInFactory", header:"Location in Factory", label:"Location",   w:"100px" },
   { key:"status",     header:"Status",                   label:"Status",        w:"80px",  badge:true, type:"select", options:["Active","Maintenance","Inactive"] },
   { key:"tags",       header:"⟷ Tags",                   label:"Tags",          w:"80px" },
-  { key:"remarks",    header:"Remarks",                  label:"Remarks",       w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",                  label:"Remarks",       w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_SUPPLIER_MASTER_1B = [
@@ -298,7 +298,7 @@ export const SCHEMA_SUPPLIER_MASTER_1B = [
   { key:"state",    header:"State",            label:"State",      w:"90px" },
   { key:"gstNo",    header:"GST No",           label:"GSTIN",      w:"140px", mono:true },
   { key:"status",   header:"Status",           label:"Status",     w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",  header:"Remarks",          label:"Remarks",    w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",  header:"Remarks",          label:"Remarks",    w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_ITEM_SUPPLIER_RATES = [
@@ -307,7 +307,7 @@ export const SCHEMA_ITEM_SUPPLIER_RATES = [
   { key:"itemMaster", header:"Item Master",              label:"Item Master", w:"90px" },
   { key:"itemName",   header:"← Item Name (Auto)",       label:"Item Name",   w:"1fr",   auto:true },
   { key:"suppCode",   header:"→ Supplier Code",          label:"Supplier",    w:"100px", required:true },
-  { key:"suppName",   header:"← Supplier Name (Auto)",   label:"Supp Name",   w:"0",     hidden:true, auto:true },
+  { key:"suppName",   header:"← Supplier Name (Auto)",   label:"Supp Name",   w:"110px", hidden:true, auto:true },
   { key:"unitPrice",  header:"Unit Price (excl GST)",    label:"Price",       w:"90px",  type:"number", required:true },
   { key:"gstPct",     header:"GST %",                    label:"GST %",       w:"60px",  type:"number" },
   { key:"priceInclGst",header:"∑ Price incl GST (Auto)", label:"Price+GST",   w:"90px",  auto:true },
@@ -322,12 +322,12 @@ export const SCHEMA_WAREHOUSE_MASTER = [
   { key:"code",     header:"# Warehouse Code",   label:"WH Code",     w:"120px", mono:true, auto:true },
   { key:"name",     header:"⚠ Warehouse Name",    label:"WH Name",     w:"1fr",   required:true },
   { key:"type",     header:"Type",                label:"Type",        w:"100px", type:"select", options:["Raw Material","Finished Goods","Trim","Chemical","General"] },
-  { key:"address",  header:"Address",             label:"Address",     w:"0",     hidden:true },
+  { key:"address",  header:"Address",             w:"150px",     hidden:true },
   { key:"manager",  header:"Manager",             label:"Manager",     w:"120px" },
   { key:"capacity", header:"Capacity",            label:"Capacity",    w:"80px",  type:"number" },
   { key:"capUom",   header:"Capacity UOM",        label:"Cap UOM",     w:"80px" },
   { key:"active",   header:"Active",              label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",  header:"Remarks",             label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",  header:"Remarks",             label:"Remarks",     w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_CONTRACTOR_MASTER = [
@@ -335,18 +335,18 @@ export const SCHEMA_CONTRACTOR_MASTER = [
   { key:"name",       header:"⚠ Contractor Name",           label:"Name",        w:"1fr",   required:true },
   { key:"contact",    header:"Contact Person",             label:"Contact",     w:"120px" },
   { key:"phone",      header:"Phone",                      label:"Phone",       w:"110px" },
-  { key:"email",      header:"Email",                      label:"Email",       w:"0",     hidden:true },
+  { key:"email",      header:"Email",                      w:"150px",     hidden:true },
   { key:"processType",header:"Process Type",               label:"Process",     w:"100px" },
   { key:"city",       header:"City",                       label:"City",        w:"90px" },
   { key:"state",      header:"State",                      label:"State",       w:"90px" },
   { key:"gstNo",      header:"GST No",                     label:"GSTIN",       w:"120px", mono:true },
   { key:"payTerms",   header:"→ Payment Terms",             label:"Pay Terms",   w:"100px" },
-  { key:"payTermsName",header:"← Payment Terms Name (Auto)",label:"PT Name",    w:"0",     hidden:true, auto:true },
+  { key:"payTermsName",header:"← Payment Terms Name (Auto)",label:"PT Name",    w:"110px", hidden:true, auto:true },
   { key:"rateBasis",  header:"Rate Basis",                 label:"Rate Basis",  w:"80px" },
   { key:"rateAmt",    header:"Rate Amount (₹)",            label:"Rate ₹",      w:"80px",  type:"number" },
   { key:"leadTime",   header:"Lead Time (Days)",           label:"Lead",        w:"60px",  type:"number" },
   { key:"active",     header:"Active",                     label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",    header:"Remarks",                    label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",                    label:"Remarks",     w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_PROCESS_MASTER = [
@@ -354,12 +354,12 @@ export const SCHEMA_PROCESS_MASTER = [
   { key:"name",       header:"⚠ Process Name",         label:"Process Name",  w:"1fr",   required:true },
   { key:"type",       header:"Process Type",           label:"Type",          w:"100px" },
   { key:"deptCode",   header:"→ Department",            label:"Dept",          w:"90px" },
-  { key:"deptName",   header:"← Dept Name (Auto)",     label:"Dept Name",     w:"0",     hidden:true, auto:true },
+  { key:"deptName",   header:"← Dept Name (Auto)",     label:"Dept Name",     w:"110px", hidden:true, auto:true },
   { key:"sequence",   header:"Sequence",               label:"Seq",           w:"60px",  type:"number" },
   { key:"stdTime",    header:"Standard Time (min)",    label:"Std Time",      w:"80px",  type:"number" },
   { key:"uom",        header:"UOM",                    label:"UOM",           w:"60px" },
   { key:"active",     header:"Active",                 label:"Active",        w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",      header:"Notes",                  label:"Notes",         w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",      header:"Notes",                  label:"Notes",         w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_DESIGNATION_MASTER = [
@@ -367,9 +367,9 @@ export const SCHEMA_DESIGNATION_MASTER = [
   { key:"name",     header:"Designation Name",     label:"Designation", w:"1fr",   required:true },
   { key:"level",    header:"Level",                label:"Level",       w:"80px",  type:"number" },
   { key:"deptCode", header:"→ Department",          label:"Dept",        w:"100px" },
-  { key:"deptName", header:"← Dept Name (Auto)",   label:"Dept Name",   w:"0",     hidden:true, auto:true },
+  { key:"deptName", header:"← Dept Name (Auto)",   label:"Dept Name",   w:"110px", hidden:true, auto:true },
   { key:"active",   header:"Active",               label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",    header:"Notes",                label:"Notes",       w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",    header:"Notes",                label:"Notes",       w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_SHIFT_MASTER = [
@@ -380,7 +380,7 @@ export const SCHEMA_SHIFT_MASTER = [
   { key:"breakMin",  header:"Break (Minutes)",    label:"Break",       w:"70px",  type:"number" },
   { key:"workHrs",   header:"Working Hours",      label:"Work Hrs",    w:"80px",  type:"number" },
   { key:"active",    header:"Active",             label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",     header:"Notes",              label:"Notes",       w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",     header:"Notes",              label:"Notes",       w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_CUSTOMER_MASTER = [
@@ -388,38 +388,38 @@ export const SCHEMA_CUSTOMER_MASTER = [
   { key:"name",         header:"⚠ Customer Name",               label:"Name",        w:"1fr",   required:true },
   { key:"contact",      header:"Contact Person",               label:"Contact",     w:"120px" },
   { key:"phone",        header:"Phone",                        label:"Phone",       w:"110px" },
-  { key:"email",        header:"Email",                        label:"Email",       w:"0",     hidden:true },
-  { key:"address",      header:"Address",                      label:"Address",     w:"0",     hidden:true },
+  { key:"email",        header:"Email",                        w:"150px",     hidden:true },
+  { key:"address",      header:"Address",                      w:"150px",     hidden:true },
   { key:"city",         header:"City",                         label:"City",        w:"90px" },
   { key:"state",        header:"State",                        label:"State",       w:"80px" },
   { key:"gstNo",        header:"GST No",                       label:"GSTIN",       w:"140px", mono:true },
   { key:"pan",          header:"PAN",                          label:"PAN",         w:"100px", mono:true },
   { key:"payTerms",     header:"→ Payment Terms",               label:"Pay Terms",   w:"100px" },
-  { key:"payTermsName", header:"← Payment Terms Name (Auto)",  label:"PT Name",     w:"0",     hidden:true, auto:true },
+  { key:"payTermsName", header:"← Payment Terms Name (Auto)",  label:"PT Name",     w:"110px", hidden:true, auto:true },
   { key:"creditLimit",  header:"Credit Limit (₹)",             label:"Credit ₹",    w:"90px",  type:"number" },
   { key:"creditDays",   header:"Credit Period (Days)",         label:"Credit Days",  w:"80px",  type:"number" },
   { key:"status",       header:"Status",                       label:"Status",      w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
   { key:"tags",         header:"⟷ Tags",                       label:"Tags",        w:"80px" },
-  { key:"remarks",      header:"Remarks",                      label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",      header:"Remarks",                      label:"Remarks",     w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_STORAGE_BIN_MASTER = [
   { key:"code",     header:"# Bin Code",                 label:"Bin Code",   w:"110px", mono:true, auto:true },
   { key:"whCode",   header:"→ Warehouse Code",           label:"Warehouse",  w:"100px" },
-  { key:"whName",   header:"← Warehouse Name (Auto)",    label:"WH Name",    w:"0",     hidden:true, auto:true },
+  { key:"whName",   header:"← Warehouse Name (Auto)",    label:"WH Name",    w:"110px", hidden:true, auto:true },
   { key:"name",     header:"Bin Name / Label",           label:"Bin Name",   w:"1fr",   required:true },
   { key:"zone",     header:"Zone",                       label:"Zone",       w:"80px" },
   { key:"rack",     header:"Rack",                       label:"Rack",       w:"70px" },
   { key:"level",    header:"Level",                      label:"Level",      w:"70px" },
   { key:"itemType", header:"Item Type",                  label:"Item Type",  w:"100px" },
   { key:"active",   header:"Active",                     label:"Active",     w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",    header:"Notes",                      label:"Notes",      w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",    header:"Notes",                      label:"Notes",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_FACTORY_MASTER = [
   { key:"code",    header:"# Factory Code",   label:"Factory Code", w:"120px", mono:true, auto:true },
   { key:"name",    header:"⚠ Factory Name",    label:"Factory Name", w:"1fr",   required:true },
-  { key:"address", header:"Address",           label:"Address",      w:"0",     hidden:true },
+  { key:"address", header:"Address",           w:"150px",     hidden:true },
   { key:"city",    header:"City",              label:"City",         w:"90px" },
   { key:"state",   header:"State",             label:"State",        w:"80px" },
   { key:"pinCode", header:"Pin Code",          label:"Pin",          w:"70px" },
@@ -427,9 +427,9 @@ export const SCHEMA_FACTORY_MASTER = [
   { key:"pan",     header:"PAN",               label:"PAN",          w:"100px", mono:true },
   { key:"contact", header:"Contact Person",    label:"Contact",      w:"120px" },
   { key:"phone",   header:"Phone",             label:"Phone",        w:"110px" },
-  { key:"email",   header:"Email",             label:"Email",        w:"0",     hidden:true },
+  { key:"email",   header:"Email",             w:"150px",     hidden:true },
   { key:"active",  header:"Active",            label:"Active",       w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks", header:"Remarks",           label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks", header:"Remarks",           label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_MACHINE_CATEGORY = [
@@ -444,7 +444,7 @@ export const SCHEMA_ASSET_MASTER = [
   { key:"name",        header:"⚠ Asset Name",              label:"Asset Name",   w:"1fr",   required:true },
   { key:"category",    header:"Category",                  label:"Category",     w:"100px" },
   { key:"factCode",    header:"→ Factory Code",            label:"Factory",      w:"90px" },
-  { key:"factName",    header:"← Factory Name (Auto)",     label:"Factory Name", w:"0",     hidden:true, auto:true },
+  { key:"factName",    header:"← Factory Name (Auto)",     label:"Factory Name", w:"110px", hidden:true, auto:true },
   { key:"location",    header:"Location",                  label:"Location",     w:"100px" },
   { key:"purchDate",   header:"Purchase Date",             label:"Purchased",    w:"100px", type:"date" },
   { key:"purchValue",  header:"Purchase Value (₹)",        label:"Value ₹",      w:"90px",  type:"number" },
@@ -452,22 +452,22 @@ export const SCHEMA_ASSET_MASTER = [
   { key:"currentVal",  header:"∑ Current Value (₹)",       label:"Current ₹",    w:"90px",  auto:true },
   { key:"warranty",    header:"Warranty Expiry",           label:"Warranty",     w:"100px", type:"date" },
   { key:"status",      header:"Status",                    label:"Status",       w:"80px",  badge:true, type:"select", options:["Active","Maintenance","Disposed"] },
-  { key:"remarks",     header:"Remarks",                   label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                   label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_MAINTENANCE_SCHEDULE = [
   { key:"code",       header:"# Schedule Code",          label:"Sched Code",   w:"120px", mono:true, auto:true },
   { key:"machCode",   header:"→ Machine Code",           label:"Machine",      w:"100px" },
-  { key:"machName",   header:"← Machine Name (Auto)",    label:"Machine Name", w:"0",     hidden:true, auto:true },
+  { key:"machName",   header:"← Machine Name (Auto)",    label:"Machine Name", w:"110px", hidden:true, auto:true },
   { key:"maintType",  header:"Maintenance Type",         label:"Type",         w:"100px" },
   { key:"frequency",  header:"Frequency",                label:"Frequency",    w:"90px" },
   { key:"lastDone",   header:"Last Done Date",           label:"Last Done",    w:"100px", type:"date" },
   { key:"nextDue",    header:"Next Due Date",            label:"Next Due",     w:"100px", type:"date" },
   { key:"assignedTo", header:"Assigned To",              label:"Assigned",     w:"100px" },
-  { key:"spares",     header:"→ Spare Parts Used",       label:"Spares",       w:"0",     hidden:true },
+  { key:"spares",     header:"→ Spare Parts Used",       label:"Spares",       w:"110px", hidden:true },
   { key:"estCost",    header:"Estimated Cost (₹)",       label:"Est Cost ₹",   w:"90px",  type:"number" },
   { key:"status",     header:"Status",                   label:"Status",       w:"80px",  badge:true, type:"select", options:["Scheduled","Completed","Overdue"] },
-  { key:"notes",      header:"Notes",                    label:"Notes",        w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",      header:"Notes",                    label:"Notes",        w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_SPARE_PARTS_MASTER = [
@@ -479,25 +479,25 @@ export const SCHEMA_SPARE_PARTS_MASTER = [
   { key:"reorderLevel", header:"Reorder Level",             label:"Reorder",     w:"70px",  type:"number" },
   { key:"currentStock", header:"Current Stock",             label:"Stock",       w:"70px",  type:"number" },
   { key:"suppCode",     header:"→ Supplier Code",           label:"Supplier",    w:"100px" },
-  { key:"suppName",     header:"← Supplier Name (Auto)",    label:"Supp Name",   w:"0",     hidden:true, auto:true },
+  { key:"suppName",     header:"← Supplier Name (Auto)",    label:"Supp Name",   w:"110px", hidden:true, auto:true },
   { key:"costPerUnit",  header:"Cost per Unit (₹)",         label:"Cost ₹",      w:"80px",  type:"number" },
   { key:"leadTime",     header:"Lead Time (Days)",          label:"Lead",        w:"60px",  type:"number" },
   { key:"status",       header:"Status",                    label:"Status",      w:"80px",  badge:true, type:"select", options:["Active","Inactive"] },
-  { key:"remarks",      header:"Remarks",                   label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",      header:"Remarks",                   label:"Remarks",     w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_WORK_CENTER_MASTER = [
   { key:"code",        header:"# Work Center Code",       label:"WC Code",      w:"120px", mono:true, auto:true },
   { key:"name",        header:"⚠ Work Center Name",        label:"WC Name",      w:"1fr",   required:true },
   { key:"procCode",    header:"→ Process Code",            label:"Process",      w:"100px" },
-  { key:"procName",    header:"← Process Name (Auto)",     label:"Process Name", w:"0",     hidden:true, auto:true },
+  { key:"procName",    header:"← Process Name (Auto)",     label:"Process Name", w:"110px", hidden:true, auto:true },
   { key:"factCode",    header:"→ Factory Code",            label:"Factory",      w:"90px" },
-  { key:"factName",    header:"← Factory Name (Auto)",     label:"Factory Name", w:"0",     hidden:true, auto:true },
+  { key:"factName",    header:"← Factory Name (Auto)",     label:"Factory Name", w:"110px", hidden:true, auto:true },
   { key:"location",    header:"Location",                  label:"Location",     w:"100px" },
   { key:"capPerShift", header:"Capacity per Shift",        label:"Cap/Shift",    w:"80px",  type:"number" },
   { key:"capUom",      header:"Capacity UOM",              label:"Cap UOM",      w:"80px" },
   { key:"active",      header:"Active",                    label:"Active",       w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",     header:"Remarks",                   label:"Remarks",      w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                   label:"Remarks",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_JOBWORK_PARTY_MASTER = [
@@ -505,20 +505,20 @@ export const SCHEMA_JOBWORK_PARTY_MASTER = [
   { key:"name",         header:"⚠ Party Name",                    label:"Party Name", w:"1fr",   required:true },
   { key:"contact",      header:"Contact Person",                 label:"Contact",    w:"120px" },
   { key:"phone",        header:"Phone",                          label:"Phone",      w:"110px" },
-  { key:"email",        header:"Email",                          label:"Email",      w:"0",     hidden:true },
-  { key:"address",      header:"Address",                        label:"Address",    w:"0",     hidden:true },
+  { key:"email",        header:"Email",                          w:"150px",     hidden:true },
+  { key:"address",      header:"Address",                        w:"150px",     hidden:true },
   { key:"city",         header:"City",                           label:"City",       w:"90px" },
   { key:"state",        header:"State",                          label:"State",      w:"80px" },
   { key:"gstNo",        header:"GST No",                         label:"GSTIN",      w:"120px", mono:true },
   { key:"processTypes", header:"Process Types",                  label:"Processes",  w:"120px" },
   { key:"payTerms",     header:"→ Payment Terms",                 label:"Pay Terms",  w:"100px" },
-  { key:"payTermsName", header:"← Payment Terms Name (Auto)",    label:"PT Name",    w:"0",     hidden:true, auto:true },
+  { key:"payTermsName", header:"← Payment Terms Name (Auto)",    label:"PT Name",    w:"110px", hidden:true, auto:true },
   { key:"rateBasis",    header:"Rate Basis",                     label:"Rate Basis", w:"80px" },
   { key:"rateAmt",      header:"Rate Amount (₹)",                label:"Rate ₹",     w:"80px",  type:"number" },
   { key:"leadTime",     header:"Lead Time (Days)",               label:"Lead",       w:"60px",  type:"number" },
   { key:"qualRating",   header:"Quality Rating",                 label:"Rating",     w:"70px" },
   { key:"active",       header:"Active",                         label:"Active",     w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",      header:"Remarks",                        label:"Remarks",    w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",      header:"Remarks",                        label:"Remarks",    w:"130px", type:"textarea" },
 ];
 
 
@@ -529,24 +529,24 @@ export const SCHEMA_SUPPLIER_MASTER_1C = [
   { key:"name",        header:"⚠ Supplier Name",           label:"Name",        w:"1fr",   required:true },
   { key:"contact",     header:"Contact Person",           label:"Contact",     w:"120px" },
   { key:"phone",       header:"Phone",                    label:"Phone",       w:"110px" },
-  { key:"email",       header:"Email",                    label:"Email",       w:"0",     hidden:true },
-  { key:"address",     header:"Address",                  label:"Address",     w:"0",     hidden:true },
+  { key:"email",       header:"Email",                    w:"150px",     hidden:true },
+  { key:"address",     header:"Address",                  w:"150px",     hidden:true },
   { key:"city",        header:"City",                     label:"City",        w:"90px" },
   { key:"state",       header:"State",                    label:"State",       w:"80px" },
   { key:"pinCode",     header:"Pin Code",                 label:"Pin",         w:"70px" },
   { key:"gstNo",       header:"GST No",                   label:"GSTIN",       w:"140px", mono:true },
   { key:"pan",         header:"PAN",                      label:"PAN",         w:"100px", mono:true },
-  { key:"msme",        header:"MSME Registration",        label:"MSME",        w:"0",     hidden:true },
+  { key:"msme",        header:"MSME Registration",        label:"MSME",        w:"110px", hidden:true },
   { key:"payTerms",    header:"→ Payment Terms",           label:"Pay Terms",   w:"100px" },
-  { key:"payTermsName",header:"← Payment Terms Name (Auto)", label:"PT Name",  w:"0",     hidden:true, auto:true },
-  { key:"bankName",    header:"Bank Name",                label:"Bank",        w:"0",     hidden:true },
-  { key:"accountNo",   header:"Account No",               label:"Account",     w:"0",     hidden:true },
-  { key:"ifsc",        header:"IFSC Code",                label:"IFSC",        w:"0",     hidden:true, mono:true },
+  { key:"payTermsName",header:"← Payment Terms Name (Auto)", label:"PT Name",  w:"110px", hidden:true, auto:true },
+  { key:"bankName",    header:"Bank Name",                label:"Bank",        w:"110px", hidden:true },
+  { key:"accountNo",   header:"Account No",               label:"Account",     w:"110px", hidden:true },
+  { key:"ifsc",        header:"IFSC Code",                label:"IFSC",        w:"110px", hidden:true, mono:true },
   { key:"creditDays",  header:"Credit Period (Days)",     label:"Credit Days", w:"80px",  type:"number" },
   { key:"supplyCat",   header:"Supply Category",          label:"Supply Cat",  w:"100px" },
   { key:"status",      header:"Status",                   label:"Status",      w:"80px",  badge:true, type:"select", options:["Active","Inactive","Blocked"] },
   { key:"tags",        header:"⟷ Tags",                   label:"Tags",        w:"80px" },
-  { key:"remarks",     header:"Remarks",                  label:"Remarks",     w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",     header:"Remarks",                  label:"Remarks",     w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_PAYMENT_TERMS = [
@@ -580,18 +580,18 @@ export const SCHEMA_BANK_MASTER = [
   { key:"contact",    header:"Contact Person",   label:"Contact",    w:"120px" },
   { key:"phone",      header:"Phone",            label:"Phone",      w:"100px" },
   { key:"active",     header:"Active",           label:"Active",     w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"remarks",    header:"Remarks",          label:"Remarks",    w:"0",     hidden:true, type:"textarea" },
+  { key:"remarks",    header:"Remarks",          label:"Remarks",    w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_COST_CENTER = [
   { key:"code",     header:"# Cost Center Code",   label:"CC Code",    w:"120px", mono:true, auto:true },
   { key:"name",     header:"⚠ Cost Center Name",    label:"CC Name",    w:"1fr",   required:true },
   { key:"deptCode", header:"→ Department",           label:"Dept",       w:"100px" },
-  { key:"deptName", header:"← Dept Name (Auto)",    label:"Dept Name",  w:"0",     hidden:true, auto:true },
+  { key:"deptName", header:"← Dept Name (Auto)",    label:"Dept Name",  w:"110px", hidden:true, auto:true },
   { key:"manager",  header:"Manager",               label:"Manager",    w:"120px" },
   { key:"budget",   header:"Budget Amount (₹)",     label:"Budget ₹",   w:"100px", type:"number" },
   { key:"active",   header:"Active",                label:"Active",     w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",    header:"Notes",                  label:"Notes",      w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",    header:"Notes",                  label:"Notes",      w:"130px", type:"textarea" },
 ];
 
 export const SCHEMA_ACCOUNT_MASTER = [
@@ -602,7 +602,7 @@ export const SCHEMA_ACCOUNT_MASTER = [
   { key:"parentAcct", header:"Parent Account",    label:"Parent",      w:"110px" },
   { key:"openBal",    header:"Opening Balance (₹)", label:"Opening ₹", w:"100px", type:"number" },
   { key:"active",     header:"Active",            label:"Active",      w:"70px",  badge:true, type:"select", options:["Yes","No"] },
-  { key:"notes",      header:"Notes",              label:"Notes",       w:"0",     hidden:true, type:"textarea" },
+  { key:"notes",      header:"Notes",              label:"Notes",       w:"130px", type:"textarea" },
 ];
 
 

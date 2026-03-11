@@ -64,7 +64,7 @@ const FALLBACK_SCHEMA = [
   { key: 'name',     label: 'Name',     w: '1fr',   required: true },
   { key: 'category', label: 'Category', w: '120px' },
   { key: 'status',   label: 'Status',   w: '90px',  badge: true, type: 'select', options: ['Active', 'Inactive'] },
-  { key: 'remarks',  label: 'Remarks',  w: '0',     hidden: true, type: 'textarea' },
+  { key: 'remarks',  label: 'Remarks',  w: '130px', hidden: true, type: 'textarea' },
 ];
 
 // ── 12 aggregation functions ──
@@ -1458,14 +1458,16 @@ export default function RecordsTab({ sheet, fileKey, fileLabel, M, A, uff, dff, 
 
   const schema     = SCHEMA_MAP[sheet.key] || FALLBACK_SCHEMA;
   const codeKey    = schema[0]?.key || 'code';
-  const allFields  = schema.filter(c => !c.hidden && c.w !== '0');
+  // hidden:true = hidden by default but available in column picker; w:'0' = truly invisible
+  const allFields  = schema.filter(c => c.w !== '0' && c.w !== 0);
   const formFields = schema.filter(c => c.key !== '__skip');
 
   // ── Reset view state when sheet changes ──
   useEffect(() => {
     const initOrder = allFields.map(f => f.key);
     setColOrder(initOrder);
-    setHiddenC([]);
+    // hidden:true fields start hidden by default (user can "Show All" to reveal)
+    setHiddenC(allFields.filter(f => f.hidden).map(f => f.key));
     setSorts([]);
     setAggs({});
     setFilters({});
