@@ -4,82 +4,67 @@ import { FieldInput, DtBadge, IcoCell } from './helpers/fieldInput';
 // CC_RED — mandatory for Save to Sheet button and inline mode header
 const CC_RED = '#CC0000';
 
-// ── UI PREVIEW OPTIONS (A / B / C) ──────────────────────────────────────────
-// Remove the PREVIEW_OPTS switcher once the user has picked a design.
-const PREVIEW_OPTS = [
-  { id: 'A', label: 'Card Sections', icon: '🗂' },
-  { id: 'B', label: 'Wizard Steps',  icon: '🧭' },
-  { id: 'C', label: 'Single Column', icon: '☰'  },
-];
-
 /**
  * DataEntryTab — Form + Inline entry modes for a master sheet.
  * Props: {
  *   enriched, formData, onChange, errors, isDirty,
  *   entryMode, visibleKeys, onClear, onSave, saving,
+ *   editRecord, onEditClear, sheetLabel,
  *   M, A, uff, dff
  * }
  */
 export default function DataEntryTab({
   enriched, formData, onChange, errors, isDirty,
   entryMode, visibleKeys, onClear, onSave, saving,
+  editRecord = null, onEditClear, sheetLabel,
   M, A, uff, dff,
 }) {
-  const [showConfirm, setShowConfirm]   = useState(false);
-  const [formLayout, setFormLayout]     = useState('A');   // 'A' | 'B' | 'C'
+  const [showConfirm, setShowConfirm] = useState(false);
+  const isEditing = !!editRecord;
 
   const handleSaveClick = () => setShowConfirm(true);
   const handleConfirmSave = () => { setShowConfirm(false); onSave(); };
 
+  // Derive display label: code + name/description from record
+  const editingLabel = isEditing
+    ? [editRecord.code, editRecord.name || editRecord.description || editRecord.trimCode || editRecord.colourName].filter(Boolean).join(' — ')
+    : '';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
-      {/* ── Preview Switcher Bar ── */}
-      {entryMode === 'form' && (
+      {/* ── Editing Banner (shown when editing an existing record) ── */}
+      {isEditing && (
         <div style={{
-          padding: '5px 14px', borderBottom: `1px solid ${M.divider}`,
-          display: 'flex', alignItems: 'center', gap: 6,
-          background: M.surfHigh, flexShrink: 0,
+          padding: '7px 14px', borderBottom: `1px solid #fde68a`,
+          display: 'flex', alignItems: 'center', gap: 10,
+          background: '#fffbeb', flexShrink: 0,
         }}>
-          <span style={{ fontSize: 9, fontWeight: 900, color: M.textD, letterSpacing: .8, textTransform: 'uppercase', fontFamily: uff }}>
-            Form Layout:
-          </span>
-          {PREVIEW_OPTS.map(o => (
-            <button key={o.id} onClick={() => setFormLayout(o.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              padding: '4px 12px', borderRadius: 5, cursor: 'pointer',
-              border: `1.5px solid ${formLayout === o.id ? A.a : M.inputBd}`,
-              background: formLayout === o.id ? A.al : M.inputBg,
-              color: formLayout === o.id ? A.a : M.textB,
-              fontSize: 10, fontWeight: formLayout === o.id ? 900 : 700,
-              fontFamily: uff, transition: 'all .15s',
-            }}>
-              <span>{o.icon}</span>
-              <span>{o.label}</span>
-              {formLayout === o.id && (
-                <span style={{
-                  background: A.a, color: '#fff', borderRadius: 10,
-                  padding: '1px 6px', fontSize: 8, fontWeight: 900,
-                }}>Active</span>
-              )}
-            </button>
-          ))}
-          <span style={{ fontSize: 9, color: M.textD, fontFamily: uff, marginLeft: 8, fontStyle: 'italic' }}>
-            Preview only — pick your favourite, then we'll lock it in.
-          </span>
+          <span style={{ fontSize: 14 }}>✏️</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: 9, fontWeight: 900, color: '#92400e', letterSpacing: .6, textTransform: 'uppercase', fontFamily: uff }}>
+              Editing Record
+            </span>
+            {editingLabel && (
+              <span style={{ fontSize: 10, fontWeight: 700, color: '#78350f', fontFamily: uff, marginLeft: 8 }}>
+                {editingLabel}
+              </span>
+            )}
+          </div>
+          <button onClick={onEditClear} style={{
+            padding: '3px 12px', border: '1px solid #fcd34d', borderRadius: 4,
+            background: '#fef3c7', color: '#92400e', fontSize: 9.5, fontWeight: 800,
+            cursor: 'pointer', fontFamily: uff,
+          }}>
+            × Cancel Edit
+          </button>
         </div>
       )}
 
       {/* ── Main content area ── */}
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {entryMode === 'form' ? (
-          formLayout === 'A' ? (
-            <FormViewA enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
-          ) : formLayout === 'B' ? (
-            <FormViewB enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
-          ) : (
-            <FormViewC enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
-          )
+          <FormViewA enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
         ) : (
           <InlineView enriched={enriched} formData={formData} onChange={onChange} errors={errors} visibleKeys={visibleKeys} M={M} A={A} uff={uff} dff={dff} />
         )}
@@ -89,10 +74,12 @@ export default function DataEntryTab({
       <div style={{ padding: '8px 14px', borderTop: `1px solid ${M.divider}`, display: 'flex', alignItems: 'center', gap: 8, background: M.surfMid, flexShrink: 0 }}>
         {isDirty && <span style={{ fontSize: 9, color: '#f59e0b', fontWeight: 900, fontFamily: uff }}>● Unsaved changes</span>}
         <div style={{ flex: 1 }} />
-        <button onClick={onClear} style={{ padding: '6px 14px', border: `1px solid ${M.inputBd}`, borderRadius: 5, background: M.inputBg, color: M.textB, fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>↺ Clear</button>
+        <button onClick={isEditing ? onEditClear : onClear} style={{ padding: '6px 14px', border: `1px solid ${M.inputBd}`, borderRadius: 5, background: M.inputBg, color: M.textB, fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: uff }}>
+          {isEditing ? '× Cancel Edit' : '↺ Clear'}
+        </button>
         <button onClick={handleSaveClick} disabled={saving}
           style={{ padding: '6px 20px', border: 'none', borderRadius: 5, background: saving ? M.textD : CC_RED, color: '#fff', fontSize: 10, fontWeight: 900, cursor: saving ? 'default' : 'pointer', fontFamily: uff }}>
-          {saving ? 'Saving…' : '✓ Save to Sheet'}
+          {saving ? 'Saving…' : isEditing ? '✓ Update Record' : '✓ Save to Sheet'}
         </button>
       </div>
 
@@ -207,8 +194,9 @@ function FormViewA({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  OPTION B — Wizard Steps (left nav + one section at a time)
+//  OPTION B — Wizard Steps (kept for potential future use)
 // ═══════════════════════════════════════════════════════════════════════════════
+// eslint-disable-next-line no-unused-vars
 function FormViewB({ enriched, formData, onChange, errors, visibleKeys, M, A, uff, dff }) {
   const sections = enriched.sections.filter(s => {
     const secFields = enriched.fields.filter(f => s.cols.includes(f.col) && visibleKeys.includes(f.key));
@@ -357,8 +345,9 @@ function FormViewB({ enriched, formData, onChange, errors, visibleKeys, M, A, uf
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  OPTION C — Single Column Panel (flat, searchable, full-width)
+//  OPTION C — Single Column Panel (kept for potential future use)
 // ═══════════════════════════════════════════════════════════════════════════════
+// eslint-disable-next-line no-unused-vars
 function FormViewC({ enriched, formData, onChange, errors, visibleKeys, M, A, uff, dff }) {
   const [search, setSearch]         = useState('');
   const [showOnlyReq, setShowOnlyReq] = useState(false);

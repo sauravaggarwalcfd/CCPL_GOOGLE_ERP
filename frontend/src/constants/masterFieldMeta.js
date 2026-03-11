@@ -55,11 +55,11 @@ export const FIELD_META = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  //  RM FABRIC — 25 fields
+  //  RM FABRIC — 28 fields
   // ═══════════════════════════════════════════════════════════════════════════
   rm_fabric: {
     sections: [
-      { id: "identity", icon: "📋", title: "Fabric Identity",   keys: ["code", "fabricSku", "knitName", "yarnComp", "yarnNames"] },
+      { id: "identity", icon: "📋", title: "Fabric Identity",   keys: ["code", "fabricSku", "l1Division", "l2Category", "knitName", "imageLink", "yarnComp", "yarnNames"] },
       { id: "props",    icon: "⚙️", title: "Fabric Properties",  keys: ["fabricType", "colour", "gsmMin", "gsmMax", "width", "uom"] },
       { id: "supply",   icon: "🏭", title: "Supplier & Costs",   keys: ["hsnCode", "gstPct", "primarySupp", "suppCode", "suppName", "season", "costPerUom", "moq"] },
       { id: "status",   icon: "🏷️", title: "Status & Logistics", keys: ["leadTime", "reorderLevel", "status", "remarks", "finCost", "tags"] },
@@ -67,9 +67,12 @@ export const FIELD_META = {
     fields: {
       code:         { ico: "#",  hint: "GAS generates RM-FAB-001. LOCKED.", fieldType: "autocode" },
       fabricSku:    { ico: "∑",  hint: "∑ GAS builds: Knit Name + Yarn Composition.", fieldType: "calc" },
-      knitName:     { ico: "→",  fk: "fabric_type_master", hint: "FK → FABRIC_TYPE_MASTER. SJ/PIQ/FLC etc.", fieldType: "fk" },
-      yarnComp:     { ico: "←",  hint: "← Auto yarn codes from RM_MASTER_YARN.", fieldType: "auto" },
-      yarnNames:    { ico: "⟷",  fk: "rm_yarn", hint: "Multi-select yarn names.", fieldType: "multifk" },
+      l1Division:   { ico: "←",  hint: "← Auto: Raw Material. Read-only.", fieldType: "auto" },
+      l2Category:   { ico: "←",  hint: "← Auto: Knit Fabric. Read-only.", fieldType: "auto" },
+      knitName:     { ico: "→",  fk: "fabric_type_master", hint: "Dropdown: Single Jersey / Pique / Fleece / French Terry / Rib etc.", fieldType: "fk" },
+      imageLink:    { ico: "—",  hint: "Google Drive public image URL.", fieldType: "url" },
+      yarnComp:     { ico: "←",  hint: "← Auto yarn composition from RM_MASTER_YARN.", fieldType: "auto" },
+      yarnNames:    { ico: "⟷",  fk: "rm_yarn", hint: "Dropdown from RM MASTER YARN.", fieldType: "multifk" },
       fabricType:   { ico: "⚠",  hint: "KORA / FINISHED.", fieldType: "dropdown", opts: "fabricType" },
       colour:       { ico: "—",  hint: "KORA / COLOURED / DYED / MÉLANGE.", fieldType: "dropdown", opts: "fabricColour" },
       gsmMin:       { ico: "—",  hint: "Grams per sq metre (min)." },

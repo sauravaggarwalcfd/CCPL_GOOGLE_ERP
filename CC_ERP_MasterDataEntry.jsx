@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import SchemaEditor from "./components/schema/SchemaEditor";
 
 // ═══════════════════════════════════════════════════════════════════════
 //  §3B MODES  |  §3C ACCENTS  (UI_SPEC_V6 exact hex)
@@ -1287,6 +1288,7 @@ export default function App(){
   const [draft,setDraft] = useState({...DEFAULTS});
   const [showSP,setShowSP]   = useState(false);
   const [sel,setSel]         = useState("ARTICLE_MASTER");
+  const [showSchema,setShowSchema] = useState(false);
   const [mainTab,setMainTab] = useState("entry");
   const [entryMode,setEntryMode] = useState("form");
   const [openSec,setOpenSec] = useState(["identity","all"]);
@@ -1485,15 +1487,41 @@ export default function App(){
               );
             })}
           </div>
-        </div>
 
-        {/* ── DRAG HANDLE ── */}
+          {/* ── ADMIN SECTION ── */}
+          <div style={{flexShrink:0}}>
+            <div style={{padding:"4px 12px 3px",background:M.surfMid,borderTop:`1px solid ${M.sidebarBd}`,borderBottom:`1px solid ${M.sidebarBd}`}}>
+              <div style={{fontSize:8.5,fontWeight:900,color:M.textD,letterSpacing:1.4,textTransform:"uppercase"}}>ADMIN</div>
+            </div>
+            <button onClick={()=>setShowSchema(s=>!s)}
+              style={{width:"100%",display:"flex",alignItems:"center",gap:8,
+                padding:`${pyV+1}px 12px`,
+                background:showSchema?`${A.a}15`:"transparent",
+                borderLeft:`3px solid ${showSchema?A.a:"transparent"}`,
+                borderBottom:`1px solid ${M.sidebarBd}`,
+                border:"none",cursor:"pointer"}}>
+              <span style={{fontSize:15,flexShrink:0}}>🧩</span>
+              <div style={{flex:1,textAlign:"left"}}>
+                <div style={{fontSize:9.5,fontWeight:900,color:showSchema?A.a:M.textA}}>Schema Editor</div>
+                <div style={{fontSize:7.5,color:M.textD,fontFamily:"'IBM Plex Mono',monospace",marginTop:1}}>Field types · renderType · diff</div>
+              </div>
+              {showSchema&&<span style={{fontSize:9,fontWeight:900,color:A.a,background:A.al,borderRadius:99,padding:"1px 6px"}}>OPEN</span>}
+            </button>
+          </div>
+        </div>
         <div onMouseDown={onSbDrag} style={{width:5,cursor:"col-resize",background:sbDrag?`${A.a}25`:"transparent",borderLeft:`1px solid ${sbDrag?A.a:M.sidebarBd}`,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
           <div style={{width:2,height:60,background:sbDrag?A.a:M.sidebarBd,borderRadius:2}}/>
         </div>
 
         {/* ── MAIN CONTENT ── */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
+        <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative"}}>
+
+          {/* ── SCHEMA EDITOR OVERLAY ── */}
+          {showSchema&&(
+            <div style={{position:"absolute",inset:0,zIndex:50,overflow:"auto",background:"inherit"}}>
+              <SchemaEditor/>
+            </div>
+          )}
 
           {/* Master header */}
           <div style={{padding:"10px 16px 0",background:M.surfHigh,borderBottom:`1px solid ${M.divider}`,flexShrink:0}}>

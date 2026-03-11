@@ -32,7 +32,7 @@ const FALLBACK_SCHEMA = [
   { key: "name",     label: "Name",     w: "1fr",   required: true },
   { key: "category", label: "Category", w: "120px" },
   { key: "status",   label: "Status",   w: "90px",  badge: true, type: "select", options: ["Active","Inactive"] },
-  { key: "remarks",  label: "Remarks",  w: "0",     hidden: true, type: "textarea" },
+  { key: "remarks",  label: "Remarks",  w: "130px", hidden: true, type: "textarea" },
 ];
 
 const MAIN_TABS = [
@@ -58,8 +58,10 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // ── V3 entry: record to pre-fill when editing from Records/Layout tab ──
+  // ── V3 entry: record to pre-fill when editing from Records/Layout tab (article_master only) ──
   const [v3EditRecord, setV3EditRecord] = useState(null);
+  // ── Generic edit record: for all other masters ──
+  const [editRecord, setEditRecord] = useState(null);
 
   // ── Views state ──
   const [viewsMap, setViewsMap] = useState({});
@@ -222,12 +224,25 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
     setFormData({});
     setErrors({});
     setIsDirty(false);
+    setEditRecord(null);
   };
 
-  // ── Edit from Layout Panel or Records tab → pre-fill V3 form and switch to entry ──
-  const handleEditFromLayout = (art) => {
+  // ── Edit from Layout Panel or Records tab → pre-fill form and switch to entry ──
+  const handleEditFromLayout = (record) => {
     if (!canEdit) return;
-    setV3EditRecord(art);
+    if (isArticleMaster) {
+      setV3EditRecord(record);
+    } else {
+      // Pre-fill formData from the record for all other masters
+      const prefilled = {};
+      schema.forEach(f => {
+        if (record[f.key] !== undefined && record[f.key] !== null) prefilled[f.key] = record[f.key];
+      });
+      setFormData(prefilled);
+      setErrors({});
+      setIsDirty(false);
+      setEditRecord(record);
+    }
     setMainTab("entry");
     setEntryMode("form");
   };
@@ -449,6 +464,9 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
             onClear={handleClear}
             onSave={handleSave}
             saving={saving}
+            editRecord={editRecord}
+            onEditClear={() => { setEditRecord(null); handleClear(); }}
+            sheetLabel={sheet.name || sheet.label || sheet.key}
             M={M} A={A} uff={uff} dff={dff}
           />
         )}
@@ -474,7 +492,7 @@ export default function SheetWorkspace({ sheet, fileKey, fileLabel, M, A, uff, d
             fileLabel={fileLabel}
             M={M} A={A} uff={uff} dff={dff} fz={fz} pyV={pyV}
             sheetCounts={sheetCounts}
-            onEditRecord={isArticleMaster ? handleEditFromRecords : undefined}
+            onEditRecord={handleEditFromRecords}
           />
         )}
         {mainTab === "layout" && isArticleMaster && (

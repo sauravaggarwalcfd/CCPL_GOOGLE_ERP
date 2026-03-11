@@ -6,14 +6,19 @@ import Chip from '../ui/Chip';
 import Toggle from '../ui/Toggle';
 import ModeCard from '../ui/ModeCard';
 import SDiv from '../ui/SDiv';
+import SchemaEditor from '../schema/SchemaEditor';
+
+const SP_TABS=[["appearance","🎨 Appearance"],["schema","🗂 Schema Editor"]];
 
 export default function SettingsPanel({M,A,cfg,onApply,onClose}){
   const [draft,setDraft]=useState({...cfg});
+  const [spTab,setSpTab]=useState("appearance");
   const set=(k,v)=>setDraft(d=>({...d,[k]:v}));
+  const isSchema=spTab==="schema";
   return(
     <>
       <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:498,background:"rgba(0,0,0,.45)",backdropFilter:"blur(2px)"}}/>
-      <div className="sp-anim" style={{position:"fixed",top:0,right:0,width:420,height:"100vh",background:M.dropBg,borderLeft:`1px solid ${M.divider}`,boxShadow:M.shadow,zIndex:499,display:"flex",flexDirection:"column",fontFamily:"inherit"}}>
+      <div className="sp-anim" style={{position:"fixed",top:0,right:0,width:isSchema?820:420,height:"100vh",background:M.dropBg,borderLeft:`1px solid ${M.divider}`,boxShadow:M.shadow,zIndex:499,display:"flex",flexDirection:"column",fontFamily:"inherit",transition:"width .25s ease"}}>
         {/* Header */}
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${M.divider}`,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
@@ -23,8 +28,15 @@ export default function SettingsPanel({M,A,cfg,onApply,onClose}){
             </div>
             <button onClick={onClose} style={{width:30,height:30,borderRadius:6,border:`1px solid ${M.divider}`,background:M.surfMid,color:M.textC,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
+          {/* Tab bar */}
+          <div style={{display:"flex",gap:4,marginTop:12}}>
+            {SP_TABS.map(([id,lbl])=>{const active=spTab===id;return(
+              <button key={id} onClick={()=>setSpTab(id)} style={{flex:1,padding:"7px 0",borderRadius:6,border:`1.5px solid ${active?A.a:M.divider}`,background:active?A.al:"transparent",color:active?A.a:M.textC,fontSize:11,fontWeight:active?800:600,cursor:"pointer",fontFamily:"inherit",transition:"all .15s"}}>{lbl}</button>
+            );})}
+          </div>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:"4px 20px 20px"}}>
+        <div style={{flex:1,overflowY:"auto",padding:isSchema?"0":"4px 20px 20px"}}>
+          {isSchema?<SchemaEditor themeM={M} accentA={A}/>:<>
           {/* Colour Mode */}
           <SDiv label="Colour Mode" M={M} first/>
           <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:4}}>
@@ -116,12 +128,13 @@ export default function SettingsPanel({M,A,cfg,onApply,onClose}){
               <Toggle on={!!draft[key]} onChange={v=>set(key,v)} A={ACCENTS[draft.accent]} M={M}/>
             </div>
           ))}
+          </>}
         </div>
-        {/* Footer */}
-        <div style={{padding:"14px 20px",borderTop:`1px solid ${M.divider}`,background:M.surfMid,flexShrink:0,display:"flex",flexDirection:"column",gap:8}}>
+        {/* Footer — only for Appearance tab */}
+        {!isSchema&&<div style={{padding:"14px 20px",borderTop:`1px solid ${M.divider}`,background:M.surfMid,flexShrink:0,display:"flex",flexDirection:"column",gap:8}}>
           <button onClick={()=>setDraft({...DEFAULTS})} style={{width:"100%",padding:"8px",borderRadius:6,border:`1px solid ${M.divider}`,background:"transparent",color:M.textC,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>↩ Reset Defaults</button>
           <button onClick={()=>{onApply(draft);onClose();}} style={{width:"100%",padding:"9px",borderRadius:6,border:"none",background:ACCENTS[draft.accent].a,color:"#fff",fontSize:12,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>✓ Apply & Close</button>
-        </div>
+        </div>}
       </div>
     </>
   );

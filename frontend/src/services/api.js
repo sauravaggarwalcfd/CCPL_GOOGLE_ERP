@@ -167,6 +167,13 @@ const api = {
 
   // Incremental Sync — lightweight check if data changed
   getDataSince: (sheet, version) => request('getDataSince', { sheet, version }),
+
+  // Schema Admin — push schema changes to live Google Sheet
+  updateSchemaFields: async (sheet, changes) => {
+    const result = await request('updateSchemaFields', { sheet, changes });
+    dataCache.invalidatePrefix(`masterData_${sheet}`);
+    return result;
+  },
 };
 
 export default api;

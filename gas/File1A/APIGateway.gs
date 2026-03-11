@@ -158,7 +158,12 @@ var API_ROUTES = {
   // V13 — Performance: Boot Bundle + Incremental Sync
   // -------------------------------------------------------------------------
   'getBootBundle':        handleGetBootBundle,
-  'getDataSince':         handleGetDataSince
+  'getDataSince':         handleGetDataSince,
+
+  // -------------------------------------------------------------------------
+  // V15 — Schema Admin (live schema edits from frontend)
+  // -------------------------------------------------------------------------
+  'updateSchemaFields':   handleUpdateSchemaFields
 };
 
 
@@ -2033,4 +2038,212 @@ function handleGetDataSince(params) {
   }
 
   return { rows: rows, unchanged: false, version: serverVersion };
+}
+
+
+// =============================================================================
+// V15 — SCHEMA ADMIN: Live schema edits from frontend Schema Editor
+// =============================================================================
+// Supported change types:
+//   label  — rename a column header (Row 2)
+//   reorder — move a column to a new position
+//   add    — append a new column at the end
+//   on     — show/hide a column (stores in Row 3 description prefix)
+//   mand   — toggle required flag (stores in Row 3 description)
+//   hint   — update Row 3 description text
+//
+// Sheet structure: Row 1=banner, Row 2=headers, Row 3=descriptions, Row 4+=data
+// =============================================================================
+
+/**
+ * Applies a batch of schema changes to a live Google Sheet.
+ *
+ * @param {Object} params
+ * @param {string} params.sheet   — master key (e.g. "article_master")
+ * @param {Array}  params.changes — array of change objects from Schema Editor
+ *   Each change: { type, fid, old, nw, lbl }
+ *     type: "label"|"reorder"|"add"|"on"|"mand"|"hint"|"icon"|"rt"|"fk"
+ *     fid:  field id (1-based index matching column position)
+ *     old:  previous value
+ *     nw:   new value
+ *     lbl:  human-readable field label (for audit log)
+ *
+ * @returns {Object} { applied: number, errors: string[], sheetName: string }
+ */
+function handleUpdateSchemaFields(params) {
+  var sheetKey = params.sheet || '';
+  var changes  = params.changes || [];
+  var info     = MASTER_SHEET_MAP[sheetKey];
+
+  if (!info) return { applied: 0, errors: ['Unknown sheet: ' + sheetKey] };
+  if (!changes.length) return { applied: 0, errors: ['No changes provided'] };
+
+  var ssId = getMasterFileId_(info.file);
+  if (!ssId) return { applied: 0, errors: ['File not found for: ' + info.file] };
+
+  var ss = SpreadsheetApp.openById(ssId);
+  var sh = ss.getSheetByName(info.sheet);
+  if (!sh) return { applied: 0, errors: ['Sheet not found: ' + info.sheet] };
+
+  var lastCol = sh.getLastColumn();
+  var headers = sh.getRange(2, 1, 1, Math.max(lastCol, 1)).getValues()[0]
+    .map(function(h) { return String(h).trim(); });
+
+  // Row 3 descriptions
+  var descs = sh.getRange(3, 1, 1, Math.max(lastCol, 1)).getValues()[0]
+    .map(function(d) { return String(d).trim(); });
+
+  var userEmail = '';
+  try { userEmail = Session.getActiveUser().getEmail(); } catch (e) {}
+
+  var applied = 0;
+  var errors  = [];
+
+  for (var i = 0; i < changes.length; i++) {
+    var ch = changes[i];
+    try {
+      switch (ch.type) {
+
+        // ── Rename header ──────────────────────────────────────────────
+        case 'label': {
+          var col = _findColByLabel(headers, ch.old);
+          if (col < 0) { errors.push('Column not found: ' + ch.old); break; }
+          sh.getRange(2, col + 1).setValue(ch.nw);
+          headers[col] = ch.nw;  // update local copy
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Header Rename',
+            ch.old, ch.nw, userEmail);
+          applied++;
+          break;
+        }
+
+        // ── Add new column ─────────────────────────────────────────────
+        case 'add': {
+          var newField = ch.nw || {};
+          var newCol = lastCol + 1;
+          sh.getRange(2, newCol).setValue(newField.label || 'New Column');
+          sh.getRange(3, newCol).setValue(newField.hint || '');
+          lastCol = newCol;
+          headers.push(newField.label || 'New Column');
+          descs.push(newField.hint || '');
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Column Added',
+            '', newField.label || 'New Column', userEmail);
+          applied++;
+          break;
+        }
+
+        // ── Update hint / description (Row 3) ──────────────────────────
+        case 'hint': {
+          var hCol = _findColByLabel(headers, ch.lbl);
+          if (hCol < 0) { errors.push('Column not found for hint: ' + ch.lbl); break; }
+          sh.getRange(3, hCol + 1).setValue(ch.nw || '');
+          descs[hCol] = ch.nw || '';
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Description Updated: ' + ch.lbl,
+            ch.old, ch.nw, userEmail);
+          applied++;
+          break;
+        }
+
+        // ── Toggle mandatory (stored as [REQ] prefix in Row 3) ─────────
+        case 'mand': {
+          var mCol = _findColByLabel(headers, ch.lbl);
+          if (mCol < 0) { errors.push('Column not found for mand: ' + ch.lbl); break; }
+          var curDesc = descs[mCol] || '';
+          var hasReq = curDesc.indexOf('[REQ]') === 0;
+          if (ch.nw && !hasReq) {
+            curDesc = '[REQ] ' + curDesc;
+          } else if (!ch.nw && hasReq) {
+            curDesc = curDesc.replace(/^\[REQ\]\s*/, '');
+          }
+          sh.getRange(3, mCol + 1).setValue(curDesc);
+          descs[mCol] = curDesc;
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Required Toggle: ' + ch.lbl,
+            String(ch.old), String(ch.nw), userEmail);
+          applied++;
+          break;
+        }
+
+        // ── Toggle visibility (stored as [HIDDEN] prefix in Row 3) ─────
+        case 'on': {
+          var vCol = _findColByLabel(headers, ch.lbl);
+          if (vCol < 0) { errors.push('Column not found for on: ' + ch.lbl); break; }
+          var vDesc = descs[vCol] || '';
+          var isHidden = vDesc.indexOf('[HIDDEN]') === 0;
+          if (!ch.nw && !isHidden) {
+            // Hiding: add [HIDDEN] prefix
+            vDesc = '[HIDDEN] ' + vDesc;
+          } else if (ch.nw && isHidden) {
+            // Showing: remove [HIDDEN] prefix
+            vDesc = vDesc.replace(/^\[HIDDEN\]\s*/, '');
+          }
+          sh.getRange(3, vCol + 1).setValue(vDesc);
+          descs[vCol] = vDesc;
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Visibility Toggle: ' + ch.lbl,
+            ch.nw ? 'hidden' : 'visible', ch.nw ? 'visible' : 'hidden', userEmail);
+          applied++;
+          break;
+        }
+
+        // ── Reorder column ─────────────────────────────────────────────
+        case 'reorder': {
+          // Reorder is complex (must move entire column of data).
+          // For safety, we log it but skip the actual move in v1.
+          errors.push('Column reorder is logged but not auto-applied. Reorder manually in Google Sheets.');
+          writeChangeLog('SCHEMA_UPDATE', info.sheet, '', 'Reorder Requested: ' + ch.lbl,
+            'original position', 'new position near ' + ch.nw, userEmail);
+          break;
+        }
+
+        // ── Icon / render type / FK changes — metadata only ────────────
+        case 'icon':
+        case 'rt':
+        case 'fk': {
+          // These are frontend-only metadata stored in masterFieldMeta.js.
+          // Log the intent but these don't modify sheet structure.
+          writeChangeLog('SCHEMA_META', info.sheet, '', ch.type + ' change: ' + ch.lbl,
+            String(ch.old || ''), String(ch.nw || ''), userEmail);
+          applied++;
+          break;
+        }
+
+        default:
+          errors.push('Unknown change type: ' + ch.type);
+      }
+    } catch (err) {
+      errors.push('Error applying ' + ch.type + ' for ' + (ch.lbl || ch.fid) + ': ' + err.message);
+    }
+  }
+
+  // Flush all changes to the sheet
+  SpreadsheetApp.flush();
+
+  // Invalidate server-side cache for this sheet
+  try {
+    if (typeof invalidateSheetCache_ === 'function') {
+      invalidateSheetCache_(info.sheet);
+    }
+  } catch (e) {}
+
+  return {
+    applied:   applied,
+    errors:    errors,
+    sheetName: info.sheet,
+    total:     changes.length
+  };
+}
+
+/**
+ * Find column index by header label (case-insensitive, trimmed).
+ * Returns -1 if not found.
+ */
+function _findColByLabel(headers, label) {
+  if (!label) return -1;
+  var target = String(label).trim().toLowerCase();
+  for (var i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim().toLowerCase() === target) return i;
+  }
+  // Fallback: partial match (header may have emoji prefixes)
+  for (var j = 0; j < headers.length; j++) {
+    if (String(headers[j]).trim().toLowerCase().indexOf(target) >= 0) return j;
+  }
+  return -1;
 }
