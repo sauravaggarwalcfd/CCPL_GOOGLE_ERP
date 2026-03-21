@@ -9,11 +9,12 @@ import api from '../../services/api';
 ───────────────────────────────────────────────────────────────────────────── */
 
 const ROLE_DEFS = {
-  Admin:       { color:"#BE123C", bg:"#fff1f2", code:"ADMIN", icon:"🔴", mods:["Procurement","Production","Inventory","Quality","Sales","Finance","Masters","Dashboard"], actions:["CREATE","EDIT","SUBMIT","APPROVE","DELETE","EXPORT_PDF","EXPORT_SHEET","EXPORT_EXCEL","VIEW_PRICES","IMPORT","USER_MGMT","SUSPEND","AUDIT"], exports:["PDF","SHEET","EXCEL","CLIPBOARD","EMAIL"] },
-  Manager:     { color:"#1D4ED8", bg:"#eff6ff", code:"MGR",   icon:"🔵", mods:["Procurement","Production","Inventory","Quality","Sales","Finance","Masters","Dashboard"], actions:["CREATE","EDIT","SUBMIT","APPROVE","DELETE","EXPORT_PDF","EXPORT_SHEET","EXPORT_EXCEL","VIEW_PRICES","IMPORT","AUDIT"],                  exports:["PDF","SHEET","EXCEL","CLIPBOARD","EMAIL"] },
-  Supervisor:  { color:"#7C3AED", bg:"#f5f3ff", code:"SUP",   icon:"🟣", mods:["Procurement","Production","Inventory","Quality","Sales","Dashboard"],                     actions:["CREATE","EDIT","SUBMIT","APPROVE","EXPORT_PDF","EXPORT_SHEET","VIEW_PRICES"],                                                               exports:["PDF","SHEET","CLIPBOARD"] },
-  Operator:    { color:"#15803D", bg:"#f0fdf4", code:"OPR",   icon:"🟢", mods:["Procurement","Production","Inventory","Quality","Sales"],                                  actions:["CREATE","EDIT","EXPORT_PDF"],                                                                                                              exports:["PDF"] },
-  "View Only": { color:"#6b7280", bg:"#f9fafb", code:"VIEW",  icon:"⚪", mods:["Procurement","Dashboard"],                                                                 actions:[],                                                                                                                                         exports:[] },
+  Admin:       { color:"#BE123C", bg:"#fff1f2", code:"ADMIN", icon:"🔴", mods:["Procurement","Production","Inventory","Quality","Sales","Finance","Masters","Dashboard"], actions:["CREATE","EDIT","SUBMIT","APPROVE","DELETE","EXPORT_PDF","EXPORT_SHEET","EXPORT_EXCEL","VIEW_PRICES","IMPORT","USER_MGMT","SUSPEND","AUDIT"], exports:["PDF","SHEET","EXCEL","CLIPBOARD","EMAIL"], desc:"Full access — locked" },
+  Manager:     { color:"#1D4ED8", bg:"#eff6ff", code:"MGR",   icon:"🔵", mods:["Procurement","Production","Inventory","Quality","Sales","Finance","Masters","Dashboard"], actions:["CREATE","EDIT","SUBMIT","APPROVE","DELETE","EXPORT_PDF","EXPORT_SHEET","EXPORT_EXCEL","VIEW_PRICES","IMPORT","AUDIT"],                  exports:["PDF","SHEET","EXCEL","CLIPBOARD","EMAIL"], desc:"All modules + reports" },
+  Supervisor:  { color:"#7C3AED", bg:"#f5f3ff", code:"SUP",   icon:"🟣", mods:["Procurement","Production","Inventory","Quality","Sales","Dashboard"],                     actions:["CREATE","EDIT","SUBMIT","APPROVE","EXPORT_PDF","EXPORT_SHEET","VIEW_PRICES"],                                                               exports:["PDF","SHEET","CLIPBOARD"], desc:"Core modules + approvals" },
+  Operator:    { color:"#15803D", bg:"#f0fdf4", code:"OPR",   icon:"🟢", mods:["Procurement","Production","Inventory","Quality","Sales"],                                  actions:["CREATE","EDIT","EXPORT_PDF"],                                                                                                              exports:["PDF"], desc:"Assigned modules only" },
+  "View Only": { color:"#6b7280", bg:"#f9fafb", code:"VIEW",  icon:"⚪", mods:["Procurement","Dashboard"],                                                                 actions:[],                                                                                                                                         exports:[], desc:"Read-only access" },
+  Custom:      { color:"#D97706", bg:"#fffbeb", code:"CUSTOM", icon:"🟠", mods:[], actions:[], exports:[], desc:"Admin-defined permissions", isCustom:true },
 };
 
 const ALL_MODULES = ["Procurement","Production","Inventory","Quality","Sales","Finance","Masters","Dashboard"];
@@ -46,6 +47,20 @@ function getEffective(user) {
   const rd = ROLE_DEFS[user.role];
   if (!rd) return { mods:[], actions:[], exports:[], hiddenFields:[] };
   if (user.role === "Admin") return { mods:[...rd.mods], actions:[...rd.actions], exports:[...rd.exports], hiddenFields:[] };
+  // Custom role: customMods = granted modules, extraActions = granted actions (no role defaults)
+  if (rd.isCustom) {
+    const mods = [...(user.customMods || [])];
+    const actions = [...(user.extraActions || [])];
+    const exports = ALL_EXPORTS.filter(e => {
+      if (e === "EXCEL" && actions.includes("EXPORT_EXCEL")) return true;
+      if (e === "SHEET" && actions.includes("EXPORT_SHEET")) return true;
+      if (e === "PDF"   && actions.includes("EXPORT_PDF"))   return true;
+      if (e === "CLIPBOARD" && actions.length > 0) return true;
+      if (e === "EMAIL" && actions.length > 0) return true;
+      return false;
+    });
+    return { mods, actions, exports, hiddenFields: user.deniedFields || [] };
+  }
   const mods    = user.customMods.length > 0 ? [...user.customMods] : [...rd.mods];
   const actions = [...new Set([...rd.actions, ...user.extraActions])].filter(a => !user.deniedActions.includes(a));
   const exports = [...rd.exports].filter(e => {
@@ -61,6 +76,8 @@ function getEffective(user) {
 function countOverrides(user) {
   if (user.role === "Admin") return 0;
   const rd = ROLE_DEFS[user.role];
+  // Custom role: count granted items (not "overrides" since there are no defaults)
+  if (rd?.isCustom) return (user.customMods?.length || 0) + (user.extraActions?.length || 0) + (user.deniedFields?.length || 0);
   const customModDiffs = user.customMods.length > 0
     ? user.customMods.filter(m => !rd.mods.includes(m)).length + rd.mods.filter(m => !user.customMods.includes(m)).length
     : 0;
@@ -68,15 +85,17 @@ function countOverrides(user) {
 }
 
 // ── SMALL COMPONENTS ───────────────────────────────────────────────────────
-function RolePill({ role, sm }) {
+function RolePill({ role, sm, customName }) {
   const r = ROLE_DEFS[role];
   if (!r) return null;
+  const label = (role === "Custom" && customName) ? customName : r.code;
   return (
     <span style={{ display:"inline-flex", alignItems:"center", gap:3,
       padding: sm ? "2px 7px" : "3px 9px", borderRadius:20,
       background:r.bg, color:r.color, border:`1px solid ${r.color}40`,
-      fontSize:sm ? 10 : 11, fontWeight:800, letterSpacing:"0.03em", whiteSpace:"nowrap" }}>
-      {r.icon} {r.code}
+      fontSize:sm ? 10 : 11, fontWeight:800, letterSpacing:"0.03em", whiteSpace:"nowrap",
+      maxWidth: sm ? 90 : 120, overflow:"hidden", textOverflow:"ellipsis" }}>
+      {r.icon} {label}
     </span>
   );
 }
@@ -209,11 +228,12 @@ function PermissionsPanel({ user, onSave, onClose, M, A, uff, dff }) {
   ];
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.4)", zIndex:400,
-      display:"flex", justifyContent:"flex-end", animation:"fadeIn 0.15s" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:400,
+      display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeIn 0.15s" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width:540, height:"100vh", background:M.surfHigh, display:"flex",
-        flexDirection:"column", boxShadow:"-6px 0 28px rgba(0,0,0,0.14)", animation:"slideInRight 0.22s", fontFamily:uff }}>
+      <div style={{ width:560, maxHeight:"88vh", background:M.surfHigh, display:"flex",
+        flexDirection:"column", boxShadow:"0 12px 40px rgba(0,0,0,0.18)", animation:"scaleUp 0.18s",
+        fontFamily:uff, borderRadius:14, overflow:"hidden" }}>
 
         {/* Header */}
         <div style={{ padding:"16px 20px 14px", borderBottom:`1px solid ${M.divider}`,
@@ -230,7 +250,7 @@ function PermissionsPanel({ user, onSave, onClose, M, A, uff, dff }) {
               border:`1px solid ${M.divider}`, background:M.surfLow, cursor:"pointer", fontSize:18, lineHeight:1, fontFamily:uff }}>×</button>
           </div>
           <div style={{ display:"flex", alignItems:"center", gap:7, flexWrap:"wrap" }}>
-            <RolePill role={user.role} />
+            <RolePill role={user.role} customName={user.customRoleName} />
             <StatusBubble status={user.status} />
             {isAdmin ? (
               <span style={{ fontSize:11, color:A.a, fontWeight:700, padding:"3px 10px",
@@ -477,16 +497,28 @@ function EditPanel({ user, users, onSave, onClose, onDeactivate, M, A, uff, dff 
 
         <div style={{ flex:1, overflowY:"auto", padding:"18px 20px" }}>
           {/* Role banner */}
-          <div style={{ padding:"10px 14px", borderRadius:8, marginBottom:18,
+          <div style={{ padding:"10px 14px", borderRadius:8, marginBottom: form.role === "Custom" ? 10 : 18,
             background:ROLE_DEFS[form.role]?.bg || M.surfMid,
             border:`1px solid ${ROLE_DEFS[form.role]?.color || M.divider}30`,
             display:"flex", alignItems:"center", gap:8 }}>
-            <RolePill role={form.role} />
+            <RolePill role={form.role} customName={form.customRoleName} />
             <span style={{ fontSize:11, color:ROLE_DEFS[form.role]?.color || M.textC, fontWeight:600 }}>
-              {form.role==="Admin"?"Full system access":form.role==="Manager"?"All modules + reports":
-               form.role==="Supervisor"?"Core ops modules":form.role==="Operator"?"Assigned modules only":"Read-only access"}
+              {ROLE_DEFS[form.role]?.desc || "Custom permissions"}
             </span>
           </div>
+          {form.role === "Custom" && (
+            <div style={{ marginBottom:14 }}>
+              <label style={{ display:"block", fontSize:10, fontWeight:900, textTransform:"uppercase",
+                letterSpacing:"0.1em", color:"#D97706", marginBottom:5 }}>Custom Role Name *</label>
+              <input value={form.customRoleName || ""} onChange={e => upd("customRoleName", e.target.value)}
+                placeholder="e.g. Auditor, Trainee, Warehouse Lead…"
+                style={{ width:"100%", padding:"8px 10px", border:"1px solid #D9770640", borderRadius:6,
+                  fontSize:13, color:M.textA, background:"#fffbeb", fontFamily:uff, boxSizing:"border-box", fontWeight:700 }} />
+              <div style={{ fontSize:9, color:"#92400e", marginTop:4 }}>
+                This name will appear on the user's role badge. Set permissions via the 🔑 Permissions panel after saving.
+              </div>
+            </div>
+          )}
 
           {/* Fields */}
           {[{ k:"name", l:"Full Name *", t:"text", p:"e.g. Rajesh Kumar" },
@@ -597,6 +629,14 @@ function getCellState(user, col) {
   const rd = ROLE_DEFS[user.role];
   if (!rd) return "off";
   if (user.role === "Admin") return "admin";
+  // Custom role: everything is explicitly granted or off (no role defaults)
+  if (rd.isCustom) {
+    if (col.type === "mod") return (user.customMods || []).includes(col.key) ? "granted" : "off";
+    if (col.type === "act") return (user.extraActions || []).includes(col.key) ? "granted" : "off";
+    if (col.type === "exp") { const eff = getEffective(user); return eff.exports.includes(col.key) ? "granted" : "off"; }
+    if (col.type === "fld") return (user.deniedFields || []).includes(col.key) ? "denied" : "role";
+    return "off";
+  }
   if (col.type === "mod") {
     if (user.customMods.length === 0) return rd.mods.includes(col.key) ? "role" : "off";
     return user.customMods.includes(col.key)
@@ -648,7 +688,19 @@ function cyclePermission(user, col, setUsers) {
 
   setUsers(prev => prev.map(u => {
     if (u.id !== user.id) return u;
-    const next = { ...u, customMods: [...u.customMods], extraActions: [...u.extraActions], deniedActions: [...u.deniedActions], deniedFields: [...u.deniedFields] };
+    const next = { ...u, customMods: [...(u.customMods||[])], extraActions: [...(u.extraActions||[])], deniedActions: [...(u.deniedActions||[])], deniedFields: [...(u.deniedFields||[])] };
+
+    // Custom role: simple toggle on/off for modules and actions
+    if (rd?.isCustom) {
+      if (col.type === "mod") {
+        next.customMods = next.customMods.includes(col.key) ? next.customMods.filter(m => m !== col.key) : [...next.customMods, col.key];
+      } else if (col.type === "act") {
+        next.extraActions = next.extraActions.includes(col.key) ? next.extraActions.filter(a => a !== col.key) : [...next.extraActions, col.key];
+      } else if (col.type === "fld") {
+        next.deniedFields = next.deniedFields.includes(col.key) ? next.deniedFields.filter(f => f !== col.key) : [...next.deniedFields, col.key];
+      }
+      return next;
+    }
 
     if (col.type === "mod") {
       const inRole = rd.mods.includes(col.key);
@@ -747,7 +799,7 @@ function PermissionTable({ users, setUsers, M, A, uff, dff, onEditUser, onPermUs
                 {/* Frozen: Role */}
                 <td style={{ position: "sticky", left: 160, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
                   padding: "4px 8px", borderBottom: `1px solid ${M.divider}` }}>
-                  <RolePill role={u.role} sm />
+                  <RolePill role={u.role} sm customName={u.customRoleName} />
                 </td>
                 {/* Frozen: Status */}
                 <td style={{ position: "sticky", left: 230, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
@@ -1052,7 +1104,7 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
                         background: u.status==="Active" ? "#22c55e" : u.status==="Suspended" ? "#ef4444" : "#9ca3af" }} />
                     </div>
                     <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:4 }}>
-                      <RolePill role={u.role} sm />
+                      <RolePill role={u.role} sm customName={u.customRoleName} />
                       {overrides > 0 && !isAdmin && (
                         <span style={{ fontSize:9, fontWeight:900, background:"#f5f3ff", color:"#7C3AED",
                           borderRadius:10, padding:"1px 7px", border:"1px solid #ddd6fe" }}>
