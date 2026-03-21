@@ -441,7 +441,7 @@ function PermissionsPanel({ user, onSave, onClose, M, A, uff, dff }) {
 // ══════════════════════════════════════════════════════════════════════════
 // EDIT USER PANEL
 // ══════════════════════════════════════════════════════════════════════════
-function EditPanel({ user, users, onSave, onClose, M, A, uff, dff }) {
+function EditPanel({ user, users, onSave, onClose, onDeactivate, M, A, uff, dff }) {
   const isNew = !user;
   const [form, setForm] = useState(user ? { ...user } : {
     name:"", initials:"", email:"", role:"Operator", status:"Active",
@@ -556,9 +556,12 @@ function EditPanel({ user, users, onSave, onClose, M, A, uff, dff }) {
         <div style={{ padding:"14px 20px", borderTop:`1px solid ${M.divider}`, background:M.surfMid,
           display:"flex", gap:8, alignItems:"center", flexShrink:0 }}>
           {!isNew && (
-            <button style={{ padding:"7px 14px", borderRadius:6, border:"1px solid #fecaca",
+            <button onClick={() => { onClose(); onDeactivate(user); }}
+              style={{ padding:"7px 14px", borderRadius:6, border:"1px solid #fecaca",
               background:"#fff1f2", color:"#be123c", cursor:"pointer", fontSize:12,
-              fontWeight:700, marginRight:"auto", fontFamily:uff }}>🗑 Deactivate</button>
+              fontWeight:700, marginRight:"auto", fontFamily:uff }}>
+              {user.status === "Suspended" ? "✅ Reactivate" : "🗑 Deactivate"}
+            </button>
           )}
           <button onClick={onClose} style={{ padding:"7px 14px", borderRadius:6,
             border:`1px solid ${M.divider}`, background:M.surfLow, color:M.textB,
@@ -573,8 +576,210 @@ function EditPanel({ user, users, onSave, onClose, M, A, uff, dff }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// PERMISSION TABLE VIEW — Users × Permissions matrix with 3-state cells
+// ══════════════════════════════════════════════════════════════════════════
+const PERM_COLUMNS = [
+  ...ALL_MODULES.map(m => ({ key: m, type: "mod", icon: MOD_ICONS[m], label: m })),
+  ...ALL_ACTIONS.map(a => ({ key: a, type: "act", icon: ACT_ICONS[a], label: ACT_LABELS[a] })),
+  ...ALL_EXPORTS.map(e => ({ key: e, type: "exp", icon: EXP_ICONS[e], label: EXP_LABELS[e] })),
+  ...ALL_FIELDS.map(f =>  ({ key: f, type: "fld", icon: "🔒", label: FLD_LABELS[f] })),
+];
+
+const GROUP_RANGES = [
+  { label: "MODULES", color: "#1D4ED8", count: ALL_MODULES.length },
+  { label: "ACTIONS", color: "#7C3AED", count: ALL_ACTIONS.length },
+  { label: "EXPORTS", color: "#15803D", count: ALL_EXPORTS.length },
+  { label: "FIELDS",  color: "#BE123C", count: ALL_FIELDS.length },
+];
+
+function getCellState(user, col) {
+  const rd = ROLE_DEFS[user.role];
+  if (!rd) return "off";
+  if (user.role === "Admin") return "admin";
+  if (col.type === "mod") {
+    if (user.customMods.length === 0) return rd.mods.includes(col.key) ? "role" : "off";
+    return user.customMods.includes(col.key)
+      ? (rd.mods.includes(col.key) ? "role" : "granted")
+      : (rd.mods.includes(col.key) ? "denied" : "off");
+  }
+  if (col.type === "act") {
+    if (user.extraActions.includes(col.key)) return "granted";
+    if (user.deniedActions.includes(col.key)) return "denied";
+    return rd.actions.includes(col.key) ? "role" : "off";
+  }
+  if (col.type === "exp") {
+    const eff = getEffective(user);
+    return eff.exports.includes(col.key) ? "role" : "off";
+  }
+  if (col.type === "fld") {
+    return user.deniedFields.includes(col.key) ? "denied" : "role";
+  }
+  return "off";
+}
+
+const CELL_STYLES = {
+  admin:   { bg: "#f3f4f6", color: "#9ca3af", symbol: "✓", cursor: "not-allowed" },
+  role:    { bg: "#ffffff", color: "#9ca3af", symbol: "✓", cursor: "pointer" },
+  granted: { bg: "#dcfce7", color: "#15803d", symbol: "✓", cursor: "pointer" },
+  denied:  { bg: "#fee2e2", color: "#be123c", symbol: "✗", cursor: "pointer" },
+  off:     { bg: "#ffffff", color: "#e5e7eb", symbol: "",  cursor: "pointer" },
+};
+
+function cyclePermission(user, col, setUsers) {
+  if (user.role === "Admin") return;
+  const rd = ROLE_DEFS[user.role];
+
+  setUsers(prev => prev.map(u => {
+    if (u.id !== user.id) return u;
+    const next = { ...u, customMods: [...u.customMods], extraActions: [...u.extraActions], deniedActions: [...u.deniedActions], deniedFields: [...u.deniedFields] };
+
+    if (col.type === "mod") {
+      const inRole = rd.mods.includes(col.key);
+      if (next.customMods.length === 0) {
+        // first click: fork from role defaults
+        next.customMods = inRole ? rd.mods.filter(m => m !== col.key) : [...rd.mods, col.key];
+      } else if (next.customMods.includes(col.key)) {
+        next.customMods = next.customMods.filter(m => m !== col.key);
+      } else {
+        next.customMods = [...next.customMods, col.key];
+      }
+      // if customMods matches role defaults exactly, reset to empty
+      if (next.customMods.length === rd.mods.length && rd.mods.every(m => next.customMods.includes(m))) {
+        next.customMods = [];
+      }
+    } else if (col.type === "act") {
+      const inRole = rd.actions.includes(col.key);
+      const isExtra = next.extraActions.includes(col.key);
+      const isDenied = next.deniedActions.includes(col.key);
+      if (inRole) {
+        if (!isDenied) { next.deniedActions.push(col.key); next.extraActions = next.extraActions.filter(a => a !== col.key); }
+        else { next.deniedActions = next.deniedActions.filter(a => a !== col.key); }
+      } else {
+        if (!isExtra) { next.extraActions.push(col.key); next.deniedActions = next.deniedActions.filter(a => a !== col.key); }
+        else { next.extraActions = next.extraActions.filter(a => a !== col.key); }
+      }
+    } else if (col.type === "fld") {
+      if (next.deniedFields.includes(col.key)) next.deniedFields = next.deniedFields.filter(f => f !== col.key);
+      else next.deniedFields.push(col.key);
+    }
+    return next;
+  }));
+}
+
+function PermissionTable({ users, setUsers, M, A, uff, dff, onEditUser, onPermUser }) {
+  return (
+    <div style={{ flex: 1, overflow: "auto", background: M.bg }}>
+      <table style={{ borderCollapse: "separate", borderSpacing: 0, fontSize: 11, fontFamily: dff, width: "max-content", minWidth: "100%" }}>
+        {/* Group header row */}
+        <thead>
+          <tr>
+            <th colSpan={4} style={{ position: "sticky", left: 0, zIndex: 4, background: M.surfHigh, borderBottom: `2px solid ${M.divider}` }} />
+            {GROUP_RANGES.map(g => (
+              <th key={g.label} colSpan={g.count} style={{ padding: "5px 0", fontSize: 9, fontWeight: 900,
+                letterSpacing: "0.1em", color: g.color, background: M.surfHigh,
+                borderBottom: `2px solid ${g.color}40`, borderLeft: `2px solid ${M.divider}`, textAlign: "center" }}>
+                {g.label}
+              </th>
+            ))}
+          </tr>
+          {/* Icon header row */}
+          <tr>
+            <th style={{ position: "sticky", left: 0, zIndex: 4, background: M.surfMid, padding: "6px 12px",
+              textAlign: "left", fontSize: 9, fontWeight: 900, color: M.textD, letterSpacing: "0.08em",
+              borderBottom: `1px solid ${M.divider}`, minWidth: 160 }}>USER</th>
+            <th style={{ position: "sticky", left: 160, zIndex: 4, background: M.surfMid, padding: "6px 8px",
+              fontSize: 9, fontWeight: 900, color: M.textD, letterSpacing: "0.08em",
+              borderBottom: `1px solid ${M.divider}`, minWidth: 70 }}>ROLE</th>
+            <th style={{ position: "sticky", left: 230, zIndex: 4, background: M.surfMid, padding: "6px 4px",
+              fontSize: 9, fontWeight: 900, color: M.textD, borderBottom: `1px solid ${M.divider}`, minWidth: 28, textAlign: "center" }}>ST</th>
+            <th style={{ position: "sticky", left: 258, zIndex: 4, background: M.surfMid, padding: "6px 4px",
+              borderBottom: `1px solid ${M.divider}`, borderRight: `2px solid ${M.divider}`, minWidth: 36 }} />
+            {PERM_COLUMNS.map((col, i) => {
+              const isGroupStart = i === 0 || col.type !== PERM_COLUMNS[i - 1].type;
+              return (
+                <th key={col.key} title={col.label}
+                  style={{ padding: "5px 2px", textAlign: "center", fontSize: 13, cursor: "default",
+                    background: M.surfMid, borderBottom: `1px solid ${M.divider}`, minWidth: 34,
+                    borderLeft: isGroupStart ? `2px solid ${M.divider}` : `1px solid ${M.divider}20` }}>
+                  {col.icon}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((u, ri) => {
+            const r = ROLE_DEFS[u.role];
+            const isAdmin = u.role === "Admin";
+            const overrides = countOverrides(u);
+            return (
+              <tr key={u.id} style={{ background: ri % 2 === 0 ? M.surfHigh : M.surfMid }}>
+                {/* Frozen: Name */}
+                <td style={{ position: "sticky", left: 0, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
+                  padding: "7px 12px", borderBottom: `1px solid ${M.divider}`, whiteSpace: "nowrap" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <UserAvatar user={u} size={26} />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: M.textA, fontFamily: uff }}>{u.name}</div>
+                      <div style={{ fontSize: 9, color: M.textD, fontFamily: dff }}>{u.email}</div>
+                    </div>
+                  </div>
+                </td>
+                {/* Frozen: Role */}
+                <td style={{ position: "sticky", left: 160, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
+                  padding: "4px 8px", borderBottom: `1px solid ${M.divider}` }}>
+                  <RolePill role={u.role} sm />
+                </td>
+                {/* Frozen: Status */}
+                <td style={{ position: "sticky", left: 230, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
+                  padding: "4px", borderBottom: `1px solid ${M.divider}`, textAlign: "center" }}>
+                  <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%",
+                    background: u.status === "Active" ? "#22c55e" : u.status === "Suspended" ? "#ef4444" : "#9ca3af" }} />
+                </td>
+                {/* Frozen: Actions */}
+                <td style={{ position: "sticky", left: 258, zIndex: 2, background: ri % 2 === 0 ? M.surfHigh : M.surfMid,
+                  padding: "2px 4px", borderBottom: `1px solid ${M.divider}`, borderRight: `2px solid ${M.divider}` }}>
+                  <div style={{ display: "flex", gap: 2 }}>
+                    <button onClick={() => onEditUser(u)} title="Edit user"
+                      style={{ width: 22, height: 22, borderRadius: 4, border: `1px solid ${M.divider}`,
+                        background: M.surfLow, cursor: "pointer", fontSize: 10, padding: 0 }}>✏️</button>
+                  </div>
+                </td>
+                {/* Permission cells */}
+                {PERM_COLUMNS.map((col, i) => {
+                  const state = getCellState(u, col);
+                  const cs = CELL_STYLES[state];
+                  const isGroupStart = i === 0 || col.type !== PERM_COLUMNS[i - 1].type;
+                  return (
+                    <td key={col.key}
+                      onClick={() => state !== "admin" && cyclePermission(u, col, setUsers)}
+                      title={`${u.name}: ${col.label} — ${state}`}
+                      style={{ padding: 0, borderBottom: `1px solid ${M.divider}`,
+                        borderLeft: isGroupStart ? `2px solid ${M.divider}` : `1px solid ${M.divider}20`,
+                        textAlign: "center", cursor: cs.cursor, userSelect: "none" }}>
+                      <div style={{ width: 32, height: 28, display: "flex", alignItems: "center",
+                        justifyContent: "center", background: cs.bg, color: cs.color,
+                        fontSize: 13, fontWeight: 800, transition: "background 0.1s",
+                        margin: "0 auto" }}>
+                        {cs.symbol}
+                      </div>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // MAIN PAGE — Users & Roles (receives M, A, cfg, fz, dff from App)
 // ══════════════════════════════════════════════════════════════════════════
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function UsersPanel({ M, A, cfg, fz, dff }) {
   const uff = uiFF(cfg.uiFont);
 
@@ -586,6 +791,10 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
   const [permUser, setPermUser]       = useState(null);
   const [selectedCard, setSelectedCard] = useState(null);
   const [toast, setToast]             = useState(null);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [deactivateTarget, setDeactivateTarget] = useState(null); // user object for confirm dialog
+  const [deactivateReason, setDeactivateReason] = useState("");
+  const [viewMode, setViewMode] = useState("cards"); // "cards" | "table"
 
   const showToast = (msg, type="ok") => {
     setToast({ msg, type });
@@ -631,36 +840,76 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
 
   const handleSaveUser = async (form) => {
     if (!form.name || !form.email) { showToast("Name and email are required", "error"); return; }
+    if (!EMAIL_RE.test(form.email)) { showToast("Please enter a valid email address", "error"); return; }
     try {
       if (form.id) {
-        // Update existing user
-        await api.updateUser(form.id, form).catch(() => {});
+        await api.updateUser(form.id, form);
         setUsers(us => us.map(u => u.id === form.id ? { ...u, ...form } : u));
         showToast(`${form.name} updated successfully`);
       } else {
-        // Add new user
         const id = `USR-${String(users.length + 1).padStart(3,"0")}`;
         const newUser = { ...form, id, sessions:0, lastLogin:"Never",
           customMods:[], extraActions:[], deniedActions:[], deniedFields:[] };
-        await api.saveUser(newUser).catch(() => {});
+        await api.saveUser(newUser);
         setUsers(us => [...us, newUser]);
         showToast(`${form.name} added`);
       }
+      setEditUser(null);
     } catch (err) {
-      showToast(`Error: ${err.message}`, "error");
+      showToast(`Save failed: ${err.message}`, "error");
     }
-    setEditUser(null);
   };
 
   const handleSavePerms = async (draft) => {
     try {
-      await api.updateUserPermissions(permUser.id, draft).catch(() => {});
+      await api.updateUserPermissions(permUser.id, draft);
       setUsers(us => us.map(u => u.id === permUser.id ? { ...u, ...draft } : u));
       showToast(`Permissions saved for ${permUser.name}`);
+      setPermUser(null);
     } catch (err) {
-      showToast(`Error: ${err.message}`, "error");
+      showToast(`Permission save failed: ${err.message}`, "error");
     }
-    setPermUser(null);
+  };
+
+  const handleDeactivateUser = async () => {
+    if (!deactivateTarget) return;
+    const u = deactivateTarget;
+    const updatedStatus = u.status === "Suspended" ? "Active" : "Suspended";
+    try {
+      await api.updateUser(u.id, { ...u, status: updatedStatus, notes: u.notes ? `${u.notes} | ${updatedStatus}: ${deactivateReason}` : `${updatedStatus}: ${deactivateReason}` });
+      setUsers(us => us.map(x => x.id === u.id ? { ...x, status: updatedStatus, notes: x.notes ? `${x.notes} | ${updatedStatus}: ${deactivateReason}` : `${updatedStatus}: ${deactivateReason}` } : x));
+      showToast(`${u.name} ${updatedStatus === "Suspended" ? "deactivated" : "reactivated"}`);
+    } catch (err) {
+      showToast(`Failed: ${err.message}`, "error");
+    }
+    setDeactivateTarget(null);
+    setDeactivateReason("");
+  };
+
+  const handleExport = (format) => {
+    setShowExportMenu(false);
+    const rows = filtered.map(u => ({
+      ID: u.id, Name: u.name, Email: u.email, Role: u.role, Status: u.status,
+      Department: u.dept || "", ReportsTo: u.reportTo || "", LastLogin: u.lastLogin,
+      Sessions: u.sessions, Overrides: countOverrides(u), Notes: u.notes || "",
+    }));
+    if (format === "clipboard") {
+      const header = Object.keys(rows[0]).join("\t");
+      const body = rows.map(r => Object.values(r).join("\t")).join("\n");
+      navigator.clipboard.writeText(header + "\n" + body).then(
+        () => showToast(`${rows.length} users copied to clipboard`),
+        () => showToast("Clipboard copy failed", "error"),
+      );
+    } else if (format === "csv") {
+      const header = Object.keys(rows[0]).join(",");
+      const body = rows.map(r => Object.values(r).map(v => `"${String(v).replace(/"/g,'""')}"`).join(",")).join("\n");
+      const blob = new Blob([header + "\n" + body], { type: "text/csv" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `CC_ERP_Users_${new Date().toISOString().slice(0,10)}.csv`; a.click();
+      showToast(`Exported ${rows.length} users as CSV`);
+    } else {
+      showToast(`${format.toUpperCase()} export coming soon`, "error");
+    }
   };
 
   return (
@@ -677,8 +926,38 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
             style={{ padding:"5px 10px 5px 26px", border:`1px solid ${M.divider}`, borderRadius:6,
               fontSize:12, width:200, color:M.textA, background:M.surfLow, fontFamily:uff, outline:"none" }} />
         </div>
-        <button style={{ padding:"6px 14px", borderRadius:6, border:`1px solid ${M.divider}`,
-          background:M.surfLow, color:M.textB, cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:uff }}>📤 Export</button>
+        <div style={{ display:"flex", border:`1px solid ${M.divider}`, borderRadius:6, overflow:"hidden" }}>
+          {[["cards","🃏"],["table","📊"]].map(([mode, icon]) => (
+            <button key={mode} onClick={() => setViewMode(mode)} title={mode === "cards" ? "Card View" : "Permission Table"}
+              style={{ padding:"5px 10px", border:"none", fontSize:14, cursor:"pointer", fontFamily:uff,
+                background: viewMode === mode ? A.a : M.surfLow,
+                color: viewMode === mode ? "#fff" : M.textC,
+                transition:"all 0.12s" }}>
+              {icon}
+            </button>
+          ))}
+        </div>
+        <div style={{ position:"relative" }}>
+          <button onClick={() => setShowExportMenu(v => !v)} style={{ padding:"6px 14px", borderRadius:6, border:`1px solid ${M.divider}`,
+            background: showExportMenu ? A.al : M.surfLow, color: showExportMenu ? A.a : M.textB,
+            cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:uff }}>📤 Export ▾</button>
+          {showExportMenu && (
+            <div style={{ position:"absolute", top:"100%", right:0, marginTop:4, background:M.surfHigh,
+              border:`1px solid ${M.divider}`, borderRadius:8, boxShadow:"0 6px 24px rgba(0,0,0,0.12)",
+              zIndex:100, minWidth:180, overflow:"hidden", animation:"scaleUp 0.12s" }}>
+              {[["clipboard","📋 Copy to Clipboard"],["csv","📊 Download CSV"],["pdf","📄 Export PDF"],["excel","📗 Export Excel"]].map(([fmt, label]) => (
+                <button key={fmt} onClick={() => handleExport(fmt)}
+                  style={{ display:"block", width:"100%", padding:"9px 16px", border:"none",
+                    background:"transparent", color:M.textA, cursor:"pointer", fontSize:12,
+                    fontWeight:600, textAlign:"left", fontFamily:uff }}
+                  onMouseEnter={e => e.currentTarget.style.background = M.surfMid}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button onClick={() => setEditUser(false)}
           style={{ padding:"6px 18px", borderRadius:6, border:"none",
             background:A.a, color:"#fff", cursor:"pointer", fontSize:13, fontWeight:700, fontFamily:uff }}>+ Add User</button>
@@ -716,17 +995,19 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
         </div>
       </div>
 
-      {/* Card grid */}
-      <div style={{ flex:1, overflow:"auto", padding:"20px 24px" }}>
-        {loading ? (
-          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", gap:12 }}>
-            <div style={{ fontSize:28, animation:"spin 1s linear infinite" }}>⏳</div>
-            <div style={{ fontSize:13, color:M.textC, fontFamily:uff, fontWeight:700 }}>Loading users from Google Sheet…</div>
-            <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
-          </div>
-        ) : (
-        <>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:14 }}>
+      {/* Content area — Cards or Table */}
+      {loading ? (
+        <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:12 }}>
+          <div style={{ fontSize:28, animation:"spin 1s linear infinite" }}>⏳</div>
+          <div style={{ fontSize:13, color:M.textC, fontFamily:uff, fontWeight:700 }}>Loading users from Google Sheet…</div>
+          <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        </div>
+      ) : viewMode === "table" ? (
+        <PermissionTable users={filtered} setUsers={setUsers} M={M} A={A} uff={uff} dff={dff}
+          onEditUser={u => setEditUser(u)} onPermUser={u => setPermUser(u)} />
+      ) : (
+        <div style={{ flex:1, overflow:"auto", padding:"20px 24px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(240px, 1fr))", gap:14 }}>
           {filtered.map(u => {
             const r         = ROLE_DEFS[u.role];
             const eff       = getEffective(u);
@@ -855,15 +1136,14 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
           })}
         </div>
 
-        {filtered.length === 0 && (
-          <div style={{ textAlign:"center", padding:"60px 0" }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>👥</div>
-            <div style={{ fontSize:14, color:M.textC }}>No users match your filter</div>
-          </div>
-        )}
-        </>
-        )}
-      </div>
+          {filtered.length === 0 && (
+            <div style={{ textAlign:"center", padding:"60px 0" }}>
+              <div style={{ fontSize:40, marginBottom:12 }}>👥</div>
+              <div style={{ fontSize:14, color:M.textC }}>No users match your filter</div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Status bar */}
       {cfg.showStatusBar && (
@@ -890,6 +1170,7 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
           users={users}
           onSave={handleSaveUser}
           onClose={() => setEditUser(null)}
+          onDeactivate={u => setDeactivateTarget(u)}
           M={M} A={A} uff={uff} dff={dff}
         />
       )}
@@ -900,6 +1181,57 @@ export default function UsersPanel({ M, A, cfg, fz, dff }) {
           onClose={() => setPermUser(null)}
           M={M} A={A} uff={uff} dff={dff}
         />
+      )}
+
+      {/* Deactivate Confirm Dialog */}
+      {deactivateTarget && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:500,
+          display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeIn 0.12s" }}
+          onClick={e => { if (e.target === e.currentTarget) { setDeactivateTarget(null); setDeactivateReason(""); } }}>
+          <div style={{ width:400, background:M.surfHigh, borderRadius:14, overflow:"hidden",
+            boxShadow:"0 12px 40px rgba(0,0,0,0.2)", animation:"scaleUp 0.15s", fontFamily:uff }}>
+            <div style={{ padding:"18px 22px 14px", borderBottom:`1px solid ${M.divider}` }}>
+              <div style={{ fontSize:15, fontWeight:800, color:M.textA }}>
+                {deactivateTarget.status === "Suspended" ? "✅ Reactivate User" : "🗑 Deactivate User"}
+              </div>
+              <div style={{ fontSize:12, color:M.textC, marginTop:4 }}>
+                {deactivateTarget.status === "Suspended"
+                  ? `Reactivate ${deactivateTarget.name}? They will regain access.`
+                  : `Suspend ${deactivateTarget.name}? They will lose all access immediately.`}
+              </div>
+            </div>
+            <div style={{ padding:"16px 22px" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14 }}>
+                <UserAvatar user={deactivateTarget} size={36} />
+                <div>
+                  <div style={{ fontSize:13, fontWeight:700, color:M.textA }}>{deactivateTarget.name}</div>
+                  <div style={{ fontSize:11, color:M.textC, fontFamily:dff }}>{deactivateTarget.email} · {deactivateTarget.role}</div>
+                </div>
+              </div>
+              <div style={{ fontSize:11, fontWeight:700, color:M.textB, marginBottom:4 }}>Reason (optional)</div>
+              <textarea value={deactivateReason} onChange={e => setDeactivateReason(e.target.value)}
+                placeholder="e.g. On leave, resigned, policy violation…"
+                rows={2} style={{ width:"100%", padding:"8px 10px", borderRadius:6, border:`1px solid ${M.divider}`,
+                  fontSize:12, fontFamily:uff, resize:"vertical", background:M.surfLow, color:M.textA, outline:"none" }} />
+            </div>
+            <div style={{ padding:"12px 22px 16px", display:"flex", gap:8, justifyContent:"flex-end" }}>
+              <button onClick={() => { setDeactivateTarget(null); setDeactivateReason(""); }}
+                style={{ padding:"7px 16px", borderRadius:6, border:`1px solid ${M.divider}`,
+                  background:M.surfLow, color:M.textB, cursor:"pointer", fontSize:12, fontWeight:600, fontFamily:uff }}>Cancel</button>
+              <button onClick={handleDeactivateUser}
+                style={{ padding:"7px 18px", borderRadius:6, border:"none", cursor:"pointer",
+                  fontSize:12, fontWeight:700, fontFamily:uff,
+                  background: deactivateTarget.status === "Suspended" ? "#15803d" : "#be123c", color:"#fff" }}>
+                {deactivateTarget.status === "Suspended" ? "✅ Reactivate" : "🗑 Deactivate"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Close export menu on outside click */}
+      {showExportMenu && (
+        <div style={{ position:"fixed", inset:0, zIndex:50 }} onClick={() => setShowExportMenu(false)} />
       )}
 
       {/* Toast */}
