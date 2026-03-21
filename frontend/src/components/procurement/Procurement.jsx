@@ -951,7 +951,7 @@ export default function Procurement({ M: rawM, A, cfg, fz, dff }){
   const uff=uiFF(cfg.uiFont);
   const pyV=PY_MAP[cfg.density];
 
-  const[tab,setTab]=useState("entry");
+  const[tab,setTab]=useState("records");
   const[entity,setEntity]=useState("po");
   const[poData,setPOData]=useState({poCode:"",date:"",supplier:"",supName:"",poType:"Fabric",season:"SS25",delivDate:"",payTerms:"30 Days Credit",currency:"INR",delivLoc:"Confidence Clothing, Ludhiana",physLink:"",notes:""});
   const[toasts,setToasts]=useState([]);
@@ -1006,7 +1006,7 @@ export default function Procurement({ M: rawM, A, cfg, fz, dff }){
   };
 
   const TABS=[
-    {id:"entry",l:"Entry"},{id:"records",l:"Records"},{id:"bulk",l:"Bulk Entry"},
+    {id:"records",l:"Records"},{id:"entry",l:"Entry"},{id:"bulk",l:"Bulk Entry"},
   ];
   const ENTITIES=[
     {id:"po",l:"Purchase Orders",c:"#E8690A"},

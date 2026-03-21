@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react"; // v6.2
 import { uiFF, dataFF } from '../../constants/fonts';
 import api from '../../services/api';
 

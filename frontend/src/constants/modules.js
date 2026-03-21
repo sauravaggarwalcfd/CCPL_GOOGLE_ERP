@@ -1,12 +1,12 @@
 export const MODS = [
+  {id:"dashboard",  icon:"📈",lbl:"Dashboard",    badge:0, desc:"Reports · Analytics",      col:"#0E7490",stats:null, sub:[{icon:"📊",lbl:"Reports"},{icon:"📉",lbl:"Analytics"}]},
+  {id:"masters",    icon:"🗂️",lbl:"Masters",      badge:0, desc:"Items · Suppliers · Setup", col:"#B45309",stats:null, sub:[{icon:"📦",lbl:"Items"},{icon:"🏢",lbl:"Suppliers"},{icon:"⚙️",lbl:"Setup"}]},
   {id:"procurement",icon:"📦",lbl:"Procurement", badge:0, desc:"PO · GRN · Returns",       col:"#E8690A",stats:null, sub:[{icon:"🗒️",lbl:"Purchase Orders"},{icon:"📥",lbl:"Goods Receipt"},{icon:"↩️",lbl:"Returns"}]},
   {id:"production", icon:"🏭",lbl:"Production",  badge:0, desc:"Work Orders · BOM · JW",   col:"#0078D4",stats:null, sub:[{icon:"📋",lbl:"Work Orders"},{icon:"🔩",lbl:"BOM"},{icon:"🏗️",lbl:"Job Work"}]},
   {id:"inventory",  icon:"🗄️",lbl:"Inventory",   badge:0, desc:"Stock · Transfer · Alerts", col:"#007C7C",stats:null, sub:[{icon:"📊",lbl:"Stock"},{icon:"🔄",lbl:"Transfer"},{icon:"🔔",lbl:"Alerts"}]},
   {id:"quality",    icon:"🔬",lbl:"Quality",      badge:0, desc:"Fabric · Inline · AQL",     col:"#7C3AED",stats:null, sub:[{icon:"🧵",lbl:"Fabric"},{icon:"📐",lbl:"Inline"},{icon:"✅",lbl:"AQL"}]},
   {id:"sales",      icon:"💼",lbl:"Sales",        badge:0, desc:"Orders · DC · Invoice",     col:"#15803D",stats:null, sub:[{icon:"🛒",lbl:"Orders"},{icon:"🚚",lbl:"Delivery Challan"},{icon:"🧾",lbl:"Invoice"}]},
   {id:"finance",    icon:"💰",lbl:"Finance",      badge:0, desc:"Payments · GST · Reports",  col:"#BE123C",stats:null, sub:[{icon:"💳",lbl:"Payments"},{icon:"📑",lbl:"GST"},{icon:"📊",lbl:"Reports"}]},
-  {id:"masters",    icon:"🗂️",lbl:"Masters",      badge:0, desc:"Items · Suppliers · Setup", col:"#B45309",stats:null, sub:[{icon:"📦",lbl:"Items"},{icon:"🏢",lbl:"Suppliers"},{icon:"⚙️",lbl:"Setup"}]},
-  {id:"dashboard",  icon:"📈",lbl:"Dashboard",    badge:0, desc:"Reports · Analytics",      col:"#0E7490",stats:null, sub:[{icon:"📊",lbl:"Reports"},{icon:"📉",lbl:"Analytics"}]},
 ];
 
 export const CMD_INDEX = [

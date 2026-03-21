@@ -81,14 +81,35 @@ const FILES = {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MASTERS HOME — Card grid overview
 // ═══════════════════════════════════════════════════════════════════════════════
+// ── View mode icons (SVG paths for corporate look) ──
+const VIEW_ICONS = {
+  grid: (c) => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke={c} strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5" stroke={c} strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5" stroke={c} strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5" stroke={c} strokeWidth="1.5"/></svg>,
+  table: (c) => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="2" stroke={c} strokeWidth="1.3"/><line x1="1" y1="5" x2="15" y2="5" stroke={c} strokeWidth="1"/><line x1="1" y1="8.5" x2="15" y2="8.5" stroke={c} strokeWidth="1"/><line x1="1" y1="12" x2="15" y2="12" stroke={c} strokeWidth="1"/><line x1="5.5" y1="5" x2="5.5" y2="15" stroke={c} strokeWidth="1"/><line x1="10.5" y1="5" x2="10.5" y2="15" stroke={c} strokeWidth="1"/></svg>,
+};
+
+// ── Tag colors ──
+const TAG_COLORS = { Core:"#dc2626", Active:"#059669", Finance:"#7c3aed", System:"#6b7280", Admin:"#d97706" };
+
 function MastersHome({ M, A, uff, dff, onSelectSheet, sheetCounts }) {
+  const [viewMode, setViewMode] = useState("grid");
+  const [search, setSearch] = useState("");
+  const [expandedFiles, setExpandedFiles] = useState({});
+
   const totalSheets  = Object.values(FILES).reduce((a, f) => a + f.sheets.length, 0);
   const totalRecords = Object.values(FILES).reduce((a, f) => a + f.sheets.reduce((b, s) => b + (sheetCounts[s.key] || 0), 0), 0);
+
+  const matchesSearch = (sheet) => {
+    if (!search) return true;
+    const q = search.toLowerCase();
+    return sheet.name.toLowerCase().includes(q) || sheet.desc.toLowerCase().includes(q) || sheet.tags.some(t => t.toLowerCase().includes(q));
+  };
+
+  const toggleFile = (fk) => setExpandedFiles(p => ({ ...p, [fk]: !p[fk] }));
 
   return (
     <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px 40px" }}>
       {/* KPI row */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
         {[["Total Sheets", totalSheets, "📋"], ["Total Records", totalRecords, "📊"], ["Files", 3, "🗂"]].map(([l, v, ic]) => (
           <div key={l} style={{ background: M.surfHigh, border: `1px solid ${M.divider}`, borderRadius: 8, padding: "12px 18px", display: "flex", alignItems: "center", gap: 12 }}>
             <span style={{ fontSize: 22 }}>{ic}</span>
@@ -100,60 +121,135 @@ function MastersHome({ M, A, uff, dff, onSelectSheet, sheetCounts }) {
         ))}
       </div>
 
-      {/* File sections */}
-      {Object.values(FILES).map(file => (
-        <div key={file.key} style={{ marginBottom: 28 }}>
-          {/* File header */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14, padding: "10px 14px", background: file.color, borderRadius: 10, boxShadow: "0 2px 8px rgba(0,0,0,0.12)" }}>
-            <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 6, padding: "4px 12px", fontSize: 13, fontWeight: 900, color: "#fff", fontFamily: uff }}>
-              {file.icon} {file.label}
-            </div>
-            <div style={{ display: "flex", gap: 16 }}>
-              {[["Sheets", file.sheets.length], ["Records", file.sheets.reduce((a, s) => a + (sheetCounts[s.key] || 0), 0)]].map(([l, v]) => (
-                <div key={l} style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                  <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontWeight: 700, fontFamily: uff }}>{l}:</span>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: "#fff", fontFamily: dff }}>{v}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Cards grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
-            {file.sheets.map(sheet => {
-              const count = sheetCounts[sheet.key] || 0;
-              return (
-                <div key={sheet.key} className="card-wrap" style={{ position: "relative" }}>
-                  {/* Add New pill */}
-                  <button className="add-btn"
-                    onClick={e => { e.stopPropagation(); onSelectSheet(file.key, sheet); }}
-                    style={{ position: "absolute", top: -10, right: 10, zIndex: 10, background: A.a, border: "none", borderRadius: 5, padding: "3px 10px", fontSize: 9, fontWeight: 900, color: "#fff", cursor: "pointer", fontFamily: uff, boxShadow: `0 2px 8px ${A.a}50` }}>
-                    + Add
-                  </button>
-                  {/* Card */}
-                  <div className="card-hover"
-                    onClick={() => onSelectSheet(file.key, sheet)}
-                    style={{ background: M.surfHigh, border: `1.5px solid ${M.divider}`, borderRadius: 9, padding: "14px 14px 12px", cursor: "pointer", transition: "all .15s", boxShadow: "0 1px 4px rgba(0,0,0,0.05)", height: "100%", boxSizing: "border-box" }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = file.color; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.1)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = M.divider; e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.05)"; }}>
-
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
-                      <div style={{ width: 36, height: 36, background: file.accent, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>{sheet.icon}</div>
-                      <div style={{ background: file.badge, color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 20, fontFamily: dff }}>{count}</div>
-                    </div>
-                    <div style={{ fontSize: 12, fontWeight: 900, color: M.textA, marginBottom: 3, lineHeight: 1.3, fontFamily: uff }}>{sheet.name}</div>
-                    <div style={{ fontSize: 10, color: M.textD, marginBottom: 10, fontFamily: uff }}>{sheet.desc}</div>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
-                      {sheet.tags.map(t => <span key={t} style={{ fontSize: 9, fontWeight: 800, padding: "1px 6px", borderRadius: 3, background: M.surfMid, color: M.textC, textTransform: "uppercase", fontFamily: uff }}>{t}</span>)}
-                    </div>
-                    <div style={{ paddingTop: 9, borderTop: `1px solid ${M.bg}`, fontSize: 10, fontWeight: 800, color: A.a, fontFamily: uff }}>Open →</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* View toggle toolbar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, padding: "8px 12px",
+        background: M.surfHigh, border: `1px solid ${M.divider}`, borderRadius: 8 }}>
+        {/* Search */}
+        <div style={{ position: "relative", flex: "0 0 220px" }}>
+          <span style={{ position: "absolute", left: 8, top: "50%", transform: "translateY(-50%)", fontSize: 13, color: M.textD, pointerEvents: "none" }}>🔍</span>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search masters..."
+            style={{ width: "100%", padding: "6px 8px 6px 28px", border: `1px solid ${M.divider}`, borderRadius: 6,
+              fontSize: 11, color: M.textA, background: M.surfLow, fontFamily: uff, boxSizing: "border-box", outline: "none" }} />
         </div>
-      ))}
+
+        <div style={{ flex: 1 }} />
+
+        {/* View mode toggle */}
+        <div style={{ display: "flex", gap: 2, background: M.surfLow, borderRadius: 6, padding: 2, border: `1px solid ${M.divider}` }}>
+          {(["grid", "table"]).map(v => (
+            <button key={v} onClick={() => setViewMode(v)}
+              title={v.charAt(0).toUpperCase() + v.slice(1) + " View"}
+              style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: "5px 10px",
+                borderRadius: 5, border: "none", cursor: "pointer", transition: "all .15s",
+                background: viewMode === v ? A.a : "transparent",
+                color: viewMode === v ? "#fff" : M.textC }}>
+              {VIEW_ICONS[v](viewMode === v ? "#fff" : M.textC)}
+              <span style={{ fontSize: 10, fontWeight: 800, fontFamily: uff, textTransform: "uppercase" }}>{v}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* File sections */}
+      {Object.values(FILES).map(file => {
+        const filteredSheets = file.sheets.filter(matchesSearch);
+        if (filteredSheets.length === 0) return null;
+        const isCollapsed = expandedFiles[file.key] === false;
+
+        return (
+          <div key={file.key} style={{ marginBottom: 28 }}>
+            {/* File header */}
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isCollapsed ? 0 : 14, padding: "10px 14px", background: file.color, borderRadius: isCollapsed ? 10 : "10px 10px 10px 10px", boxShadow: "0 2px 8px rgba(0,0,0,0.12)", cursor: "pointer" }}
+              onClick={() => toggleFile(file.key)}>
+              <span style={{ color: "#fff", fontSize: 14, fontWeight: 900, transition: "transform .2s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▼</span>
+              <div style={{ background: "rgba(255,255,255,0.15)", borderRadius: 6, padding: "4px 12px", fontSize: 13, fontWeight: 900, color: "#fff", fontFamily: uff }}>
+                {file.icon} {file.label}
+              </div>
+              <div style={{ display: "flex", gap: 16 }}>
+                {[["Sheets", filteredSheets.length], ["Records", filteredSheets.reduce((a, s) => a + (sheetCounts[s.key] || 0), 0)]].map(([l, v]) => (
+                  <div key={l} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                    <span style={{ fontSize: 10, color: "rgba(255,255,255,0.6)", fontWeight: 700, fontFamily: uff }}>{l}:</span>
+                    <span style={{ fontSize: 11, fontWeight: 900, color: "#fff", fontFamily: dff }}>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {!isCollapsed && viewMode === "grid" && (
+              /* ═══ GRID VIEW (COMPACT) ═══ */
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 8 }}>
+                {filteredSheets.map(sheet => {
+                  const count = sheetCounts[sheet.key] || 0;
+                  return (
+                    <div key={sheet.key} className="card-hover"
+                      onClick={() => onSelectSheet(file.key, sheet)}
+                      style={{ background: M.surfHigh, border: `1.5px solid ${M.divider}`, borderRadius: 7,
+                        padding: "8px 10px", cursor: "pointer", transition: "all .12s",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.04)", display: "flex", alignItems: "center", gap: 8 }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = file.color; e.currentTarget.style.boxShadow = "0 3px 12px rgba(0,0,0,0.08)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = M.divider; e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}>
+                      <div style={{ width: 26, height: 26, background: file.accent, borderRadius: 6,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, flexShrink: 0 }}>{sheet.icon}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: M.textA, fontFamily: uff,
+                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sheet.name}</div>
+                      </div>
+                      <span style={{ background: file.badge, color: "#fff", fontSize: 9, fontWeight: 900,
+                        padding: "1px 6px", borderRadius: 14, fontFamily: dff, flexShrink: 0 }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!isCollapsed && viewMode === "table" && (
+              /* ═══ TABLE VIEW ═══ */
+              <div style={{ border: `1px solid ${M.divider}`, borderRadius: 8, overflow: "hidden" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11, fontFamily: uff }}>
+                  <thead>
+                    <tr style={{ background: M.surfLow }}>
+                      {["", "Master Name", "Description", "Tags", "Records", ""].map((h, i) => (
+                        <th key={i} style={{ padding: "8px 10px", textAlign: "left", fontSize: 9, fontWeight: 900, color: M.textD,
+                          textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `2px solid ${file.color}`,
+                          ...(i === 4 ? { textAlign: "center", width: 70 } : {}),
+                          ...(i === 5 ? { width: 60 } : {}),
+                          ...(i === 0 ? { width: 36 } : {}) }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSheets.map((sheet, idx) => {
+                      const count = sheetCounts[sheet.key] || 0;
+                      return (
+                        <tr key={sheet.key}
+                          onClick={() => onSelectSheet(file.key, sheet)}
+                          style={{ cursor: "pointer", background: idx % 2 === 0 ? M.surfHigh : M.surfLow, transition: "background .12s" }}
+                          onMouseEnter={e => e.currentTarget.style.background = file.accent}
+                          onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? M.surfHigh : M.surfLow}>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}`, textAlign: "center", fontSize: 16 }}>{sheet.icon}</td>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}`, fontWeight: 800, color: M.textA }}>{sheet.name}</td>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}`, color: M.textD, fontSize: 10 }}>{sheet.desc}</td>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}` }}>
+                            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+                              {sheet.tags.map(t => <span key={t} style={{ fontSize: 8, fontWeight: 800, padding: "1px 5px", borderRadius: 3, background: (TAG_COLORS[t] || M.textC) + "18", color: TAG_COLORS[t] || M.textC, textTransform: "uppercase" }}>{t}</span>)}
+                            </div>
+                          </td>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}`, textAlign: "center" }}>
+                            <span style={{ background: file.badge, color: "#fff", fontSize: 10, fontWeight: 900, padding: "2px 8px", borderRadius: 14, fontFamily: dff }}>{count}</span>
+                          </td>
+                          <td style={{ padding: "7px 10px", borderBottom: `1px solid ${M.divider}`, textAlign: "center" }}>
+                            <span style={{ fontSize: 10, fontWeight: 800, color: A.a }}>Open →</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
