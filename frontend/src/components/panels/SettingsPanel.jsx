@@ -18,7 +18,7 @@ export default function SettingsPanel({M,A,cfg,onApply,onClose}){
   return(
     <>
       <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:498,background:"rgba(0,0,0,.45)",backdropFilter:"blur(2px)"}}/>
-      <div className="sp-anim" style={{position:"fixed",top:0,right:0,width:isSchema?820:420,height:"100vh",background:M.dropBg,borderLeft:`1px solid ${M.divider}`,boxShadow:M.shadow,zIndex:499,display:"flex",flexDirection:"column",fontFamily:"inherit",transition:"width .25s ease"}}>
+      <div className="sp-anim" style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:isSchema?820:480,maxHeight:"88vh",background:M.dropBg,border:`1px solid ${M.divider}`,borderRadius:14,boxShadow:"0 12px 40px rgba(0,0,0,0.18)",zIndex:499,display:"flex",flexDirection:"column",fontFamily:"inherit",transition:"width .25s ease",overflow:"hidden"}}>
         {/* Header */}
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${M.divider}`,flexShrink:0}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
