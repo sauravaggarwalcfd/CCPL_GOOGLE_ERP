@@ -457,11 +457,12 @@ function EditPanel({ user, users, onSave, onClose, onDeactivate, M, A, uff, dff 
   }, [form.name]);
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", zIndex:400,
-      display:"flex", justifyContent:"flex-end", animation:"fadeIn 0.15s" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:400,
+      display:"flex", alignItems:"center", justifyContent:"center", animation:"fadeIn 0.15s" }}
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div style={{ width:420, height:"100vh", background:M.surfHigh, display:"flex",
-        flexDirection:"column", boxShadow:"-6px 0 28px rgba(0,0,0,0.10)", animation:"slideInRight 0.22s", fontFamily:uff }}>
+      <div style={{ width:480, maxHeight:"85vh", background:M.surfHigh, display:"flex",
+        flexDirection:"column", boxShadow:"0 12px 40px rgba(0,0,0,0.18)", animation:"scaleUp 0.18s",
+        fontFamily:uff, borderRadius:14, overflow:"hidden" }}>
 
         <div style={{ padding:"16px 20px", borderBottom:`1px solid ${M.divider}`,
           display:"flex", alignItems:"center", justifyContent:"space-between",
