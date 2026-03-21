@@ -16,7 +16,6 @@ import api from './services/api';
 
 export default function App(){
   const [cfg,     setCfg]     = useState({...DEFAULTS});
-  const [cfgOpen, setCfgOpen] = useState(false);
   const [sw,      setSw]      = useState(DEFAULTS.sbWidth);
   const [drag,    setDrag]    = useState(false);
   const [actMod,  setActMod]  = useState(null);
@@ -59,7 +58,7 @@ export default function App(){
   useEffect(()=>{
     const handler = e => {
       if((e.ctrlKey||e.metaKey)&&e.key==="k"){ e.preventDefault(); setCmdOpen(o=>!o); }
-      if(e.key==="Escape"){ setCmdOpen(false); setNotifOpen(false); setCfgOpen(false); }
+      if(e.key==="Escape"){ setCmdOpen(false); setNotifOpen(false); }
     };
     window.addEventListener("keydown",handler);
     return ()=>window.removeEventListener("keydown",handler);
@@ -264,7 +263,7 @@ export default function App(){
 
         {/* Notification Bell */}
         <div style={{position:"relative",flexShrink:0}}>
-          <button onClick={()=>{setNotifOpen(o=>!o);setShowAll(false);setCfgOpen(false);}} style={{
+          <button onClick={()=>{setNotifOpen(o=>!o);setShowAll(false);}} style={{
             width:34,height:34,borderRadius:6,margin:"0 4px",
             background:notifOpen?A.a:M.surfLow,
             border:`1px solid ${notifOpen?A.a:M.shellBd}`,
@@ -292,7 +291,7 @@ export default function App(){
         </div>
 
         {/* Settings */}
-        <button onClick={()=>{setCfgOpen(o=>!o);setNotifOpen(false);}} style={{width:34,height:34,borderRadius:6,margin:"0 4px",background:cfgOpen?A.a:M.surfLow,border:`1px solid ${cfgOpen?A.a:M.shellBd}`,color:cfgOpen?"#fff":M.textB,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>⚙️</button>
+        <button onClick={()=>{setActMod("settings");setNotifOpen(false);}} style={{width:34,height:34,borderRadius:6,margin:"0 4px",background:actMod==="settings"?A.a:M.surfLow,border:`1px solid ${actMod==="settings"?A.a:M.shellBd}`,color:actMod==="settings"?"#fff":M.textB,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",transition:"all .15s"}}>⚙️</button>
 
         {/* Presence separator */}
         <div style={{width:1,height:24,background:M.divider,marginLeft:4,marginRight:8,flexShrink:0}}/>
@@ -453,7 +452,7 @@ export default function App(){
             })}
 
             <div style={{height:1,background:M.divider,margin:"6px 10px"}}/>
-            {[{icon:"⚙️",lbl:"Settings",fn:()=>setCfgOpen(true),act:cfgOpen},
+            {[{icon:"⚙️",lbl:"Settings",fn:()=>setActMod("settings"),act:actMod==="settings"},
               {icon:"👥",lbl:"Users",    fn:()=>setActMod("users"),act:actMod==="users"}].map((x,i)=>(
               <div key={i} style={{padding:collapsed?"0":"2px 8px"}}>
                 <button onClick={x.fn}
@@ -497,6 +496,8 @@ export default function App(){
           <Masters M={M} A={A} cfg={cfg} fz={fz} dff={dff} setCfg={setCfg} />
         ) : actMod === "users" ? (
           <UsersPanel M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
+        ) : actMod === "settings" ? (
+          <SettingsPanel M={M} A={A} cfg={cfg} onApply={newCfg=>setCfg(newCfg)} />
         ) : actMod && actMod !== "dashboard" ? (
           /* ── Placeholder for modules under development ── */
           (() => {
@@ -649,8 +650,7 @@ export default function App(){
         )}
       </div>
 
-      {/* SETTINGS PANEL */}
-      {cfgOpen&&<SettingsPanel M={M} A={A} cfg={cfg} onApply={newCfg=>setCfg(newCfg)} onClose={()=>setCfgOpen(false)}/>}
+      {/* SETTINGS PANEL — now rendered inline in main content area */}
 
       {/* CMD PALETTE */}
       {cmdOpen&&(

@@ -10,23 +10,20 @@ import SchemaEditor from '../schema/SchemaEditor';
 
 const SP_TABS=[["appearance","🎨 Appearance"],["schema","🗂 Schema Editor"]];
 
-export default function SettingsPanel({M,A,cfg,onApply,onClose}){
+export default function SettingsPanel({M,A,cfg,onApply}){
   const [draft,setDraft]=useState({...cfg});
   const [spTab,setSpTab]=useState("appearance");
   const set=(k,v)=>setDraft(d=>({...d,[k]:v}));
   const isSchema=spTab==="schema";
   return(
-    <>
-      <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:498,background:"rgba(0,0,0,.45)",backdropFilter:"blur(2px)"}}/>
-      <div className="sp-anim" style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",width:isSchema?820:480,maxHeight:"88vh",background:M.dropBg,border:`1px solid ${M.divider}`,borderRadius:14,boxShadow:"0 12px 40px rgba(0,0,0,0.18)",zIndex:499,display:"flex",flexDirection:"column",fontFamily:"inherit",transition:"width .25s ease",overflow:"hidden"}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",background:M.bg,fontFamily:"inherit"}}>
         {/* Header */}
-        <div style={{padding:"16px 20px",borderBottom:`1px solid ${M.divider}`,flexShrink:0}}>
+        <div style={{padding:"16px 20px",borderBottom:`1px solid ${M.divider}`,flexShrink:0,background:M.surfHigh}}>
           <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
             <div>
               <div style={{fontSize:15,fontWeight:900,color:M.textA}}>⚙ Workspace Settings</div>
               <div style={{fontSize:10,color:M.textC,marginTop:2}}>Personalise your ERP interface</div>
             </div>
-            <button onClick={onClose} style={{width:30,height:30,borderRadius:6,border:`1px solid ${M.divider}`,background:M.surfMid,color:M.textC,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
           </div>
           {/* Tab bar */}
           <div style={{display:"flex",gap:4,marginTop:12}}>
@@ -35,7 +32,7 @@ export default function SettingsPanel({M,A,cfg,onApply,onClose}){
             );})}
           </div>
         </div>
-        <div style={{flex:1,overflowY:"auto",padding:isSchema?"0":"4px 20px 20px"}}>
+        <div style={{flex:1,overflowY:"auto",padding:isSchema?"0":"20px 24px 24px"}}><div style={{maxWidth:isSchema?undefined:560,margin:isSchema?undefined:"0 auto"}}>
           {isSchema?<SchemaEditor themeM={M} accentA={A}/>:<>
           {/* Colour Mode */}
           <SDiv label="Colour Mode" M={M} first/>
@@ -129,13 +126,12 @@ export default function SettingsPanel({M,A,cfg,onApply,onClose}){
             </div>
           ))}
           </>}
-        </div>
-        {/* Footer — only for Appearance tab */}
-        {!isSchema&&<div style={{padding:"14px 20px",borderTop:`1px solid ${M.divider}`,background:M.surfMid,flexShrink:0,display:"flex",flexDirection:"column",gap:8}}>
-          <button onClick={()=>setDraft({...DEFAULTS})} style={{width:"100%",padding:"8px",borderRadius:6,border:`1px solid ${M.divider}`,background:"transparent",color:M.textC,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>↩ Reset Defaults</button>
-          <button onClick={()=>{onApply(draft);onClose();}} style={{width:"100%",padding:"9px",borderRadius:6,border:"none",background:ACCENTS[draft.accent].a,color:"#fff",fontSize:12,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>✓ Apply & Close</button>
-        </div>}
+          {/* Footer — only for Appearance tab */}
+          {!isSchema&&<div style={{marginTop:16,display:"flex",flexDirection:"column",gap:8}}>
+            <button onClick={()=>setDraft({...DEFAULTS})} style={{width:"100%",padding:"8px",borderRadius:6,border:`1px solid ${M.divider}`,background:"transparent",color:M.textC,fontSize:11,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>↩ Reset Defaults</button>
+            <button onClick={()=>onApply(draft)} style={{width:"100%",padding:"9px",borderRadius:6,border:"none",background:ACCENTS[draft.accent].a,color:"#fff",fontSize:12,fontWeight:900,cursor:"pointer",fontFamily:"inherit"}}>✓ Apply Changes</button>
+          </div>}
+        </div></div>
       </div>
-    </>
   );
 }
