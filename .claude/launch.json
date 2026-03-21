@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/start-vite.mjs"],
+      "port": 9090,
+      "autoPort": true
+    },
+    {
+      "name": "frontend-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/start-vite.mjs", "preview"],
+      "port": 9090,
+      "autoPort": true
+    },
+    {
+      "name": "frontend-serve",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [".claude/start-vite.mjs", "--host"],
+      "port": 9090,
+      "autoPort": true
+    }
+  ]
+}

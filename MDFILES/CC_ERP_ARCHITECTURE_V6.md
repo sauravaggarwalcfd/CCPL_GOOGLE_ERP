@@ -75,7 +75,7 @@ C:\CCPL_GOOGLE_ERP\                      ← Local Windows folder
 ├── CC_ERP_UI_SPEC_V6.md                 # UI spec document
 ├── gas/
 │   └── File1A/                          # GAS backend files (deploy to App Script)
-│       ├── APIGateway.gs                # NEW — API router (22 routes)
+│       ├── APIGateway.gs                # API router (54 routes — updated V14)
 │       ├── Code.gs                      # UPDATED — API-only doGet/doPost
 │       ├── Config.gs
 │       ├── Cache.gs

@@ -42,7 +42,9 @@ Apparel needs filtering by target audience (Men's/Women's/Kids/Unisex) as the fi
 
 ---
 
-## 3. GAS MODULE — `CategoryEngine.gs`
+## 3. GAS MODULE — Category Functions (in `APIGateway.gs`)
+
+> **Note:** These functions were planned for a standalone `CategoryEngine.gs` file but were implemented directly in `APIGateway.gs` (routes: `getAllCategories`, `createCategory`, `updateCategory` — lines 1723–1900+). The function signatures and logic below remain accurate.
 
 ### 3A. Code Generation
 

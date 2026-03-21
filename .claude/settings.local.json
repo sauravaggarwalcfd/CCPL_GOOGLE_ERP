@@ -44,7 +44,14 @@
       "Bash(git stash:*)",
       "Bash(git push:*)",
       "Bash(git:*)",
-      "Bash(node -e \"const fs=require\\(''fs''\\); let c=fs.readFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',''utf8''\\); c=c.replace\\(/,\\\\t+ype:/g,'', type:''\\); fs.writeFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',c\\); console.log\\(''type:textarea count:'',\\(c.match\\(/type:\"\"textarea\"\"/g\\)||[]\\).length\\); console.log\\(''remaining ype:'',\\(c.match\\(/\\\\ttype:/g\\)||[]\\).length + \\(c.match\\(/,\\\\t+ype:/g\\)||[]\\).length\\);\")"
+      "Bash(node -e \"const fs=require\\(''fs''\\); let c=fs.readFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',''utf8''\\); c=c.replace\\(/,\\\\t+ype:/g,'', type:''\\); fs.writeFileSync\\(''e:/Lenovo/Documents/GitHub/CCPL_GOOGLE_ERP/frontend/src/constants/masterSchemas.js'',c\\); console.log\\(''type:textarea count:'',\\(c.match\\(/type:\"\"textarea\"\"/g\\)||[]\\).length\\); console.log\\(''remaining ype:'',\\(c.match\\(/\\\\ttype:/g\\)||[]\\).length + \\(c.match\\(/,\\\\t+ype:/g\\)||[]\\).length\\);\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 10904\" /FO CSV /NH)",
+      "Bash(tasklist /FI \"PID eq 23612\" /FO CSV /NH)",
+      "Bash(WMIC PROCESS WHERE \"ProcessId=10904\" GET Name,ProcessId,CommandLine /FORMAT:LIST)",
+      "Bash(WMIC PROCESS WHERE \"ProcessId=23612\" GET Name,ProcessId,CommandLine /FORMAT:LIST)",
+      "Bash(find \"E:\\\\Lenovo\\\\Documents\\\\GitHub\\\\CCPL_GOOGLE_ERP\\\\frontend\\\\src\\\\components\" -name \"*.jsx\" -type f -exec wc -l {} +)"
     ]
   }
 }
