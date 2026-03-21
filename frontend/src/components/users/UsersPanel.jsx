@@ -618,11 +618,27 @@ function getCellState(user, col) {
 }
 
 const CELL_STYLES = {
-  admin:   { bg: "#f3f4f6", color: "#9ca3af", symbol: "✓", cursor: "not-allowed" },
-  role:    { bg: "#ffffff", color: "#9ca3af", symbol: "✓", cursor: "pointer" },
-  granted: { bg: "#dcfce7", color: "#15803d", symbol: "✓", cursor: "pointer" },
-  denied:  { bg: "#fee2e2", color: "#be123c", symbol: "✗", cursor: "pointer" },
-  off:     { bg: "#ffffff", color: "#e5e7eb", symbol: "",  cursor: "pointer" },
+  admin:   { bg: "#f3f4f6", color: null, symbol: "☑️", cursor: "not-allowed" },
+  role:    { bg: "#f0fdf4", color: null, symbol: "✅", cursor: "pointer" },
+  granted: { bg: "#dcfce7", color: null, symbol: "✅", cursor: "pointer" },
+  denied:  { bg: "#fee2e2", color: null, symbol: "❌", cursor: "pointer" },
+  off:     { bg: "#ffffff", color: "#d1d5db", symbol: "⭘",  cursor: "pointer" },
+};
+
+const COL_SHORT_LABELS = {
+  // Modules
+  Procurement: "Proc", Production: "Prod", Inventory: "Inv", Quality: "Qual",
+  Sales: "Sales", Finance: "Fin", Masters: "Mstr", Dashboard: "Dash",
+  // Actions
+  CREATE: "Create", EDIT: "Edit", SUBMIT: "Submit", APPROVE: "Approve", DELETE: "Delete",
+  EXPORT_PDF: "PDF", EXPORT_SHEET: "Sheet", EXPORT_EXCEL: "Excel",
+  VIEW_PRICES: "Prices", IMPORT: "Import", USER_MGMT: "Users", SUSPEND: "Suspend", AUDIT: "Audit",
+  // Exports
+  PDF: "PDF", SHEET: "Sheet", EXCEL: "Excel", CLIPBOARD: "Clip", EMAIL: "Email",
+  // Fields
+  UNIT_PRICE: "Unit₹", SUPPLIER_PRICE: "Supp₹", LANDED_COST: "Land₹", MARGIN: "Margin",
+  SALARY: "Salary", BANK_DETAILS: "Bank", GST_NUMBER: "GST", CREDIT_LIMIT: "Credit",
+  DISCOUNT_RATE: "Disc%", COST_SHEET: "Cost",
 };
 
 function cyclePermission(user, col, setUsers) {
@@ -698,10 +714,12 @@ function PermissionTable({ users, setUsers, M, A, uff, dff, onEditUser, onPermUs
               const isGroupStart = i === 0 || col.type !== PERM_COLUMNS[i - 1].type;
               return (
                 <th key={col.key} title={col.label}
-                  style={{ padding: "5px 2px", textAlign: "center", fontSize: 13, cursor: "default",
-                    background: M.surfMid, borderBottom: `1px solid ${M.divider}`, minWidth: 34,
+                  style={{ padding: "4px 2px 3px", textAlign: "center", cursor: "default",
+                    background: M.surfMid, borderBottom: `1px solid ${M.divider}`, minWidth: 44,
                     borderLeft: isGroupStart ? `2px solid ${M.divider}` : `1px solid ${M.divider}20` }}>
-                  {col.icon}
+                  <div style={{ fontSize: 12, lineHeight: 1 }}>{col.icon}</div>
+                  <div style={{ fontSize: 7, fontWeight: 800, color: M.textD, letterSpacing: "0.02em",
+                    marginTop: 1, lineHeight: 1, whiteSpace: "nowrap" }}>{COL_SHORT_LABELS[col.key] || col.key}</div>
                 </th>
               );
             })}
@@ -757,10 +775,10 @@ function PermissionTable({ users, setUsers, M, A, uff, dff, onEditUser, onPermUs
                       style={{ padding: 0, borderBottom: `1px solid ${M.divider}`,
                         borderLeft: isGroupStart ? `2px solid ${M.divider}` : `1px solid ${M.divider}20`,
                         textAlign: "center", cursor: cs.cursor, userSelect: "none" }}>
-                      <div style={{ width: 32, height: 28, display: "flex", alignItems: "center",
-                        justifyContent: "center", background: cs.bg, color: cs.color,
-                        fontSize: 13, fontWeight: 800, transition: "background 0.1s",
-                        margin: "0 auto" }}>
+                      <div style={{ width: 36, height: 28, display: "flex", alignItems: "center",
+                        justifyContent: "center", background: cs.bg, ...(cs.color ? { color: cs.color } : {}),
+                        fontSize: 13, transition: "all 0.12s",
+                        margin: "0 auto", borderRadius: 3 }}>
                         {cs.symbol}
                       </div>
                     </td>
