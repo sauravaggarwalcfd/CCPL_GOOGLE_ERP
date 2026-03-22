@@ -11,6 +11,7 @@ import { NotifPanel, CmdPalette, SettingsPanel } from './components/panels';
 import SidebarStylePreview from './components/panels/SidebarStylePreview';
 import Procurement from './components/procurement/Procurement';
 import { Masters } from './components/masters';
+import { Inventory } from './components/inventory';
 import { UsersPanel } from './components/users';
 import api from './services/api';
 
@@ -19,6 +20,7 @@ export default function App(){
   const [sw,      setSw]      = useState(DEFAULTS.sbWidth);
   const [drag,    setDrag]    = useState(false);
   const [actMod,  setActMod]  = useState(null);
+  const [actSub,  setActSub]  = useState(null);
   const [hovMod,  setHovMod]  = useState(null);
   const [showAll, setShowAll] = useState(false);
   const [expandedMod, setExpandedMod] = useState(null);
@@ -400,7 +402,7 @@ export default function App(){
               /* ── Collapsed: icon only ── */
               if(collapsed){
                 return(
-                  <button key={mod.id} onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);}}
+                  <button key={mod.id} onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);const firstSid=mod.sub?.find(s=>s.sid)?.sid;if(firstSid)setActSub(firstSid);}}
                     style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"center",padding:"12px 0",border:"none",background:active?`${A.a}14`:"transparent",cursor:"pointer",fontFamily:uff}}>
                     <span style={{fontSize:20}}>{mod.icon}</span>
                   </button>
@@ -421,10 +423,10 @@ export default function App(){
                     </button>
                     {/* Card body: sub-items with dividers */}
                     {mod.sub&&mod.sub.map((sub,i)=>(
-                      <button key={i} onClick={()=>setActMod(mod.id)}
-                        style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 16px",border:"none",borderTop:`1px solid ${M.divider}`,background:M.sidebarBg,cursor:"pointer",fontFamily:uff}}>
-                        <span style={{fontSize:14,color:A.a+"99",flexShrink:0}}>{sub.icon}</span>
-                        <span style={{fontSize:fz,fontWeight:600,color:M.textB}}>{sub.lbl}</span>
+                      <button key={i} onClick={()=>{setActMod(mod.id);if(sub.sid)setActSub(sub.sid);}}
+                        style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"8px 16px",border:"none",borderTop:`1px solid ${M.divider}`,background:actSub===sub.sid?`${A.a}12`:M.sidebarBg,cursor:"pointer",fontFamily:uff}}>
+                        <span style={{fontSize:14,color:actSub===sub.sid?A.a:A.a+"99",flexShrink:0}}>{sub.icon}</span>
+                        <span style={{fontSize:fz,fontWeight:actSub===sub.sid?800:600,color:actSub===sub.sid?A.a:M.textB}}>{sub.lbl}</span>
                       </button>
                     ))}
                   </div>
@@ -436,7 +438,7 @@ export default function App(){
                 <div key={mod.id} style={{padding:"2px 8px"}}>
                   <button
                     onMouseEnter={()=>setHovMod(mod.id)} onMouseLeave={()=>setHovMod(null)}
-                    onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);}}
+                    onClick={()=>{setActMod(mod.id);setExpandedMod(mod.id);const firstSid=mod.sub?.find(s=>s.sid)?.sid;if(firstSid)setActSub(firstSid);}}
                     style={{width:"100%",display:"flex",alignItems:"center",gap:9,padding:"9px 12px",
                       border:hover?`1px solid ${A.a}`:"1px solid transparent",
                       borderRadius:8,
@@ -498,6 +500,8 @@ export default function App(){
           <UsersPanel M={M} A={A} cfg={cfg} fz={fz} dff={dff} />
         ) : actMod === "settings" ? (
           <SettingsPanel M={M} A={A} cfg={cfg} onApply={newCfg=>setCfg(newCfg)} />
+        ) : actMod === "inventory" ? (
+          <Inventory activeSub={actSub} onSubChange={setActSub} />
         ) : actMod && actMod !== "dashboard" ? (
           /* ── Placeholder for modules under development ── */
           (() => {
