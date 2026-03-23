@@ -27,6 +27,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo, Component } from "react";
+import StockIssueTabNew from './StockIssue';
 
 const CC_RED = "#CC0000";
 
@@ -2798,10 +2799,10 @@ function ColumnView({mockRecords, allFields, onOpenRecord, M, A, fz, ts}) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   STOCK ISSUE TAB — 7 issue types × 6 item categories
-   3-layer dynamic fields: Common + Type-specific + Category-specific
+   STOCK ISSUE TAB — replaced by StockIssue.jsx (470 lines, 7×6 dynamic form + line items)
+   Original inline version removed. Import from separate file.
    ═══════════════════════════════════════════════════════════════════ */
-function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setViewState, templates, onSaveTemplate, onDeleteTemplate}) {
+function StockIssueTab_OLD({mockRecords, allFields, M, A, fz, pyV, viewState, setViewState, templates, onSaveTemplate, onDeleteTemplate}) {
   const [tab, setTab] = useState("records"); // "records" | "new"
   const [issueType, setIssueType] = useState("Production Issue");
   const [itemCat, setItemCat] = useState("FABRIC");
@@ -3679,12 +3680,14 @@ function ModuleApp({ activeSub: externalSub, onSubChange }) {
               </div>
             </div>
           ) : tab==="records" && activeSub==="issue" ? (
-            <StockIssueTab
+            <StockIssueTabNew
               mockRecords={activeMocks}
               allFields={activeFields}
               M={M} A={A} fz={fz} pyV={pyV}
               viewState={recViewState} setViewState={setRecViewState}
               templates={recTpls} onSaveTemplate={onSaveRecTpl} onDeleteTemplate={onDeleteRecTpl}
+              RecordsTab={RecordsTab}
+              getFirstImg={getFirstImg}
             />
           ) : tab==="records" && (
             <RecordsTab
