@@ -206,6 +206,10 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
   if(!RecordsTab) RecordsTab = ({mockRecords}) => <div style={{padding:20,color:"#6b7280"}}>RecordsTab not provided — pass it as prop. {mockRecords.length} records available.</div>;
   const [hoverImg, setHoverImg] = useState(null); // {src, name, code, top, left}
   const [openImg, setOpenImg] = useState(null);   // {src, name, code}
+  const [lineMaxView, setLineMaxView] = useState(false);
+  useEffect(()=>{if(!lineMaxView)return;const h=e=>{if(e.key==="Escape")setLineMaxView(false);};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);},[lineMaxView]);
+  const [accOpen, setAccOpen] = useState({common:true, type:true, cat:true});
+  const toggleAcc = (key) => setAccOpen(p=>({...p,[key]:!p[key]}));
   const [issueType, setIssueType] = useState("Production Issue");
   const [itemCat, setItemCat] = useState("YARN");
   const [headerData, setHeaderData] = useState({});
@@ -309,16 +313,39 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
   return(
   <div style={{display:"flex",flexDirection:"column",height:"100%",overflow:"hidden"}}>
     {/* Tab bar */}
-    <div style={{padding:"5px 12px",borderBottom:`1px solid ${M.div}`,background:M.mid,display:"flex",alignItems:"center",gap:8,flexShrink:0}}>
-      {[{id:"records",icon:"📋",label:"Issue Records"},{id:"new",icon:"➕",label:"New Stock Issue"}].map(t=>(
-        <button key={t.id} onClick={()=>setTab(t.id)} style={{padding:"5px 14px",borderRadius:6,border:`1.5px solid ${tab===t.id?"#BE123C":M.inBd}`,background:tab===t.id?"rgba(190,18,60,.08)":"transparent",color:tab===t.id?"#BE123C":M.tB,fontSize:11,fontWeight:tab===t.id?900:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{t.icon}</span>{t.label}</button>
-      ))}
+    <div style={{padding:"8px 14px",borderBottom:`2px solid ${CC_RED}`,background:M.sh,display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+      <button onClick={()=>setTab("records")}
+        onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow=tab==="records"?"0 6px 16px rgba(0,0,0,.2)":"0 4px 12px rgba(0,0,0,.15)";}}
+        onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=tab==="records"?"0 3px 8px rgba(0,0,0,.15), inset 0 -2px 0 rgba(0,0,0,.1)":"0 2px 4px rgba(0,0,0,.08), inset 0 -2px 0 rgba(0,0,0,.06)";}}
+        onMouseDown={e=>{e.currentTarget.style.transform="translateY(1px)";e.currentTarget.style.boxShadow="0 1px 2px rgba(0,0,0,.1), inset 0 1px 0 rgba(0,0,0,.05)";}}
+        onMouseUp={e=>{e.currentTarget.style.transform="translateY(-2px)";}}
+        style={{padding:"9px 20px",borderRadius:8,border:tab==="records"?`2px solid ${A.a}`:`1.5px solid ${M.inBd}`,background:tab==="records"?`linear-gradient(180deg,${A.al},${A.a}15)`:`linear-gradient(180deg,#fff,#f3f4f6)`,color:tab==="records"?A.a:M.tB,fontSize:13,fontWeight:800,cursor:"pointer",display:"flex",alignItems:"center",gap:6,boxShadow:tab==="records"?"0 3px 8px rgba(0,0,0,.15), inset 0 -2px 0 rgba(0,0,0,.1)":"0 2px 4px rgba(0,0,0,.08), inset 0 -2px 0 rgba(0,0,0,.06)",transition:"transform .1s"}}>
+        <span style={{fontSize:15}}>📋</span>Issue Records
+      </button>
+      <button onClick={()=>setTab("new")}
+        onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-2px)";e.currentTarget.style.boxShadow="0 6px 16px rgba(21,128,61,.3)";}}
+        onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow=tab==="new"?"0 3px 10px rgba(21,128,61,.25), inset 0 -2px 0 rgba(0,0,0,.15)":"0 2px 6px rgba(21,128,61,.15), inset 0 -2px 0 rgba(0,0,0,.1)";}}
+        onMouseDown={e=>{e.currentTarget.style.transform="translateY(1px)";e.currentTarget.style.boxShadow="0 1px 2px rgba(0,0,0,.1), inset 0 1px 0 rgba(0,0,0,.1)";}}
+        onMouseUp={e=>{e.currentTarget.style.transform="translateY(-2px)";}}
+        style={{padding:"9px 22px",borderRadius:8,border:tab==="new"?"2px solid #15803d":"1.5px solid #86efac",background:tab==="new"?"linear-gradient(180deg,#22c55e,#15803d)":"linear-gradient(180deg,#f0fdf4,#dcfce7)",color:tab==="new"?"#fff":"#15803d",fontSize:13,fontWeight:900,cursor:"pointer",display:"flex",alignItems:"center",gap:6,boxShadow:tab==="new"?"0 3px 10px rgba(21,128,61,.25), inset 0 -2px 0 rgba(0,0,0,.15)":"0 2px 6px rgba(21,128,61,.15), inset 0 -2px 0 rgba(0,0,0,.1)",transition:"transform .1s"}}>
+        <span style={{fontSize:15}}>➕</span>New Stock Issue
+      </button>
       <div style={{flex:1}}/>
-      <div style={{display:"flex",gap:4}}>{ISSUE_TYPES.map(t=>{const cnt=issueTypeCounts[t.v]||0;if(!cnt)return null;return<span key={t.v} style={{padding:"2px 8px",borderRadius:10,fontSize:8,fontWeight:800,background:t.c+"15",color:t.c}}>{t.icon} {cnt}</span>;})}</div>
+      <div style={{display:"flex",gap:5}}>{ISSUE_TYPES.map(t=>{const cnt=issueTypeCounts[t.v]||0;if(!cnt)return null;return<span key={t.v} style={{padding:"3px 9px",borderRadius:10,fontSize:9,fontWeight:800,background:t.c+"15",color:t.c,border:`1px solid ${t.c}30`}}>{t.icon} {cnt}</span>;})}</div>
     </div>
 
     {tab==="records"?(
-      <RecordsTab allFields={allFields} mockRecords={mockRecords} M={M} A={A} fz={fz} pyV={pyV} viewState={viewState} setViewState={setViewState} templates={templates} onSaveTemplate={onSaveTemplate} onDeleteTemplate={onDeleteTemplate} showThumb={true} renderMode="table"/>
+      <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden"}}>
+        {/* Issue Records header */}
+        <div style={{padding:"8px 14px",background:M.mid,borderBottom:`1px solid ${M.div}`,display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:15}}>📋</span>
+          <span style={{fontSize:14,fontWeight:900,color:M.tA}}>Issue Records</span>
+          <span style={{padding:"3px 10px",borderRadius:6,fontSize:11,fontWeight:800,background:CC_RED+"12",color:CC_RED,border:`1px solid ${CC_RED}30`}}>{mockRecords.length} records</span>
+          <div style={{flex:1}}/>
+          <div style={{display:"flex",gap:5}}>{ISSUE_TYPES.map(t=>{const cnt=issueTypeCounts[t.v]||0;if(!cnt)return null;return<span key={t.v} style={{padding:"2px 8px",borderRadius:10,fontSize:9,fontWeight:800,background:t.c+"12",color:t.c}}>{t.icon} {t.v.split(" ")[0]} ({cnt})</span>;})}</div>
+        </div>
+        <RecordsTab allFields={allFields} mockRecords={mockRecords} M={M} A={A} fz={fz} pyV={pyV} viewState={viewState} setViewState={setViewState} templates={templates} onSaveTemplate={onSaveTemplate} onDeleteTemplate={onDeleteTemplate} showThumb={true} renderMode="table"/>
+      </div>
     ):(
     <div style={{flex:1,overflowY:"auto"}}>
 
@@ -350,6 +377,8 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
         </div>
       </div>
 
+      {/* ── Header sections (collapse when line items expanded) ── */}
+      {!lineMaxView && <>
       {/* Field count */}
       <div style={{padding:"6px 14px",borderBottom:`1px solid ${M.div}`,background:M.mid,display:"flex",alignItems:"center",gap:8,fontSize:10,color:M.tC}}>
         <span style={{fontWeight:900,color:M.tD}}>FIELDS:</span>
@@ -361,9 +390,13 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
       </div>
 
       {/* LAYER 1: Common */}
-      <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:A.al+"30"}}>
-        <div style={{fontSize:13,fontWeight:900,color:A.a,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>📋</span> Issue header — common <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:A.al,color:A.a}}>8</span></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
+      <div style={{borderBottom:`1px solid ${M.div}`,borderLeft:`4px solid ${A.a}`}}>
+        <div onClick={()=>toggleAcc("common")} style={{fontSize:13,fontWeight:900,color:A.a,display:"flex",alignItems:"center",gap:5,background:A.al,padding:"8px 14px",cursor:"pointer",borderBottom:accOpen.common?`1.5px solid ${A.a}30`:"none"}}>
+          <span style={{fontSize:10,fontWeight:900,transform:accOpen.common?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+          <span style={{fontSize:15}}>📋</span> Issue header — common <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:A.a+"15",color:A.a}}>8</span>
+          <span style={{marginLeft:"auto",fontSize:9,color:A.a+"80"}}>{accOpen.common?"click to collapse":"click to expand"}</span>
+        </div>
+        {accOpen.common && <div style={{padding:"10px 14px",background:A.al+"40"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
           <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}><span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>ISSUE NO</div><input readOnly value="ISS-2026-0009" style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%",fontFamily:"monospace"}}/></div>
           {renderF({id:"date",h:"Issue Date",req:true},A.a,"c_")}
           <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}>ISSUE TYPE</div><input readOnly value={issueType} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${TC.c}30`,borderRadius:5,background:TC.c+"10",color:TC.c,fontWeight:700,width:"100%"}}/></div>
@@ -375,27 +408,66 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
           {renderF({id:"fromLocName",h:"Location Name",auto:true},A.a,"c_")}
           {renderF({id:"status",h:"Issue Status",req:true,dd:["Draft","Confirmed","Partially Returned","Closed","Cancelled"]},A.a,"c_")}
         </div>
+      </div>}
       </div>
 
       {/* LAYER 2: Type-specific */}
-      <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:TC.c+"06",borderLeft:`4px solid ${TC.c}`}}>
-        <div style={{fontSize:13,fontWeight:900,color:TC.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>{TC.icon}</span> {issueType} — type-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:TC.c+"15",color:TC.c}}>{typeHdr.length}</span></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{typeHdr.map(f=>renderF(f,TC.c,"t_"))}</div>
+      <div style={{borderBottom:`1px solid ${M.div}`,borderLeft:`4px solid ${TC.c}`}}>
+        <div onClick={()=>toggleAcc("type")} style={{fontSize:13,fontWeight:900,color:TC.c,display:"flex",alignItems:"center",gap:5,background:TC.c+"12",padding:"8px 14px",cursor:"pointer",borderBottom:accOpen.type?`1.5px solid ${TC.c}30`:"none"}}>
+          <span style={{fontSize:10,fontWeight:900,transform:accOpen.type?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+          <span style={{fontSize:15}}>{TC.icon}</span> {issueType} — type-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:TC.c+"15",color:TC.c}}>{typeHdr.length}</span>
+          <span style={{marginLeft:"auto",fontSize:9,color:TC.c+"80"}}>{accOpen.type?"click to collapse":"click to expand"}</span>
+        </div>
+        {accOpen.type && <div style={{padding:"10px 14px",background:TC.c+"08"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{typeHdr.map(f=>renderF(f,TC.c,"t_"))}</div></div>}
       </div>
 
       {/* LAYER 3: Category-specific */}
-      <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:CC_CAT.c+"06",borderLeft:`4px solid ${CC_CAT.c}`}}>
-        <div style={{fontSize:13,fontWeight:900,color:CC_CAT.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>{CC_CAT.icon}</span> {itemCat} — category-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{catHdr.length}</span></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{catHdr.map(f=>renderF(f,CC_CAT.c,"cat_"))}</div>
+      <div style={{borderBottom:`1px solid ${M.div}`,borderLeft:`4px solid ${CC_CAT.c}`}}>
+        <div onClick={()=>toggleAcc("cat")} style={{fontSize:13,fontWeight:900,color:CC_CAT.c,display:"flex",alignItems:"center",gap:5,background:CC_CAT.c+"12",padding:"8px 14px",cursor:"pointer",borderBottom:accOpen.cat?`1.5px solid ${CC_CAT.c}30`:"none"}}>
+          <span style={{fontSize:10,fontWeight:900,transform:accOpen.cat?"rotate(90deg)":"none",transition:"transform .15s"}}>▶</span>
+          <span style={{fontSize:15}}>{CC_CAT.icon}</span> {itemCat} — category-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{catHdr.length}</span>
+          <span style={{marginLeft:"auto",fontSize:9,color:CC_CAT.c+"80"}}>{accOpen.cat?"click to collapse":"click to expand"}</span>
+        </div>
+        {accOpen.cat && <div style={{padding:"10px 14px",background:CC_CAT.c+"08"}}><div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{catHdr.map(f=>renderF(f,CC_CAT.c,"cat_"))}</div></div>}
       </div>
+      </>}
+
+      {/* ── Key fields summary strip (visible only when line items expanded) ── */}
+      {lineMaxView && (
+        <div style={{padding:"8px 14px",borderBottom:`1.5px solid ${M.div}`,background:M.mid,display:"flex",alignItems:"center",gap:8,flexWrap:"wrap",flexShrink:0}}>
+          {[
+            {label:"ISSUE NO",value:"ISS-2026-0009",color:A.a},
+            {label:"TYPE",value:issueType,color:TC.c},
+            {label:"CATEGORY",value:itemCat,color:CC_CAT.c,icon:CC_CAT.icon},
+            {label:"FROM",value:headerData.c_fromLoc||"—",color:"#15803d"},
+            {label:"WORK ORDER",value:headerData.t_t1||"—",color:"#0078D4"},
+            {label:"STATUS",value:headerData.c_status||"Draft",color:"#E8690A"},
+            {label:"PERSON",value:headerData.c_person||"—",color:M.tC},
+          ].map((f,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:4,padding:"4px 10px",borderRadius:5,background:M.sh,border:`1px solid ${M.div}`}}>
+              <span style={{fontSize:9,fontWeight:700,color:M.tD,textTransform:"uppercase"}}>{f.label}:</span>
+              {f.icon&&<span style={{fontSize:11}}>{f.icon}</span>}
+              <span style={{fontSize:12,fontWeight:800,color:f.value==="—"?M.tD:f.color}}>{f.value}</span>
+            </div>
+          ))}
+          <button onClick={()=>setLineMaxView(false)} style={{marginLeft:"auto",padding:"5px 14px",borderRadius:6,fontSize:11,fontWeight:800,color:"#fff",cursor:"pointer",background:"#dc2626",border:"none",display:"flex",alignItems:"center",gap:4}}>▼ Show All Headers</button>
+        </div>
+      )}
 
       {/* ── LINE ITEMS TABLE ── */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`}}>
-        <div style={{fontSize:13,fontWeight:900,color:"#1a2744",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontSize:15}}>📦</span> Line items — {itemCat.toLowerCase()} issued
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:A.al,color:A.a,marginLeft:"auto"}}>{lineItems.length} items</span>
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalQty.toLocaleString("en-IN")} {uom}</span>
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalCatUnit} {catUnitLabel}</span>
+        <div onClick={()=>setLineMaxView(v=>!v)} style={{marginBottom:8,cursor:"pointer",display:"flex",alignItems:"center",gap:8,padding:"10px 14px",borderRadius:8,background:CC_CAT.c+"12",border:`1.5px solid ${CC_CAT.c}40`,borderLeft:`5px solid ${CC_CAT.c}`,transition:"all .15s"}}
+          onMouseEnter={e=>{e.currentTarget.style.background=CC_CAT.c+"20";e.currentTarget.style.borderColor=CC_CAT.c;}}
+          onMouseLeave={e=>{e.currentTarget.style.background=CC_CAT.c+"12";e.currentTarget.style.borderColor=CC_CAT.c+"40";}}>
+          <span style={{fontSize:16}}>📦</span>
+          <span style={{fontSize:14,fontWeight:900,color:CC_CAT.c}}>Line Items — {itemCat.toLowerCase()} issued</span>
+          <span style={{padding:"3px 10px",borderRadius:6,fontSize:11,fontWeight:800,background:"#fff",color:A.a,border:`1px solid ${A.a}30`}}>{lineItems.length} items</span>
+          <span style={{padding:"3px 10px",borderRadius:6,fontSize:11,fontWeight:800,background:"#fff",color:CC_CAT.c,border:`1px solid ${CC_CAT.c}30`}}>{totalQty.toLocaleString("en-IN")} {uom}</span>
+          <span style={{padding:"3px 10px",borderRadius:6,fontSize:11,fontWeight:800,background:"#fff",color:CC_CAT.c,border:`1px solid ${CC_CAT.c}30`}}>{totalCatUnit} {catUnitLabel}</span>
+          <button onClick={e=>{e.stopPropagation();setLineMaxView(v=>!v);}} style={{marginLeft:"auto",padding:"6px 16px",borderRadius:6,fontSize:11,fontWeight:800,background:lineMaxView?"#dc2626":"#1a2744",color:"#fff",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,boxShadow:"0 2px 6px rgba(0,0,0,.15)"}}>
+            <span style={{fontSize:13}}>{lineMaxView?"▼":"▲"}</span>
+            {lineMaxView?"Collapse Table":"Expand Table — Hide Headers"}
+          </button>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{borderCollapse:"collapse",minWidth:"100%"}}>
