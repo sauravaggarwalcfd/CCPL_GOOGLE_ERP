@@ -62,6 +62,22 @@ const CAT_EMOJI = {FABRIC:"🧵",YARN:"🧶",TRIM:"🪡",CONSUMABLE:"🧪",PACKA
 // Fallback stub if not provided:
 function _getFirstImgStub(code) { return null; }
 
+// ── Allocation lookup (mock — in production, GAS provides this) ──
+const ISSUE_ALLOC = {
+  "RM-FAB-001":{alloc:400,free:1300,items:[{ref:"WO-2026-0001",desc:"Polo Cutting Batch 1",qty:200},{ref:"WO-2026-0003",desc:"Round Neck Cutting",qty:200}]},
+  "RM-FAB-002":{alloc:300,free:100,items:[{ref:"JW-2026-0008",desc:"Dyeing — CVC Pique",qty:300}]},
+  "RM-FAB-003":{alloc:0,free:10,items:[]},
+  "RM-YRN-001":{alloc:0,free:1250,items:[]},
+  "RM-YRN-002":{alloc:0,free:890,items:[]},
+  "RM-YRN-003":{alloc:0,free:45,items:[]},
+  "TRM-THD-001":{alloc:20,free:50,items:[{ref:"WO-2026-0001",desc:"Polo Stitching",qty:20}]},
+  "TRM-ZIP-001":{alloc:50,free:30,items:[{ref:"SO-2026-0045",desc:"Myntra Hoodie Zippers",qty:50}]},
+  "CON-DYE-001":{alloc:10,free:15,items:[{ref:"JW-2026-0010",desc:"Black dyeing batch",qty:10}]},
+  "PKG-PLY-001":{alloc:500,free:2000,items:[{ref:"SO-2026-0044",desc:"Myntra Polo packing",qty:300},{ref:"SO-2026-0045",desc:"Myntra Hoodie packing",qty:200}]},
+  "5249HP":{alloc:200,free:200,items:[{ref:"SO-2026-0044",desc:"Myntra Order — 200 Polo",qty:200}]},
+};
+function getIssueAlloc(code){return ISSUE_ALLOC[code]||{alloc:0,free:0,items:[]};}
+
 // ═══════════════════════════════════════════════════════════
 //  STOCK ISSUE — 18 Common Sheet Fields (Google Sheets cols A-R)
 // ═══════════════════════════════════════════════════════════
@@ -278,15 +294,15 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
   const renderF=(f,color,prefix)=>{
     const key=prefix+f.id;const val=headerData[key]||"";
     return(<div key={key}>
-      <div style={{fontSize:8,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:2}}>
+      <div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}>
         {f.req&&<span style={{color:"#dc2626",marginRight:1}}>*</span>}
-        {f.auto&&<span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>}
-        {f.fk&&<span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:"#E8690A15",color:"#E8690A",marginRight:3}}>FK</span>}
+        {f.auto&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>}
+        {f.fk&&<span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:"#E8690A15",color:"#E8690A",marginRight:3}}>FK</span>}
         {f.h}
       </div>
-      {f.auto?<input readOnly value={val||f.h} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/>
-      :f.dd?<select value={val} onChange={e=>setHeaderData(p=>({...p,[key]:e.target.value}))} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${M.inBd}`,borderRadius:5,background:M.inBg,color:M.tA,borderLeft:`3px solid ${color}`,width:"100%"}}><option value="">— select —</option>{f.dd.map(o=><option key={o} value={o}>{o}</option>)}</select>
-      :<input value={val} onChange={e=>setHeaderData(p=>({...p,[key]:e.target.value}))} placeholder={f.h} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${M.inBd}`,borderRadius:5,background:M.inBg,color:M.tA,borderLeft:f.fk?`3px solid #E8690A`:f.req?`3px solid ${A.a}`:"none",width:"100%"}}/>}
+      {f.auto?<input readOnly value={val||f.h} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/>
+      :f.dd?<select value={val} onChange={e=>setHeaderData(p=>({...p,[key]:e.target.value}))} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${M.inBd}`,borderRadius:5,background:M.inBg,color:M.tA,borderLeft:`3px solid ${color}`,width:"100%"}}><option value="">— select —</option>{f.dd.map(o=><option key={o} value={o}>{o}</option>)}</select>
+      :<input value={val} onChange={e=>setHeaderData(p=>({...p,[key]:e.target.value}))} placeholder={f.h} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${M.inBd}`,borderRadius:5,background:M.inBg,color:M.tA,borderLeft:f.fk?`3px solid #E8690A`:f.req?`3px solid ${A.a}`:"none",width:"100%"}}/>}
     </div>);
   };
 
@@ -308,7 +324,7 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
 
       {/* STEP 0: Templates */}
       <div style={{padding:"8px 14px",background:M.mid,borderBottom:`1px solid ${M.div}`}}>
-        <div style={{fontSize:8,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 0 — SELECT TEMPLATE (OPTIONAL, PRE-FILLS TYPE + CATEGORY)</div>
+        <div style={{fontSize:10,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 0 — SELECT TEMPLATE (OPTIONAL, PRE-FILLS TYPE + CATEGORY)</div>
         <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>{TPLS.map(tpl=>(
           <button key={tpl.id} onClick={()=>selectTemplate(tpl)} style={{padding:"6px 12px",borderRadius:7,border:`1.5px solid ${(tpl.type===issueType&&tpl.cat===itemCat)?A.a:(!tpl.type&&!tpl.cat)?M.inBd:M.inBd}`,background:(tpl.type===issueType&&tpl.cat===itemCat)?A.al:"transparent",color:(tpl.type===issueType&&tpl.cat===itemCat)?A.a:M.tB,fontSize:10,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:5}}>
             <span style={{fontSize:13}}>{tpl.icon}</span><div style={{textAlign:"left"}}><div style={{fontWeight:800}}>{tpl.name}</div><div style={{fontSize:8,color:M.tD}}>{tpl.desc}</div></div>
@@ -318,18 +334,18 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
       {/* STEP 1 + 2 */}
       <div style={{padding:"8px 14px",borderBottom:`1px solid ${M.div}`,display:"flex",gap:20}}>
         <div style={{flex:1}}>
-          <div style={{fontSize:8,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 1 — ISSUE TYPE</div>
+          <div style={{fontSize:10,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 1 — ISSUE TYPE</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ISSUE_TYPES.map(t=>(
-            <button key={t.v} onClick={()=>setIssueType(t.v)} style={{padding:"5px 11px",borderRadius:7,border:`1.5px solid ${issueType===t.v?t.c:M.inBd}`,background:issueType===t.v?t.c+"12":"transparent",color:issueType===t.v?t.c:M.tB,fontSize:10,fontWeight:issueType===t.v?900:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-              <span style={{fontSize:13}}>{t.icon}</span>{t.v}<span style={{fontSize:7,fontWeight:800,padding:"1px 5px",borderRadius:5,background:issueType===t.v?t.c+"20":M.mid,color:issueType===t.v?t.c:M.tD}}>{(TYPE_HDR[t.v]||[]).length}f</span>
+            <button key={t.v} onClick={()=>setIssueType(t.v)} style={{padding:"6px 12px",borderRadius:7,border:`1.5px solid ${issueType===t.v?t.c:M.inBd}`,background:issueType===t.v?t.c+"12":"transparent",color:issueType===t.v?t.c:M.tB,fontSize:12,fontWeight:issueType===t.v?900:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:14}}>{t.icon}</span>{t.v}<span style={{fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:5,background:issueType===t.v?t.c+"20":M.mid,color:issueType===t.v?t.c:M.tD}}>{(TYPE_HDR[t.v]||[]).length}f</span>
             </button>))}</div>
         </div>
         <div style={{width:1,background:M.div,flexShrink:0}}/>
         <div style={{flex:1}}>
-          <div style={{fontSize:8,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 2 — ITEM CATEGORY</div>
+          <div style={{fontSize:10,fontWeight:900,color:M.tD,letterSpacing:1,marginBottom:5}}>STEP 2 — ITEM CATEGORY</div>
           <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>{ITEM_CATS.map(c=>(
-            <button key={c.v} onClick={()=>setItemCat(c.v)} style={{padding:"5px 11px",borderRadius:7,border:`1.5px solid ${itemCat===c.v?c.c:M.inBd}`,background:itemCat===c.v?c.c+"12":"transparent",color:itemCat===c.v?c.c:M.tB,fontSize:10,fontWeight:itemCat===c.v?900:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
-              <span style={{fontSize:13}}>{c.icon}</span>{c.v}<span style={{fontSize:7,fontWeight:800,padding:"1px 5px",borderRadius:5,background:itemCat===c.v?c.c+"20":M.mid,color:itemCat===c.v?c.c:M.tD}}>{(CAT_HDR[c.v]||[]).length}f</span>
+            <button key={c.v} onClick={()=>setItemCat(c.v)} style={{padding:"6px 12px",borderRadius:7,border:`1.5px solid ${itemCat===c.v?c.c:M.inBd}`,background:itemCat===c.v?c.c+"12":"transparent",color:itemCat===c.v?c.c:M.tB,fontSize:12,fontWeight:itemCat===c.v?900:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4}}>
+              <span style={{fontSize:14}}>{c.icon}</span>{c.v}<span style={{fontSize:9,fontWeight:800,padding:"1px 6px",borderRadius:5,background:itemCat===c.v?c.c+"20":M.mid,color:itemCat===c.v?c.c:M.tD}}>{(CAT_HDR[c.v]||[]).length}f</span>
             </button>))}</div>
         </div>
       </div>
@@ -346,12 +362,12 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
 
       {/* LAYER 1: Common */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:A.al+"30"}}>
-        <div style={{fontSize:11,fontWeight:900,color:A.a,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>📋</span> Issue header — common <span style={{padding:"2px 7px",borderRadius:6,fontSize:8,fontWeight:800,background:A.al,color:A.a}}>8</span></div>
+        <div style={{fontSize:13,fontWeight:900,color:A.a,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>📋</span> Issue header — common <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:A.al,color:A.a}}>8</span></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:2}}><span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>ISSUE NO</div><input readOnly value="ISS-2026-0009" style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%",fontFamily:"monospace"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}><span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>ISSUE NO</div><input readOnly value="ISS-2026-0009" style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%",fontFamily:"monospace"}}/></div>
           {renderF({id:"date",h:"Issue Date",req:true},A.a,"c_")}
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:2}}>ISSUE TYPE</div><input readOnly value={issueType} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${TC.c}30`,borderRadius:5,background:TC.c+"10",color:TC.c,fontWeight:700,width:"100%"}}/></div>
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:2}}><span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>TIMESTAMP</div><input readOnly value={new Date().toLocaleString("en-IN")} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}>ISSUE TYPE</div><input readOnly value={issueType} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${TC.c}30`,borderRadius:5,background:TC.c+"10",color:TC.c,fontWeight:700,width:"100%"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",letterSpacing:".4px",textTransform:"uppercase",marginBottom:3}}><span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>TIMESTAMP</div><input readOnly value={new Date().toLocaleString("en-IN")} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8,marginTop:8}}>
           {renderF({id:"person",h:"Concern Person",req:true},A.a,"c_")}
@@ -363,39 +379,42 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
 
       {/* LAYER 2: Type-specific */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:TC.c+"06",borderLeft:`4px solid ${TC.c}`}}>
-        <div style={{fontSize:11,fontWeight:900,color:TC.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{TC.icon}</span> {issueType} — type-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:8,fontWeight:800,background:TC.c+"15",color:TC.c}}>{typeHdr.length}</span></div>
+        <div style={{fontSize:13,fontWeight:900,color:TC.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>{TC.icon}</span> {issueType} — type-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:TC.c+"15",color:TC.c}}>{typeHdr.length}</span></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{typeHdr.map(f=>renderF(f,TC.c,"t_"))}</div>
       </div>
 
       {/* LAYER 3: Category-specific */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`,background:CC_CAT.c+"06",borderLeft:`4px solid ${CC_CAT.c}`}}>
-        <div style={{fontSize:11,fontWeight:900,color:CC_CAT.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:13}}>{CC_CAT.icon}</span> {itemCat} — category-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:8,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{catHdr.length}</span></div>
+        <div style={{fontSize:13,fontWeight:900,color:CC_CAT.c,marginBottom:8,display:"flex",alignItems:"center",gap:5}}><span style={{fontSize:15}}>{CC_CAT.icon}</span> {itemCat} — category-specific <span style={{padding:"2px 7px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{catHdr.length}</span></div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:8}}>{catHdr.map(f=>renderF(f,CC_CAT.c,"cat_"))}</div>
       </div>
 
       {/* ── LINE ITEMS TABLE ── */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`}}>
-        <div style={{fontSize:11,fontWeight:900,color:"#1a2744",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontSize:13}}>📦</span> Line items — {itemCat.toLowerCase()} issued
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:8,fontWeight:800,background:A.al,color:A.a,marginLeft:"auto"}}>{lineItems.length} items</span>
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:8,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalQty.toLocaleString("en-IN")} {uom}</span>
-          <span style={{padding:"2px 8px",borderRadius:6,fontSize:8,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalCatUnit} {catUnitLabel}</span>
+        <div style={{fontSize:13,fontWeight:900,color:"#1a2744",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:15}}>📦</span> Line items — {itemCat.toLowerCase()} issued
+          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:A.al,color:A.a,marginLeft:"auto"}}>{lineItems.length} items</span>
+          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalQty.toLocaleString("en-IN")} {uom}</span>
+          <span style={{padding:"2px 8px",borderRadius:6,fontSize:10,fontWeight:800,background:CC_CAT.c+"15",color:CC_CAT.c}}>{totalCatUnit} {catUnitLabel}</span>
         </div>
         <div style={{overflowX:"auto"}}>
           <table style={{borderCollapse:"collapse",minWidth:"100%"}}>
             <thead><tr>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:24}}>S.No</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:32}}>Img</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Item Code</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Item Name</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Brand</th>
-              {catLineCols.map((col,ci)=>(<th key={col.id} style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fbbf24",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,borderLeft:ci===0?`2px solid ${CC_CAT.c}60`:"none",minWidth:col.w}}>{col.h}</th>))}
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>UOM</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>In-Hand</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#5eead4",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Issue Qty</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Rate</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Value</th>
-              <th style={{padding:"5px 6px",fontSize:8,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:20}}/>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:24}}>S.No</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:32}}>Img</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Item Code</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Item Name</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Brand</th>
+              {catLineCols.map((col,ci)=>(<th key={col.id} style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fbbf24",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,borderLeft:ci===0?`2px solid ${CC_CAT.c}60`:"none",minWidth:col.w}}>{col.h}</th>))}
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>UOM</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>In-Hand</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fca5a5",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Alloc</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#86efac",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Free</th>
+              <th style={{padding:"5px 6px",fontSize:9,fontWeight:700,color:"#c4b5fd",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`}}>Source</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#5eead4",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Issue Qty</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Rate</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,textAlign:"right"}}>Value</th>
+              <th style={{padding:"5px 6px",fontSize:10,fontWeight:700,color:"#fff",background:"#1a2744",borderBottom:`2px solid ${CC_RED}`,width:20}}/>
             </tr></thead>
             <tbody>
               {lineItems.map((row,ri)=>{
@@ -413,23 +432,28 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
                       onMouseOut={e=>{e.currentTarget.style.transform="scale(1)";e.currentTarget.style.boxShadow=img?"0 1px 4px rgba(0,0,0,.1)":"none";}}
                     >{img?<img src={img} alt="" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:emoji}</div>
                   </td>
-                  <td style={{padding:"5px 6px"}}><input value={row.code||""} onChange={e=>updateLine(row._id,"code",e.target.value)} placeholder="Item code" style={{padding:"3px 7px",fontSize:10,border:`1.5px solid ${M.inBd}`,borderRadius:4,borderLeft:"3px solid #E8690A",width:90,fontFamily:"monospace",fontWeight:700}}/></td>
-                  <td style={{padding:"5px 6px",fontSize:11,fontWeight:700,maxWidth:150,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name||<span style={{color:M.tD,fontStyle:"italic"}}>auto</span>}</td>
-                  <td style={{padding:"5px 6px",fontSize:10}}>{row.brand||""}</td>
+                  <td style={{padding:"5px 6px"}}><input value={row.code||""} onChange={e=>updateLine(row._id,"code",e.target.value)} placeholder="Item code" style={{padding:"4px 8px",fontSize:12,border:`1.5px solid ${M.inBd}`,borderRadius:4,borderLeft:"3px solid #E8690A",width:100,fontFamily:"monospace",fontWeight:700}}/></td>
+                  <td style={{padding:"5px 6px",fontSize:13,fontWeight:700,maxWidth:170,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{row.name||<span style={{color:M.tD,fontStyle:"italic"}}>auto</span>}</td>
+                  <td style={{padding:"5px 6px",fontSize:12}}>{row.brand||""}</td>
                   {catLineCols.map((col,ci)=>(<td key={col.id} style={{padding:"5px 6px",borderLeft:ci===0?`2px solid ${CC_CAT.c}20`:"none"}}>
-                    {col.dd?<select value={row[col.id]||""} onChange={e=>updateLine(row._id,col.id,e.target.value)} style={{padding:"3px 5px",fontSize:10,borderRadius:3,border:`1px solid ${M.inBd}`,borderLeft:`2px solid ${CC_CAT.c}`,width:col.w-10}}><option value="">—</option>{col.dd.map(o=><option key={o} value={o}>{o}</option>)}</select>
-                    :<input value={row[col.id]||""} onChange={e=>updateLine(row._id,col.id,e.target.value)} style={{padding:"3px 5px",fontSize:10,borderRadius:3,border:`1px solid ${M.inBd}`,borderLeft:`2px solid ${CC_CAT.c}`,width:col.w-10,textAlign:col.num?"right":"left",fontWeight:col.amber?"700":"400",color:col.amber?"#854d0e":"inherit",fontFamily:col.num?"monospace":"inherit"}}/>}
+                    {col.dd?<select value={row[col.id]||""} onChange={e=>updateLine(row._id,col.id,e.target.value)} style={{padding:"4px 6px",fontSize:12,borderRadius:3,border:`1px solid ${M.inBd}`,borderLeft:`2px solid ${CC_CAT.c}`,width:col.w}}><option value="">—</option>{col.dd.map(o=><option key={o} value={o}>{o}</option>)}</select>
+                    :<input value={row[col.id]||""} onChange={e=>updateLine(row._id,col.id,e.target.value)} style={{padding:"4px 6px",fontSize:12,borderRadius:3,border:`1px solid ${M.inBd}`,borderLeft:`2px solid ${CC_CAT.c}`,width:col.w,textAlign:col.num?"right":"left",fontWeight:col.amber?"700":"400",color:col.amber?"#854d0e":"inherit",fontFamily:col.num?"monospace":"inherit"}}/>}
                   </td>))}
-                  <td style={{padding:"5px 6px",fontWeight:800,color:"#854d0e",fontSize:10}}>{row.uom||""}</td>
-                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontWeight:700,fontSize:11,color:over?"#dc2626":ih>0?"#15803d":M.tD}}>{ih>0?ih.toLocaleString("en-IN"):"—"}</td>
-                  <td style={{padding:"5px 6px",textAlign:"right"}}><input type="number" value={row.issueQty||""} onChange={e=>updateLine(row._id,"issueQty",e.target.value)} style={{padding:"3px 5px",fontSize:11,borderRadius:3,border:`1.5px solid ${over?"#dc2626":A.a}`,color:over?"#dc2626":A.a,fontWeight:700,width:60,textAlign:"right",fontFamily:"monospace"}}/></td>
-                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontSize:10,color:"#854d0e"}}>{row.rate?`₹${row.rate}`:""}</td>
-                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontSize:10,fontWeight:700}}>{val>0?`₹${val.toLocaleString("en-IN")}`:""}</td>
+                  <td style={{padding:"5px 6px",fontWeight:800,color:"#854d0e",fontSize:12}}>{row.uom||""}</td>
+                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontWeight:700,fontSize:13,color:over?"#dc2626":ih>0?"#15803d":M.tD}}>{ih>0?ih.toLocaleString("en-IN"):"—"}</td>
+                  {(()=>{const al=getIssueAlloc(row.code);const hasAlloc=al.alloc>0;const fromAlloc=hasAlloc&&headerData.t_t1&&al.items.some(a=>a.ref===headerData.t_t1);return(<>
+                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontWeight:700,fontSize:12,color:hasAlloc?"#BE123C":M.tD}}>{hasAlloc?<span title={al.items.map(a=>`${a.ref}: ${a.qty} (${a.desc})`).join('\n')}>🔒 {al.alloc.toLocaleString("en-IN")}</span>:"—"}</td>
+                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontWeight:800,fontSize:13,color:al.free<=0?"#991b1b":al.free<100?"#92400e":"#15803d",background:al.free<=0?"#fef2f2":"transparent",borderRadius:al.free<=0?3:0}}>{al.free>0?al.free.toLocaleString("en-IN"):<span style={{fontWeight:900}}>0</span>}</td>
+                  <td style={{padding:"5px 4px"}}>{fromAlloc?<span style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:800,background:"#eff6ff",color:"#1d4ed8",border:"1px solid #bfdbfe",whiteSpace:"nowrap"}}>📋 Alloc</span>:hasAlloc?<span style={{padding:"2px 6px",borderRadius:4,fontSize:9,fontWeight:800,background:"#f0fdf4",color:"#15803d",border:"1px solid #bbf7d0",whiteSpace:"nowrap"}}>✅ Free</span>:<span style={{color:M.tD,fontSize:9}}>Free</span>}</td>
+                  </>);})()}
+                  <td style={{padding:"5px 6px",textAlign:"right"}}><input type="number" value={row.issueQty||""} onChange={e=>updateLine(row._id,"issueQty",e.target.value)} style={{padding:"4px 6px",fontSize:13,borderRadius:3,border:`1.5px solid ${over?"#dc2626":A.a}`,color:over?"#dc2626":A.a,fontWeight:700,width:65,textAlign:"right",fontFamily:"monospace"}}/></td>
+                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontSize:12,color:"#854d0e"}}>{row.rate?`₹${row.rate}`:""}</td>
+                  <td style={{padding:"5px 6px",textAlign:"right",fontFamily:"monospace",fontSize:12,fontWeight:700}}>{val>0?`₹${val.toLocaleString("en-IN")}`:""}</td>
                   <td style={{padding:"5px 6px",textAlign:"center",color:"#dc2626",cursor:"pointer",fontWeight:700,fontSize:12}} onClick={()=>removeLine(row._id)}>✕</td>
                 </tr>);
               })}
               <tr style={{background:M.mid}}>
-                <td colSpan={5+catLineCols.length+1} style={{textAlign:"right",padding:"6px 10px",fontSize:9,fontWeight:700,color:M.tD,borderTop:`2px solid ${CC_RED}`}}>TOTAL:</td>
+                <td colSpan={5+catLineCols.length+4} style={{textAlign:"right",padding:"6px 10px",fontSize:9,fontWeight:700,color:M.tD,borderTop:`2px solid ${CC_RED}`}}>TOTAL:</td>
                 <td style={{borderTop:`2px solid ${CC_RED}`}}/>
                 <td style={{textAlign:"right",padding:"6px",fontFamily:"monospace",fontSize:12,fontWeight:900,color:A.a,borderTop:`2px solid ${CC_RED}`}}>{totalQty.toLocaleString("en-IN")} {uom}</td>
                 <td style={{borderTop:`2px solid ${CC_RED}`}}/>
@@ -461,9 +485,9 @@ function StockIssueTab({mockRecords, allFields, M, A, fz, pyV, viewState, setVie
       {/* AUDIT + ACTIONS */}
       <div style={{padding:"10px 14px",borderBottom:`1px solid ${M.div}`}}>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8}}>
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:2}}><span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>ISSUED BY</div><input readOnly value="store@ccpl.in" style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:2}}><span style={{fontSize:6,padding:"1px 4px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>CREATED DATE</div><input readOnly value={new Date().toLocaleString("en-IN")} style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
-          <div><div style={{fontSize:8,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:2}}>REMARKS</div><input value={headerData.remarks||""} onChange={e=>setHeaderData(p=>({...p,remarks:e.target.value}))} placeholder="Issue notes..." style={{padding:"5px 8px",fontSize:11,border:`1.5px solid ${M.inBd}`,borderRadius:5,width:"100%"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:3}}><span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>ISSUED BY</div><input readOnly value="store@ccpl.in" style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:3}}><span style={{fontSize:8,padding:"1px 5px",borderRadius:3,background:A.al,color:A.a,marginRight:3}}>AUTO</span>CREATED DATE</div><input readOnly value={new Date().toLocaleString("en-IN")} style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${A.a}30`,borderRadius:5,background:A.al,color:A.a,fontWeight:600,width:"100%"}}/></div>
+          <div><div style={{fontSize:10,fontWeight:700,color:"#6b7280",textTransform:"uppercase",marginBottom:3}}>REMARKS</div><input value={headerData.remarks||""} onChange={e=>setHeaderData(p=>({...p,remarks:e.target.value}))} placeholder="Issue notes..." style={{padding:"6px 10px",fontSize:13,border:`1.5px solid ${M.inBd}`,borderRadius:5,width:"100%"}}/></div>
         </div>
       </div>
       <div style={{padding:"10px 14px",display:"flex",gap:8,justifyContent:"flex-end"}}>
