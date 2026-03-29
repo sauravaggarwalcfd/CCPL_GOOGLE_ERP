@@ -71,19 +71,19 @@ const FK = {
     {v:"ARTICLE",    l:"ARTICLE — Finished Garments"},
   ],
   ITEM: [
-    {v:"RM-FAB-001", l:"RM-FAB-001 — 100% Cotton Single Jersey",  master:"FABRIC",  uom:"KG", hsn:"5209", gst:5},
-    {v:"RM-FAB-002", l:"RM-FAB-002 — CVC Pique 220 GSM",         master:"FABRIC",  uom:"KG", hsn:"5209", gst:5},
-    {v:"RM-FAB-003", l:"RM-FAB-003 — Poly Fleece 280 GSM",       master:"FABRIC",  uom:"KG", hsn:"5515", gst:5},
-    {v:"RM-YRN-001", l:"RM-YRN-001 — 30s Combed Cotton",         master:"YARN",    uom:"KG", hsn:"5205", gst:5},
-    {v:"RM-YRN-002", l:"RM-YRN-002 — 2/40s CVC 60/40",          master:"YARN",    uom:"KG", hsn:"5205", gst:5},
-    {v:"TRM-THD-001",l:"TRM-THD-001 — Coats Epic 120 White",     master:"TRIM",    uom:"CONE",hsn:"5401",gst:12},
-    {v:"TRM-THD-002",l:"TRM-THD-002 — Coats Epic 120 Black",     master:"TRIM",    uom:"CONE",hsn:"5401",gst:12},
-    {v:"TRM-LBL-001",l:"TRM-LBL-001 — Main Label Woven",        master:"TRIM",    uom:"PCS", hsn:"5807",gst:12},
-    {v:"TRM-ZIP-001",l:"TRM-ZIP-001 — YKK Nylon 6\" Black",     master:"TRIM",    uom:"PCS", hsn:"9607",gst:18},
-    {v:"CON-DYE-001",l:"CON-DYE-001 — Reactive Black HE-B",     master:"CONSUMABLE",uom:"KG",hsn:"3204",gst:18},
-    {v:"PKG-PLY-001",l:"PKG-PLY-001 — Poly Bag 12×14 Clear",    master:"PACKAGING",uom:"PCS",hsn:"3923",gst:18},
-    {v:"5249HP",     l:"5249HP — Polo T-shirt CVC Pique",        master:"ARTICLE", uom:"PCS", hsn:"6105",gst:12},
-    {v:"54568HR",    l:"54568HR — Hoodie Fleece Pullover",        master:"ARTICLE", uom:"PCS", hsn:"6110",gst:12},
+    {v:"RM-FAB-001", l:"RM-FAB-001 — 100% Cotton Single Jersey",  master:"FABRIC",     uom:"KG",  hsn:"5209", gst:5,  uomP:"KG",   uomC:"KG",   cf:1},
+    {v:"RM-FAB-002", l:"RM-FAB-002 — CVC Pique 220 GSM",         master:"FABRIC",     uom:"KG",  hsn:"5209", gst:5,  uomP:"KG",   uomC:"KG",   cf:1},
+    {v:"RM-FAB-003", l:"RM-FAB-003 — Poly Fleece 280 GSM",       master:"FABRIC",     uom:"KG",  hsn:"5515", gst:5,  uomP:"KG",   uomC:"KG",   cf:1},
+    {v:"RM-YRN-001", l:"RM-YRN-001 — 30s Combed Cotton",         master:"YARN",       uom:"KG",  hsn:"5205", gst:5,  uomP:"KG",   uomC:"CONE", cf:4},
+    {v:"RM-YRN-002", l:"RM-YRN-002 — 2/40s CVC 60/40",          master:"YARN",       uom:"KG",  hsn:"5205", gst:5,  uomP:"KG",   uomC:"CONE", cf:3.33},
+    {v:"TRM-THD-001",l:"TRM-THD-001 — Coats Epic 120 White",     master:"TRIM",       uom:"CONE",hsn:"5401", gst:12, uomP:"CONE", uomC:"CONE", cf:1},
+    {v:"TRM-THD-002",l:"TRM-THD-002 — Coats Epic 120 Black",     master:"TRIM",       uom:"CONE",hsn:"5401", gst:12, uomP:"CONE", uomC:"CONE", cf:1},
+    {v:"TRM-LBL-001",l:"TRM-LBL-001 — Main Label Woven",        master:"TRIM",       uom:"PCS", hsn:"5807", gst:12, uomP:"PACK", uomC:"PCS",  cf:1000},
+    {v:"TRM-ZIP-001",l:"TRM-ZIP-001 — YKK Nylon 6\" Black",     master:"TRIM",       uom:"PCS", hsn:"9607", gst:18, uomP:"PACK", uomC:"PCS",  cf:50},
+    {v:"CON-DYE-001",l:"CON-DYE-001 — Reactive Black HE-B",     master:"CONSUMABLE", uom:"KG",  hsn:"3204", gst:18, uomP:"KG",   uomC:"KG",   cf:1},
+    {v:"PKG-PLY-001",l:"PKG-PLY-001 — Poly Bag 12×14 Clear",    master:"PACKAGING",  uom:"PCS", hsn:"3923", gst:18, uomP:"PACK", uomC:"PCS",  cf:100},
+    {v:"5249HP",     l:"5249HP — Polo T-shirt CVC Pique",        master:"ARTICLE",    uom:"PCS", hsn:"6105", gst:12, uomP:"PCS",  uomC:"PCS",  cf:1},
+    {v:"54568HR",    l:"54568HR — Hoodie Fleece Pullover",        master:"ARTICLE",    uom:"PCS", hsn:"6110", gst:12, uomP:"PCS",  uomC:"PCS",  cf:1},
   ],
   WAREHOUSE: [
     {v:"WH-FAB",   l:"WH-FAB — Fabric Godown"},
@@ -129,6 +129,90 @@ const FK = {
 };
 
 // ═══════════════════════════════════════════════════════════
+//  DUAL UOM — conversion helpers
+// ═══════════════════════════════════════════════════════════
+function getItemUOM(itemCode) {
+  const item = FK.ITEM.find(i => i.v === itemCode);
+  if (!item) return { uomP:"—", uomC:"—", cf:1, hasDualUOM:false };
+  const hasDualUOM = item.uomP !== item.uomC;
+  return { uomP: item.uomP, uomC: item.uomC, cf: item.cf, hasDualUOM };
+}
+function convertQty(qty, itemCode, direction="P2C") {
+  const { cf } = getItemUOM(itemCode);
+  if (direction === "P2C") return +(qty * cf).toFixed(2);
+  return +(qty / cf).toFixed(4);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MIP — Material In Purchase (pending PO qty per item)
+// ═══════════════════════════════════════════════════════════
+const MIP_DATA = {
+  "RM-FAB-001": { totalMIP: 500, pos: [
+    { po:"PO-2026-0010", supplier:"Rajinder Fabrics", qty:300, received:0, pending:300, expDate:"02-Apr-2026", status:"Open" },
+    { po:"PO-2026-0012", supplier:"Punjab Textiles",  qty:200, received:0, pending:200, expDate:"08-Apr-2026", status:"Open" },
+  ]},
+  "RM-FAB-002": { totalMIP: 800, pos: [
+    { po:"PO-2026-0011", supplier:"Rajinder Fabrics", qty:800, received:0, pending:800, expDate:"05-Apr-2026", status:"Open" },
+  ]},
+  "RM-FAB-003": { totalMIP: 1000, pos: [
+    { po:"PO-2026-0013", supplier:"Punjab Textiles",  qty:1000, received:0, pending:1000, expDate:"01-Apr-2026", status:"Open" },
+  ]},
+  "RM-YRN-001": { totalMIP: 200, pos: [
+    { po:"PO-2026-0014", supplier:"Vardhman Yarns",   qty:200, received:0, pending:200, expDate:"10-Apr-2026", status:"Open" },
+  ]},
+  "TRM-THD-001": { totalMIP: 0, pos: [] },
+  "TRM-ZIP-001": { totalMIP: 150, pos: [
+    { po:"PO-2026-0015", supplier:"YKK India",        qty:200, received:50, pending:150, expDate:"28-Mar-2026", status:"Partial" },
+  ]},
+  "PKG-PLY-001": { totalMIP: 0, pos: [] },
+  "5249HP":      { totalMIP: 0, pos: [] },
+  "CON-DYE-001": { totalMIP: 50, pos: [
+    { po:"PO-2026-0016", supplier:"Atul Ltd",          qty:50, received:0, pending:50, expDate:"15-Apr-2026", status:"Open" },
+  ]},
+  "54568HR":     { totalMIP: 0, pos: [] },
+};
+function getMIP(itemCode) { return MIP_DATA[itemCode] || { totalMIP:0, pos:[] }; }
+
+// ═══════════════════════════════════════════════════════════
+//  ALLOCATION — Stock reserved against WO / SO / JW
+//  In production: GAS computes from open WO_BOM + SO_LINES + JW_ORDERS
+// ═══════════════════════════════════════════════════════════
+const ALLOC_TYPE_COLORS = {
+  WO: { bg:"#eff6ff", tx:"#1d4ed8", bd:"#bfdbfe", icon:"🏭", label:"Work Order" },
+  SO: { bg:"#f0fdf4", tx:"#15803d", bd:"#bbf7d0", icon:"📦", label:"Sale Order" },
+  JW: { bg:"#faf5ff", tx:"#7C3AED", bd:"#c4b5fd", icon:"🔄", label:"Job Work" },
+};
+const ALLOC_DATA = {
+  "RM-FAB-001": { totalAlloc: 400, items: [
+    { type:"WO", ref:"WO-2026-0001", desc:"Polo T-shirt — Cutting Batch 1", qty:200, date:"20-Mar-2026", status:"In Progress", article:"5249HP" },
+    { type:"WO", ref:"WO-2026-0003", desc:"Round Neck Tee — Cutting Batch 3", qty:200, date:"22-Mar-2026", status:"Planned", article:"54568HR" },
+  ]},
+  "RM-FAB-002": { totalAlloc: 300, items: [
+    { type:"JW", ref:"JW-2026-0008", desc:"Dyeing at Punjab Dyeing — CVC Pique lot", qty:300, date:"18-Mar-2026", status:"Fabric Received", article:"5249HP" },
+  ]},
+  "RM-FAB-003": { totalAlloc: 0, items: [] },
+  "RM-YRN-001": { totalAlloc: 0, items: [] },
+  "TRM-THD-001": { totalAlloc: 20, items: [
+    { type:"WO", ref:"WO-2026-0001", desc:"Polo Stitching — Thread alloc", qty:20, date:"20-Mar-2026", status:"In Progress", article:"5249HP" },
+  ]},
+  "TRM-ZIP-001": { totalAlloc: 50, items: [
+    { type:"SO", ref:"SO-2026-0045", desc:"Myntra Order — Hoodie Zippers", qty:50, date:"25-Mar-2026", status:"Confirmed", article:"54568HR" },
+  ]},
+  "PKG-PLY-001": { totalAlloc: 500, items: [
+    { type:"SO", ref:"SO-2026-0044", desc:"Myntra Dispatch — Polo packing", qty:300, date:"15-Mar-2026", status:"Confirmed", article:"5249HP" },
+    { type:"SO", ref:"SO-2026-0045", desc:"Myntra Dispatch — Hoodie packing", qty:200, date:"25-Mar-2026", status:"Confirmed", article:"54568HR" },
+  ]},
+  "5249HP": { totalAlloc: 200, items: [
+    { type:"SO", ref:"SO-2026-0044", desc:"Myntra Order — 200 Polo CVC Pique", qty:200, date:"15-Mar-2026", status:"Ready to Dispatch", article:"5249HP" },
+  ]},
+  "54568HR": { totalAlloc: 0, items: [] },
+  "CON-DYE-001": { totalAlloc: 10, items: [
+    { type:"JW", ref:"JW-2026-0010", desc:"Black dyeing batch — Punjab Dyeing", qty:10, date:"24-Mar-2026", status:"Planned", article:"5249HP" },
+  ]},
+};
+function getAlloc(itemCode) { return ALLOC_DATA[itemCode] || { totalAlloc:0, items:[] }; }
+
+// ═══════════════════════════════════════════════════════════
 //  Direction auto-mapping for movement types
 // ═══════════════════════════════════════════════════════════
 const DIR_MAP = {
@@ -163,6 +247,12 @@ const STK_LEDGER_FIELDS = [
   {col:"T", ico:"C", h:"∑ Stock Value (₹)",      type:"calc",     req:false, auto:true,  fk:null,        hint:"=Stock On Hand × Avg Unit Cost."},
   {col:"U", ico:"_", h:"Avg Unit Cost (₹)",      type:"currency", req:false, auto:false, fk:null,        hint:"Weighted average cost from receipts."},
   {col:"V", ico:"_", h:"Remarks",                type:"textarea", req:false, auto:false, fk:null,        hint:"Stock-specific notes."},
+  {col:"W", ico:"A", h:"UOM Purchase (Auto)",    type:"auto",     req:false, auto:true,  fk:null,        hint:"← UOM used for buying. From Item Master."},
+  {col:"X", ico:"C", h:"Conv. Factor",           type:"calc",     req:false, auto:true,  fk:null,        hint:"1 Purchase UOM = X × Consumption UOM."},
+  {col:"Y", ico:"C", h:"∑ MIP Qty",              type:"calc",     req:false, auto:true,  fk:null,        hint:"Material In Purchase — pending PO qty. Click for breakdown."},
+  {col:"Z", ico:"C", h:"∑ Allocated",            type:"calc",     req:false, auto:true,  fk:null,        hint:"Reserved for WO/SO/JW. Click for breakdown. Can be released."},
+  {col:"AA",ico:"C", h:"∑ Free Stock",           type:"calc",     req:false, auto:true,  fk:null,        hint:"=On Hand − Allocated. What you can actually use today."},
+  {col:"AB",ico:"C", h:"∑ Projected",            type:"calc",     req:false, auto:true,  fk:null,        hint:"=Free Stock + MIP. Total usable including pipeline."},
 ];
 
 // ═══════════════════════════════════════════════════════════
@@ -377,12 +467,14 @@ let MODULE_FIELDS = STK_LEDGER_FIELDS;
 // ═══════════════════════════════════════════════════════════
 const SECTIONS_MAP = {
   ledger: [
-    {id:"item",    icon:"📦", title:"Item Identity",    cols:["A","B","C","D","E"]},
-    {id:"loc",     icon:"🏭", title:"Location",          cols:["F","G","H"]},
-    {id:"stock",   icon:"📊", title:"Stock Balances",    cols:["I","J","K","L","M"]},
-    {id:"reorder", icon:"🔔", title:"Reorder Settings",  cols:["N","O","P"]},
-    {id:"audit",   icon:"📅", title:"Audit & Value",     cols:["Q","R","S","T","U"]},
-    {id:"notes",   icon:"📝", title:"Notes",             cols:["V"]},
+    {id:"item",    icon:"📦", title:"Item Identity",         cols:["A","B","C","D","E"]},
+    {id:"loc",     icon:"🏭", title:"Location",               cols:["F","G","H"]},
+    {id:"uom",     icon:"⚖️", title:"UOM & Conversion",       cols:["I","W","X"]},
+    {id:"stock",   icon:"📊", title:"Stock Balances",         cols:["J","K","L","M"]},
+    {id:"alloc",   icon:"🔒", title:"Allocation & Pipeline",  cols:["Z","AA","Y","AB"]},
+    {id:"reorder", icon:"🔔", title:"Reorder Settings",       cols:["N","O","P"]},
+    {id:"audit",   icon:"📅", title:"Audit & Value",          cols:["Q","R","S","T","U"]},
+    {id:"notes",   icon:"📝", title:"Notes",                  cols:["V"]},
   ],
   movement: [
     {id:"header",  icon:"📋", title:"Movement Header",   cols:["A","B","C","D"]},
@@ -427,14 +519,14 @@ const MODULE_SECTIONS = SECTIONS_MAP.ledger;
 // ═══════════════════════════════════════════════════════════
 const MOCK_MAP = {
   ledger: [
-    {A:"STK-00001",B:"RM-FAB-001",C:"FABRIC",D:"100% Cotton SJ",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"",I:"KG",J:0,K:2500,L:800,M:1700,N:500,O:1000,P:"OK",Q:"15-Mar-2026",R:"12-Mar-2026",S:"GRN-2026-0003",T:"₹4,25,000",U:250,V:""},
-    {A:"STK-00002",B:"RM-FAB-002",C:"FABRIC",D:"CVC Pique 220",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"BIN-FAB-R1-L1",I:"KG",J:100,K:1800,L:1500,M:400,N:500,O:800,P:"REORDER",Q:"10-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0002",T:"₹1,40,000",U:350,V:"Low stock — PO raised"},
-    {A:"STK-00003",B:"TRM-THD-001",C:"TRIM",D:"Coats Epic 120 White",E:"Thread",F:"WH-TRIM",G:"Trim Store",H:"BIN-TRIM-R1-L1",I:"CONE",J:50,K:200,L:180,M:70,N:30,O:50,P:"OK",Q:"08-Mar-2026",R:"11-Mar-2026",S:"GRN-2026-0001",T:"₹10,500",U:150,V:""},
-    {A:"STK-00004",B:"TRM-ZIP-001",C:"TRIM",D:"YKK Nylon 6\" Black",E:"Zipper",F:"WH-TRIM",G:"Trim Store",H:"",I:"PCS",J:0,K:500,L:420,M:80,N:100,O:200,P:"REORDER",Q:"05-Mar-2026",R:"13-Mar-2026",S:"GRN-2026-0001",T:"₹2,400",U:30,V:""},
-    {A:"STK-00005",B:"PKG-PLY-001",C:"PACKAGING",D:"Poly Bag 12×14",E:"Packaging",F:"WH-PKG",G:"Packaging Store",H:"",I:"PCS",J:1000,K:5000,L:3500,M:2500,N:500,O:2000,P:"OK",Q:"12-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0003",T:"₹12,500",U:5,V:""},
-    {A:"STK-00006",B:"5249HP",C:"ARTICLE",D:"Polo T-shirt CVC",E:"Finished Goods",F:"WH-FG",G:"FG Store",H:"BIN-FG-R1-L1",I:"PCS",J:0,K:1200,L:800,M:400,N:100,O:300,P:"OK",Q:"14-Mar-2026",R:"15-Mar-2026",S:"",T:"₹2,40,000",U:600,V:"Season SS26"},
-    {A:"STK-00007",B:"CON-DYE-001",C:"CONSUMABLE",D:"Reactive Black HE-B",E:"Dye",F:"WH-CON",G:"Chemical Store",H:"",I:"KG",J:20,K:100,L:95,M:25,N:20,O:50,P:"OK",Q:"01-Mar-2026",R:"10-Mar-2026",S:"GRN-2026-0001",T:"₹37,500",U:1500,V:""},
-    {A:"STK-00008",B:"RM-FAB-003",C:"FABRIC",D:"Poly Fleece 280",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"BIN-FAB-R2-L1",I:"KG",J:0,K:600,L:590,M:10,N:200,O:500,P:"CRITICAL",Q:"02-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0002",T:"₹5,000",U:500,V:"Urgent reorder needed"},
+    {A:"STK-00001",B:"RM-FAB-001",C:"FABRIC",D:"100% Cotton SJ",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"",I:"KG",J:0,K:2500,L:800,M:1700,N:500,O:1000,P:"OK",Q:"15-Mar-2026",R:"12-Mar-2026",S:"GRN-2026-0003",T:"₹4,25,000",U:250,V:"", W:"KG",X:1,Y:500,Z:400,AA:1300,AB:1800},
+    {A:"STK-00002",B:"RM-FAB-002",C:"FABRIC",D:"CVC Pique 220",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"BIN-FAB-R1-L1",I:"KG",J:100,K:1800,L:1500,M:400,N:500,O:800,P:"REORDER",Q:"10-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0002",T:"₹1,40,000",U:350,V:"Low stock — PO raised", W:"KG",X:1,Y:800,Z:300,AA:100,AB:900},
+    {A:"STK-00003",B:"TRM-THD-001",C:"TRIM",D:"Coats Epic 120 White",E:"Thread",F:"WH-TRIM",G:"Trim Store",H:"BIN-TRIM-R1-L1",I:"CONE",J:50,K:200,L:180,M:70,N:30,O:50,P:"OK",Q:"08-Mar-2026",R:"11-Mar-2026",S:"GRN-2026-0001",T:"₹10,500",U:150,V:"", W:"CONE",X:1,Y:0,Z:20,AA:50,AB:50},
+    {A:"STK-00004",B:"TRM-ZIP-001",C:"TRIM",D:"YKK Nylon 6\" Black",E:"Zipper",F:"WH-TRIM",G:"Trim Store",H:"",I:"PCS",J:0,K:500,L:420,M:80,N:100,O:200,P:"REORDER",Q:"05-Mar-2026",R:"13-Mar-2026",S:"GRN-2026-0001",T:"₹2,400",U:30,V:"", W:"PACK",X:50,Y:150,Z:50,AA:30,AB:180},
+    {A:"STK-00005",B:"PKG-PLY-001",C:"PACKAGING",D:"Poly Bag 12×14",E:"Packaging",F:"WH-PKG",G:"Packaging Store",H:"",I:"PCS",J:1000,K:5000,L:3500,M:2500,N:500,O:2000,P:"OK",Q:"12-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0003",T:"₹12,500",U:5,V:"", W:"PACK",X:100,Y:0,Z:500,AA:2000,AB:2000},
+    {A:"STK-00006",B:"5249HP",C:"ARTICLE",D:"Polo T-shirt CVC",E:"Finished Goods",F:"WH-FG",G:"FG Store",H:"BIN-FG-R1-L1",I:"PCS",J:0,K:1200,L:800,M:400,N:100,O:300,P:"OK",Q:"14-Mar-2026",R:"15-Mar-2026",S:"",T:"₹2,40,000",U:600,V:"Season SS26", W:"PCS",X:1,Y:0,Z:200,AA:200,AB:200},
+    {A:"STK-00007",B:"CON-DYE-001",C:"CONSUMABLE",D:"Reactive Black HE-B",E:"Dye",F:"WH-CON",G:"Chemical Store",H:"",I:"KG",J:20,K:100,L:95,M:25,N:20,O:50,P:"OK",Q:"01-Mar-2026",R:"10-Mar-2026",S:"GRN-2026-0001",T:"₹37,500",U:1500,V:"", W:"KG",X:1,Y:50,Z:10,AA:15,AB:65},
+    {A:"STK-00008",B:"RM-FAB-003",C:"FABRIC",D:"Poly Fleece 280",E:"Fabric",F:"WH-FAB",G:"Fabric Godown",H:"BIN-FAB-R2-L1",I:"KG",J:0,K:600,L:590,M:10,N:200,O:500,P:"CRITICAL",Q:"02-Mar-2026",R:"14-Mar-2026",S:"GRN-2026-0002",T:"₹5,000",U:500,V:"Urgent reorder needed", W:"KG",X:1,Y:1000,Z:0,AA:10,AB:1010},
   ],
   movement: [
     {A:"MOV-2026-00001",B:"01-Mar-2026",C:"GRN Receipt",D:"IN",E:"RM-FAB-001",F:"FABRIC",G:"100% Cotton SJ",H:"KG",I:"",J:"WH-FAB",K:500,L:250,M:"₹1,25,000",N:"GRN",O:"GRN-2026-0001",P:"PO-2026-0001",Q:"LOT-FAB-001",R:"store@ccpl.in",S:"01-Mar-2026 09:15",T:"First fabric receipt"},
@@ -2068,7 +2160,192 @@ function applySortFilter(rows, sorts, filters, allFields) {
 // ═══════════════════════════════════════════════════════════════════
 //  RECORDS TAB — read-only browser with full view system
 // ═══════════════════════════════════════════════════════════════════
-function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewState, templates, onSaveTemplate, onDeleteTemplate, onOpenRecord, showThumb, renderMode, ts }) {
+// ═══════════════════════════════════════════════════════════
+//  CATEGORY-SPECIFIC ATTRIBUTES — data + strip component
+// ═══════════════════════════════════════════════════════════
+const CAT_COLORS = {
+  FABRIC:{bg:"#fef2f2",bd:"#CC0000",tx:"#991b1b",hi:"#CC000018"},
+  YARN:{bg:"#eff6ff",bd:"#1d4ed8",tx:"#1e3a8a",hi:"#1d4ed818"},
+  TRIM:{bg:"#faf5ff",bd:"#7C3AED",tx:"#5b21b6",hi:"#7C3AED18"},
+  CONSUMABLE:{bg:"#f0fdf4",bd:"#15803d",tx:"#14532d",hi:"#15803d18"},
+  PACKAGING:{bg:"#fff7ed",bd:"#E8690A",tx:"#9a3412",hi:"#E8690A18"},
+  ARTICLE:{bg:"#fdf4ff",bd:"#BE123C",tx:"#831843",hi:"#BE123C18"},
+};
+const LEDGER_CAT_DATA = {
+  "RM-FAB-001":{c1:"R-001..05",c2:"5",c3:"250",c4:"1,400",c5:"180",c6:"72\"",c7:"5×3",c8:"Single Jersey",c9:"White",c10:"DL-2026-001"},
+  "RM-FAB-002":{c1:"R-010..18",c2:"9",c3:"180",c4:"820",c5:"220",c6:"68\"",c7:"4×2",c8:"Pique",c9:"Natural",c10:"DL-2026-003"},
+  "RM-FAB-003":{c1:"R-020..22",c2:"3",c3:"15",c4:"54",c5:"280",c6:"66\"",c7:"3×2",c8:"Fleece",c9:"Grey Melange",c10:"DL-2026-005"},
+  "TRM-THD-001":{c1:"Thread",c2:"White",c3:"120 Tex",c4:"Coats",c5:"200",c6:"MC-2026-001"},
+  "TRM-ZIP-001":{c1:"Zipper",c2:"Black",c3:"6\" Nylon",c4:"YKK",c5:"50",c6:"MC-2026-002"},
+  "CON-DYE-001":{c1:"Reactive Black HE-B",c2:"B-042",c3:"15-Jun-2026",c4:"Class 2",c5:"MSDS-042",c6:"Cool & Dry",c7:"99.5%"},
+  "PKG-PLY-001":{c1:"12×14\"",c2:"LDPE",c3:"None",c4:"40 micron",c5:"100",c6:"No",c7:"8901234567890"},
+  "5249HP":{c1:"5249HP",c2:"S-M-L-XL-XXL",c3:"White/Navy/Black",c4:"Myntra",c5:"SS26",c6:"CTN-001..010",c7:"10",c8:"8901234500001",c9:"₹599",c10:"Yes"},
+  "54568HR":{c1:"54568HR",c2:"M-L-XL-XXL",c3:"Charcoal/Black",c4:"Amazon",c5:"AW26",c6:"CTN-050..058",c7:"9",c8:"8901234500002",c9:"₹899",c10:"Yes"},
+};
+function CategoryAttributeStrip({itemCode,category,M,A}){
+  const fields=ISSUE_CAT_FIELDS[category]||[];
+  const data=LEDGER_CAT_DATA[itemCode]||{};
+  const cc=CAT_COLORS[category]||CAT_COLORS.FABRIC;
+  const emoji=CAT_EMOJI[category]||"📦";
+  if(!fields.length)return null;
+  return(
+    <div style={{background:cc.bg,borderLeft:`4px solid ${cc.bd}`,padding:"7px 12px 7px 14px"}}>
+      <div style={{fontSize:11,fontWeight:900,color:cc.tx,marginBottom:5,display:"flex",alignItems:"center",gap:5}}>
+        <span style={{fontSize:13}}>{emoji}</span>
+        {category} ATTRIBUTES
+        <span style={{fontSize:9,fontWeight:600,color:cc.bd,background:cc.hi,padding:"2px 6px",borderRadius:3}}>{fields.length} fields</span>
+      </div>
+      <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+        {fields.map(f=>{const val=data[f.id]||"—";return(
+          <div key={f.id} style={{background:M.sh||"#fff",borderRadius:6,padding:"8px 14px",border:`1px solid ${cc.bd}30`,minWidth:0,flex:"0 0 auto",maxWidth:200}}>
+            <div style={{fontSize:11,fontWeight:800,color:cc.bd,textTransform:"uppercase",letterSpacing:.4,lineHeight:1.2,marginBottom:3}}>{f.h}</div>
+            <div style={{fontSize:15,fontWeight:800,color:M.tA||"#111",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",lineHeight:1.3}}>{val}</div>
+          </div>
+        );})}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MIP POPUP — PO breakdown when clicking MIP qty
+// ═══════════════════════════════════════════════════════════
+function MIPPopup({ itemCode, itemName, onClose, M, A }) {
+  const mip = getMIP(itemCode);
+  const uom = getItemUOM(itemCode);
+  if (!mip || mip.totalMIP === 0) return null;
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:M.sh,border:"2px solid "+A.a,borderRadius:12,width:560,maxHeight:"80vh",overflow:"auto",boxShadow:M.shadow}}>
+        <div style={{padding:"14px 18px",borderBottom:"1px solid "+M.div,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:M.tA}}>📦 Material In Purchase — Pipeline Stock</div>
+            <div style={{fontSize:11,color:M.tC,marginTop:2}}>{itemCode} — {itemName}</div>
+          </div>
+          <button onClick={onClose} style={{background:"none",border:"none",fontSize:18,cursor:"pointer",color:M.tC,padding:4}}>✕</button>
+        </div>
+        <div style={{display:"flex",gap:12,padding:"12px 18px",background:M.lo}}>
+          <div style={{flex:1,textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:700,color:A.a}}>{mip.totalMIP.toLocaleString("en-IN")}</div>
+            <div style={{fontSize:10,color:M.tC}}>Total MIP ({uom.uomC})</div>
+          </div>
+          <div style={{flex:1,textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:700,color:"#15803d"}}>{mip.pos.length}</div>
+            <div style={{fontSize:10,color:M.tC}}>Open POs</div>
+          </div>
+          {uom.hasDualUOM && <div style={{flex:1,textAlign:"center"}}>
+            <div style={{fontSize:20,fontWeight:700,color:"#7C3AED"}}>{convertQty(mip.totalMIP, itemCode, "C2P").toLocaleString("en-IN")}</div>
+            <div style={{fontSize:10,color:M.tC}}>In {uom.uomP} (buy UOM)</div>
+          </div>}
+        </div>
+        <div style={{padding:"12px 18px"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:CC_RED,color:"#fff"}}>
+              {["PO No","Supplier","Ordered","Received","Pending","Exp. Date","Status"].map((h,i)=><th key={i} style={{padding:"6px 8px",textAlign:i>1&&i<5?"right":"left",fontWeight:700,fontSize:10}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{mip.pos.map((p,i)=>(
+              <tr key={i} style={{borderBottom:"1px solid "+M.div,background:i%2===0?M.tev:M.tod}}>
+                <td style={{padding:"6px 8px",fontFamily:"monospace",fontWeight:700,color:A.a}}>{p.po}</td>
+                <td style={{padding:"6px 8px",color:M.tB}}>{p.supplier}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"monospace"}}>{p.qty}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"monospace",color:"#15803d"}}>{p.received}</td>
+                <td style={{padding:"6px 8px",textAlign:"right",fontFamily:"monospace",fontWeight:700,color:"#E8690A"}}>{p.pending}</td>
+                <td style={{padding:"6px 8px",fontFamily:"monospace",fontSize:11,color:M.tC}}>{p.expDate}</td>
+                <td style={{padding:"6px 8px",textAlign:"center"}}><span style={{padding:"2px 8px",borderRadius:4,fontSize:9,fontWeight:800,background:p.status==="Open"?"#fef3c7":"#dcfce7",color:p.status==="Open"?"#92400e":"#15803d"}}>{p.status}</span></td>
+              </tr>))}</tbody>
+          </table>
+        </div>
+        {uom.hasDualUOM && <div style={{padding:"10px 18px",borderTop:"1px solid "+M.div,background:M.lo,fontSize:11,color:M.tC,display:"flex",alignItems:"center",gap:6}}>
+          <span style={{background:"#7C3AED",color:"#fff",padding:"2px 6px",borderRadius:3,fontSize:9,fontWeight:800}}>UOM</span>
+          Buy: {uom.uomP} → Issue: {uom.uomC} | Factor: 1 {uom.uomP} = {uom.cf} {uom.uomC}
+        </div>}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+//  ALLOC POPUP — WO/SO/JW breakdown when clicking Allocated
+// ═══════════════════════════════════════════════════════════
+function AllocPopup({ itemCode, itemName, onClose, M, A }) {
+  const alloc = getAlloc(itemCode);
+  const mip = getMIP(itemCode);
+  const onHand = MOCK_MAP?.ledger?.find(r => r.B === itemCode)?.M || 0;
+  const freeStock = onHand - alloc.totalAlloc;
+  const projected = freeStock + mip.totalMIP;
+  if (!alloc || alloc.totalAlloc === 0) return null;
+  return (
+    <div onClick={onClose} style={{position:"fixed",inset:0,background:"rgba(0,0,0,.45)",zIndex:9999,display:"flex",alignItems:"center",justifyContent:"center"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:M.sh,border:"2px solid #BE123C",borderRadius:12,width:620,maxHeight:"85vh",overflow:"auto",boxShadow:M.shadow}}>
+        <div style={{padding:"14px 18px",borderBottom:"2px solid #BE123C",display:"flex",alignItems:"center",justifyContent:"space-between",background:"linear-gradient(135deg,#BE123C,#9f1239)",borderRadius:"10px 10px 0 0"}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:700,color:"#fff"}}>🔒 Stock Allocation — Reserved Material</div>
+            <div style={{fontSize:11,color:"#fecdd3",marginTop:2}}>{itemCode} — {itemName}</div>
+          </div>
+          <button onClick={onClose} style={{background:"rgba(255,255,255,.2)",border:"none",fontSize:14,cursor:"pointer",color:"#fff",padding:"4px 10px",borderRadius:6}}>✕</button>
+        </div>
+        <div style={{display:"flex",gap:8,padding:"14px 18px",background:M.lo,flexWrap:"wrap"}}>
+          {[
+            {label:"On Hand",value:onHand,color:M.tA,suffix:getItemUOM(itemCode).uomC},
+            {label:"Allocated",value:alloc.totalAlloc,color:"#BE123C",suffix:"reserved"},
+            {label:"Free Stock",value:freeStock,color:freeStock>0?"#15803d":"#991b1b",suffix:"usable now"},
+            {label:"MIP Pipeline",value:mip.totalMIP,color:"#E8690A",suffix:"incoming"},
+            {label:"Projected",value:projected,color:"#0078D4",suffix:"total available"},
+          ].map((c,i)=>(
+            <div key={i} style={{flex:"1 1 100px",textAlign:"center",padding:"8px 6px",borderRadius:8,border:"1px solid "+M.div,background:M.sh}}>
+              <div style={{fontSize:18,fontWeight:700,color:c.color}}>{(typeof c.value==="number"?c.value:0).toLocaleString("en-IN")}</div>
+              <div style={{fontSize:9,color:M.tC,marginTop:1}}>{c.label}</div>
+              <div style={{fontSize:8,color:M.tD}}>{c.suffix}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{padding:"12px 18px"}}>
+          <div style={{fontSize:11,fontWeight:700,color:M.tB,marginBottom:8}}>ALLOCATION BREAKDOWN — {alloc.items.length} reservation{alloc.items.length!==1?"s":""}</div>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+            <thead><tr style={{background:"#1A1A2E",color:"#fff"}}>
+              {["Type","Ref No","Description","Article","Qty","Date","Status",""].map((h,i)=><th key={i} style={{padding:"7px 8px",textAlign:i===4?"right":"left",fontWeight:700,fontSize:10}}>{h}</th>)}
+            </tr></thead>
+            <tbody>{alloc.items.map((a,i)=>{
+              const tc = ALLOC_TYPE_COLORS[a.type]||ALLOC_TYPE_COLORS.WO;
+              return(
+              <tr key={i} style={{borderBottom:"1px solid "+M.div,background:i%2===0?M.tev:M.tod}}>
+                <td style={{padding:"7px 8px"}}><span style={{display:"inline-flex",alignItems:"center",gap:4,padding:"2px 8px",borderRadius:4,fontSize:10,fontWeight:800,background:tc.bg,color:tc.tx,border:"1px solid "+tc.bd}}>{tc.icon} {a.type}</span></td>
+                <td style={{padding:"7px 8px",fontFamily:"monospace",fontWeight:700,color:A.a,fontSize:11}}>{a.ref}</td>
+                <td style={{padding:"7px 8px",color:M.tB,fontSize:11,maxWidth:160,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{a.desc}</td>
+                <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,fontWeight:700,color:"#7C3AED"}}>{a.article}</td>
+                <td style={{padding:"7px 8px",textAlign:"right",fontFamily:"monospace",fontWeight:800,fontSize:13,color:"#BE123C"}}>{a.qty.toLocaleString("en-IN")}</td>
+                <td style={{padding:"7px 8px",fontFamily:"monospace",fontSize:10,color:M.tC}}>{a.date}</td>
+                <td style={{padding:"7px 8px"}}><span style={{padding:"2px 8px",borderRadius:4,fontSize:9,fontWeight:800,
+                  background:a.status.includes("Progress")?"#eff6ff":a.status.includes("Confirm")||a.status.includes("Ready")?"#dcfce7":a.status.includes("Received")?"#faf5ff":"#fef3c7",
+                  color:a.status.includes("Progress")?"#1d4ed8":a.status.includes("Confirm")||a.status.includes("Ready")?"#15803d":a.status.includes("Received")?"#7C3AED":"#92400e",
+                }}>{a.status}</span></td>
+                <td style={{padding:"7px 4px"}}><button title="Release this allocation" style={{background:"none",border:"1px solid #fecdd3",borderRadius:4,color:"#BE123C",fontSize:9,fontWeight:800,padding:"3px 6px",cursor:"pointer"}} onClick={e=>{e.stopPropagation();alert(`Release ${a.qty} ${getItemUOM(itemCode).uomC} from ${a.ref}?\n\nThis would free stock for other use.\n(Not wired to GAS yet — mock only)`)}}>Release</button></td>
+              </tr>);
+            })}</tbody>
+          </table>
+        </div>
+        <div style={{padding:"10px 18px",borderTop:"1px solid "+M.div,background:"#fff7ed",fontSize:11,color:"#92400e",display:"flex",alignItems:"center",gap:8}}>
+          <span style={{fontSize:14}}>⚠️</span>
+          <span><strong>Emergency override:</strong> Click "Release" on any row to free allocated stock for immediate use. Released qty moves back to Free Stock.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UOMBadge({ itemCode }) {
+  const u = getItemUOM(itemCode);
+  if (!u.hasDualUOM) return null;
+  return (
+    <span title={`Buy: ${u.uomP} → Issue: ${u.uomC} (1 ${u.uomP} = ${u.cf} ${u.uomC})`}
+      style={{display:"inline-block",marginLeft:4,padding:"1px 5px",borderRadius:3,fontSize:8,fontWeight:800,
+        background:"#f3e8ff",color:"#7C3AED",border:"1px solid #c4b5fd",cursor:"help",verticalAlign:"middle"}}>
+      {u.uomP}→{u.uomC}
+    </span>
+  );
+}
+
+function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewState, templates, onSaveTemplate, onDeleteTemplate, onOpenRecord, showThumb, renderMode, ts, onOpenMIP, onOpenAlloc }) {
   const _ts = ts || {w:24,h:24,rw:26,rh:26,r:4}; // default small
   const isListMode = renderMode === "list";
   const [galleryCode, setGalleryCode] = useState(null);
@@ -2078,6 +2355,9 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
   const [collapsedSubs, setCollapsedSubs] = useState({});
   const toggleGrp = (key) => setCollapsedGrps(p => ({...p, [key]: !p[key]}));
   const toggleSub = (key) => setCollapsedSubs(p => ({...p, [key]: !p[key]}));
+  // ── Expandable category attribute rows ──
+  const [expandedRows, setExpandedRows] = useState(new Set());
+  const toggleExpand = (itemCode) => setExpandedRows(prev => { const n = new Set(prev); if(n.has(itemCode)) n.delete(itemCode); else n.add(itemCode); return n; });
 
   // GRP_PALETTE and GRP_EMOJI_MAP are module-level constants (above)
   const allCols = allFields.map(f => f.col);
@@ -2375,6 +2655,9 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                                 {visCols.map(col => {const f=allFields.find(x=>x.col===col);return(
                                   <th key={col} style={{padding:"3px 7px",background:cardBg+"08",borderBottom:`1.5px solid ${cardColor}`,fontSize:8,fontWeight:900,color:cardColor,textAlign:(f?.type==="number"||col==="M"||col==="T")?"right":"left",whiteSpace:"nowrap"}}>{!isListMode&&<span style={{fontFamily:"monospace",fontSize:7,color:cardColor+"90",marginRight:2}}>{col}</span>}{f?.h||col}</th>
                                 );})}
+                                {groupBy==="C"&&(ISSUE_CAT_FIELDS[sub.rows[0]?.C]||[]).map((cf,ci)=>{const _catCc=CAT_COLORS[sub.rows[0]?.C]||CAT_COLORS.FABRIC;return(
+                                  <th key={"cat_"+cf.id} style={{padding:"3px 7px",background:_catCc.bg,borderBottom:`2px solid ${_catCc.bd}`,borderLeft:ci===0?`3px solid ${_catCc.bd}`:"none",fontSize:8,fontWeight:900,color:_catCc.tx,whiteSpace:"nowrap"}}>{cf.h}</th>
+                                );})}
                               </tr></thead><tbody>
                               {sub.rows.map((row,ri)=>{
                                 serialNum++;
@@ -2382,9 +2665,10 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                                 const _thumbImg = (showThumb||isListMode) ? getFirstImg(_thumbCode) : null;
                                 const _thumbCount = (showThumb||isListMode) ? getImgs(_thumbCode).length : 0;
                                 const _thumbEmoji = (showThumb||isListMode) ? (CAT_EMOJI[row.C]||"📦") : "";
-                                return(
-                                <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:"1px solid "+M.div,background:ri%2===0?M.tev:M.tod}}>
-                                  <td style={{padding:"3px 6px",width:28}}><div style={{width:18,height:18,borderRadius:4,background:cardColor,color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{serialNum}</div></td>
+                                const _isExp1=expandedRows.has(row.B);const _cc1=CAT_COLORS[row.C]||CAT_COLORS.FABRIC;
+                                return[
+                                <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:_isExp1?"none":("1px solid "+M.div),background:_isExp1?_cc1.bg:(ri%2===0?M.tev:M.tod)}}>
+                                  <td style={{padding:"3px 4px",width:44}}><div style={{display:"flex",alignItems:"center",gap:2}}><button onClick={e=>{e.stopPropagation();toggleExpand(row.B);}} style={{width:16,height:16,borderRadius:3,border:`1px solid ${_isExp1?_cc1.bd:M.inBd}`,background:_isExp1?_cc1.bd:"transparent",color:_isExp1?"#fff":M.tD,fontSize:7,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .12s",transform:_isExp1?"rotate(90deg)":"none",padding:0,flexShrink:0}}>▶</button><div style={{width:18,height:18,borderRadius:4,background:cardColor,color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{serialNum}</div></div></td>
                                   {(showThumb||isListMode) && (
                                     <td style={{padding:"3px 4px",width:(_ts||{rw:26}).rw+12}}>
                                       <div onClick={() => {setHoverThumb(null);setGalleryCode(_thumbCode);}}
@@ -2403,7 +2687,7 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                         {visCols.map(col=>{const f=allFields.find(x=>x.col===col);const isAuto=f?.auto||["calc","autocode"].includes(f?.type||"");const v=row[col]||"";
                           /* ── LIST MODE cell rendering ── */
                           if(isListMode){
-                            const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";
+                            const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";const isMIP=col==="Y";const isAlloc=col==="Z";const isFree=col==="AA";const isProj=col==="AB";const isCF=col==="X";const isUomP=col==="W";
                             // Item Code → pill button
                             if(isCode) return(
                               <td key={col} style={{padding:"5px 6px",textAlign:"center"}}>
@@ -2432,6 +2716,18 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                             if(isLocName) return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontStyle:"italic",color:"#15803d"}}>{v}</td>);
                             // UOM → bold amber
                             if(isUOM) return(<td key={col} style={{padding:"4px 8px",fontWeight:800,fontSize:10,color:"#854d0e"}}>{v}</td>);
+                            // UOM Purchase → purple
+                            if(isUomP){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,color:"#7C3AED",fontWeight:700}}>{v}{u.hasDualUOM&&<span style={{marginLeft:3,fontSize:8,color:"#9ca3af"}}>→{row.I}</span>}</td>);}
+                            // Conversion Factor
+                            if(isCF){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontFamily:"monospace",color:u.hasDualUOM?"#7C3AED":"#9ca3af"}}>{u.hasDualUOM?`×${v}`:"—"}</td>);}
+                            // MIP → clickable orange badge
+                            if(isMIP){const mipV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{mipV>0?<button onClick={(e)=>{e.stopPropagation();onOpenMIP?.(row.B,row.D);}} style={{background:"#fff7ed",color:"#E8690A",border:"1.5px solid #fed7aa",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.background="#E8690A";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fff7ed";e.currentTarget.style.color="#E8690A";}}>{mipV.toLocaleString("en-IN")} ⓘ</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Allocated → clickable red badge with lock icon
+                            if(isAlloc){const allocV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{allocV>0?<button onClick={(e)=>{e.stopPropagation();onOpenAlloc?.(row.B,row.D);}} style={{background:"#fef2f2",color:"#BE123C",border:"1.5px solid #fecdd3",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s",boxShadow:"inset 0 0 0 1px rgba(190,18,60,.1)"}} onMouseEnter={e=>{e.currentTarget.style.background="#BE123C";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fef2f2";e.currentTarget.style.color="#BE123C";}}> 🔒 {allocV.toLocaleString("en-IN")}</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Free Stock → bold, red if zero/negative
+                            if(isFree){const freeV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:freeV<=0?"#991b1b":freeV<100?"#92400e":"#15803d",textAlign:"right",background:freeV<=0?"#fef2f2":"transparent",borderRadius:freeV<=0?4:0}}>{freeV.toLocaleString("en-IN")}</td>);}
+                            // Projected → bold blue
+                            if(isProj){const projV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:"#0078D4",textAlign:"right"}}>{projV.toLocaleString("en-IN")}</td>);}
                             // Other → standard compact
                             return(<td key={col} style={{padding:"4px 8px",fontSize:fz-2,color:isAuto?A.a:M.tB,fontFamily:["manual","autocode"].includes(f?.type)?"monospace":"inherit",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:colW(col)+40}}>{isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD}}>—</span>}</td>);
                           }
@@ -2441,8 +2737,12 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                             {col===visCols[0]&&onOpenRecord?<button onClick={()=>onOpenRecord(row)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"monospace",fontSize:fz-2,fontWeight:800,color:A.a,padding:0,borderBottom:`1px dashed ${A.a}60`}}>{v||"—"}</button>:isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD,fontStyle:"italic"}}>—</span>}
                           </td>
                         );})}
-                      </tr>
-                    );})}
+                        {groupBy==="C"&&(ISSUE_CAT_FIELDS[row.C]||[]).map((cf,ci)=>{const _catD=LEDGER_CAT_DATA[row.B]||{};const _catCc=CAT_COLORS[row.C]||CAT_COLORS.FABRIC;return(
+                          <td key={"cat_"+cf.id} style={{padding:"4px 8px",fontSize:11,fontWeight:600,color:M.tA,background:_catCc.hi,borderLeft:ci===0?`3px solid ${_catCc.bd}`:"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:120}}>{_catD[cf.id]||<span style={{color:M.tD}}>—</span>}</td>
+                        );})}
+                      </tr>,
+                      _isExp1 && <tr key={ri+"_exp"}><td colSpan={visCols.length+((showThumb||isListMode)?1:0)+1+(groupBy==="C"?(ISSUE_CAT_FIELDS[row.C]||[]).length:0)} style={{padding:0,borderBottom:"1px solid "+M.div}}><CategoryAttributeStrip itemCode={row.B} category={row.C} M={M} A={A}/></td></tr>,
+                    ];})}
                     </tbody></table>
                     )}
                     {/* Close card */}
@@ -2462,6 +2762,9 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                               {visCols.map(col => {const f=allFields.find(x=>x.col===col);return(
                                 <th key={col} style={{padding:"3px 7px",background:grpColor.bg+"08",borderBottom:`1.5px solid ${grpColor.c}`,fontSize:8,fontWeight:900,color:grpColor.c,textAlign:(f?.type==="number"||col==="M"||col==="T")?"right":"left",whiteSpace:"nowrap"}}>{!isListMode&&<span style={{fontFamily:"monospace",fontSize:7,color:grpColor.c+"90",marginRight:2}}>{col}</span>}{f?.h||col}</th>
                               );})}
+                              {groupBy==="C"&&(ISSUE_CAT_FIELDS[sub.rows[0]?.C]||[]).map((cf,ci)=>{const _catCc=CAT_COLORS[sub.rows[0]?.C]||CAT_COLORS.FABRIC;return(
+                                <th key={"cat_"+cf.id} style={{padding:"3px 7px",background:_catCc.bg,borderBottom:`2px solid ${_catCc.bd}`,borderLeft:ci===0?`3px solid ${_catCc.bd}`:"none",fontSize:8,fontWeight:900,color:_catCc.tx,whiteSpace:"nowrap"}}>{cf.h}</th>
+                              );})}
                             </tr></thead><tbody>
                             {sub.rows.map((row,ri)=>{
                               serialNum++;
@@ -2469,9 +2772,10 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                               const _thumbImg = (showThumb||isListMode) ? getFirstImg(_thumbCode) : null;
                               const _thumbCount = (showThumb||isListMode) ? getImgs(_thumbCode).length : 0;
                               const _thumbEmoji = (showThumb||isListMode) ? (CAT_EMOJI[row.C]||"📦") : "";
-                              return(
-                              <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:"1px solid "+M.div,background:ri%2===0?M.tev:M.tod}}>
-                                <td style={{padding:"3px 6px",width:28}}><div style={{width:18,height:18,borderRadius:4,background:grpColor.c,color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{serialNum}</div></td>
+                              const _isExp2=expandedRows.has(row.B);const _cc2=CAT_COLORS[row.C]||CAT_COLORS.FABRIC;
+                              return[
+                              <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:_isExp2?"none":("1px solid "+M.div),background:_isExp2?_cc2.bg:(ri%2===0?M.tev:M.tod)}}>
+                                <td style={{padding:"3px 4px",width:44}}><div style={{display:"flex",alignItems:"center",gap:2}}><button onClick={e=>{e.stopPropagation();toggleExpand(row.B);}} style={{width:16,height:16,borderRadius:3,border:`1px solid ${_isExp2?_cc2.bd:M.inBd}`,background:_isExp2?_cc2.bd:"transparent",color:_isExp2?"#fff":M.tD,fontSize:7,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .12s",transform:_isExp2?"rotate(90deg)":"none",padding:0,flexShrink:0}}>▶</button><div style={{width:18,height:18,borderRadius:4,background:grpColor.c,color:"#fff",fontSize:8,fontWeight:900,display:"flex",alignItems:"center",justifyContent:"center"}}>{serialNum}</div></div></td>
                                 {(showThumb||isListMode) && (
                                   <td style={{padding:"3px 4px",width:(_ts||{rw:26}).rw+12}}>
                                     <div onClick={() => {setHoverThumb(null);setGalleryCode(_thumbCode);}}
@@ -2489,7 +2793,7 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                                 )}
                                 {visCols.map(col=>{const f=allFields.find(x=>x.col===col);const isAuto=f?.auto||["calc","autocode"].includes(f?.type||"");const v=row[col]||"";
                                   if(isListMode){
-                                    const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";
+                                    const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";const isMIP=col==="Y";const isAlloc=col==="Z";const isFree=col==="AA";const isProj=col==="AB";const isCF=col==="X";const isUomP=col==="W";
                                     if(isCode) return(<td key={col} style={{padding:"5px 6px",textAlign:"center"}}><button onClick={()=>onOpenRecord?.(row)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,.18)";e.currentTarget.style.borderColor="#E8690A";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 6px rgba(0,0,0,.08)";e.currentTarget.style.borderColor="#d1d5db";}} style={{background:"#fff",border:"1.5px solid #d1d5db",borderRadius:8,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontSize:12,fontWeight:800,color:"#111827",padding:"6px 14px",transition:"all .15s ease",display:"block",width:"100%",boxShadow:"0 2px 6px rgba(0,0,0,.08)",whiteSpace:"nowrap"}}>{v}</button></td>);
                                     if(isName) return(<td key={col} style={{padding:"4px 8px",fontSize:13,fontWeight:900,color:M.tA,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:220}}>{v||"—"}</td>);
                                     if(isOnHand){const numV=parseFloat(v)||0;const alertV=row.P||"";return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:14,fontWeight:900,color:alertV==="CRITICAL"?"#991b1b":A.a,textAlign:"right"}}>{numV.toLocaleString("en-IN")}</td>);}
@@ -2500,12 +2804,28 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                                     if(isLoc) return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:10,fontWeight:700,color:M.tB}}>{v}</td>);
                                     if(isLocName) return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontStyle:"italic",color:"#15803d"}}>{v}</td>);
                                     if(isUOM) return(<td key={col} style={{padding:"4px 8px",fontWeight:800,fontSize:10,color:"#854d0e"}}>{v}</td>);
+                            // UOM Purchase → purple
+                            if(isUomP){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,color:"#7C3AED",fontWeight:700}}>{v}{u.hasDualUOM&&<span style={{marginLeft:3,fontSize:8,color:"#9ca3af"}}>→{row.I}</span>}</td>);}
+                            // Conversion Factor
+                            if(isCF){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontFamily:"monospace",color:u.hasDualUOM?"#7C3AED":"#9ca3af"}}>{u.hasDualUOM?`×${v}`:"—"}</td>);}
+                            // MIP → clickable orange badge
+                            if(isMIP){const mipV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{mipV>0?<button onClick={(e)=>{e.stopPropagation();onOpenMIP?.(row.B,row.D);}} style={{background:"#fff7ed",color:"#E8690A",border:"1.5px solid #fed7aa",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.background="#E8690A";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fff7ed";e.currentTarget.style.color="#E8690A";}}>{mipV.toLocaleString("en-IN")} ⓘ</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Allocated → clickable red badge with lock icon
+                            if(isAlloc){const allocV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{allocV>0?<button onClick={(e)=>{e.stopPropagation();onOpenAlloc?.(row.B,row.D);}} style={{background:"#fef2f2",color:"#BE123C",border:"1.5px solid #fecdd3",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s",boxShadow:"inset 0 0 0 1px rgba(190,18,60,.1)"}} onMouseEnter={e=>{e.currentTarget.style.background="#BE123C";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fef2f2";e.currentTarget.style.color="#BE123C";}}> 🔒 {allocV.toLocaleString("en-IN")}</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Free Stock → bold, red if zero/negative
+                            if(isFree){const freeV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:freeV<=0?"#991b1b":freeV<100?"#92400e":"#15803d",textAlign:"right",background:freeV<=0?"#fef2f2":"transparent",borderRadius:freeV<=0?4:0}}>{freeV.toLocaleString("en-IN")}</td>);}
+                            // Projected → bold blue
+                            if(isProj){const projV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:"#0078D4",textAlign:"right"}}>{projV.toLocaleString("en-IN")}</td>);}
                                     return(<td key={col} style={{padding:"4px 8px",fontSize:fz-2,color:isAuto?A.a:M.tB,fontFamily:["manual","autocode"].includes(f?.type)?"monospace":"inherit",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:colW(col)+40}}>{isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD}}>—</span>}</td>);
                                   }
                                   return(<td key={col} style={{padding:pyV+"px 10px",fontSize:fz-2,color:col===visCols[0]?A.a:M.tB,fontWeight:col===visCols[0]?700:400,fontFamily:["manual","autocode"].includes(f?.type)?"monospace":"inherit",borderRight:"1px solid "+M.div,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:colW(col)+40}}>{col===visCols[0]&&onOpenRecord?<button onClick={()=>onOpenRecord(row)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"monospace",fontSize:fz-2,fontWeight:800,color:A.a,padding:0,borderBottom:`1px dashed ${A.a}60`}}>{v||"—"}</button>:isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD,fontStyle:"italic"}}>—</span>}</td>);
                                 })}
-                              </tr>);
-                            })}
+                                {groupBy==="C"&&(ISSUE_CAT_FIELDS[row.C]||[]).map((cf,ci)=>{const _catD=LEDGER_CAT_DATA[row.B]||{};const _catCc=CAT_COLORS[row.C]||CAT_COLORS.FABRIC;return(
+                                  <td key={"cat_"+cf.id} style={{padding:"4px 8px",fontSize:11,fontWeight:600,color:M.tA,background:_catCc.hi,borderLeft:ci===0?`3px solid ${_catCc.bd}`:"none",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:120}}>{_catD[cf.id]||<span style={{color:M.tD}}>—</span>}</td>
+                                );})}
+                              </tr>,
+                              _isExp2 && <tr key={ri+"_exp"}><td colSpan={visCols.length+((showThumb||isListMode)?1:0)+1+(groupBy==="C"?(ISSUE_CAT_FIELDS[row.C]||[]).length:0)} style={{padding:0,borderBottom:"1px solid "+M.div}}><CategoryAttributeStrip itemCode={row.B} category={row.C} M={M} A={A}/></td></tr>,
+                            ];})}
                             </tbody></table>
                           </div>
                         </div>
@@ -2517,9 +2837,11 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                       const _thumbImg = (showThumb||isListMode) ? getFirstImg(_thumbCode) : null;
                       const _thumbCount = (showThumb||isListMode) ? getImgs(_thumbCode).length : 0;
                       const _thumbEmoji = (showThumb||isListMode) ? (CAT_EMOJI[row.C]||"📦") : "";
-                      return(
-                      <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:"1px solid "+M.div,background:ri%2===0?M.tev:M.tod}}>
-                        <td style={{padding:"3px 6px",width:28,textAlign:"center"}}><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:20,height:20,borderRadius:4,background:A.a,color:"#fff",fontSize:9,fontWeight:900,fontFamily:"monospace"}}>{ri+1}</span></td>
+                      const _isExp3 = expandedRows.has(row.B);
+                      const _cc3 = CAT_COLORS[row.C]||CAT_COLORS.FABRIC;
+                      return[
+                      <tr key={ri} style={{height:isListMode?Math.max(40,_ts.rh+14):undefined,borderBottom:_isExp3?"none":("1px solid "+M.div),background:_isExp3?_cc3.bg:(ri%2===0?M.tev:M.tod)}}>
+                        <td style={{padding:"3px 4px",width:44,textAlign:"center"}}><div style={{display:"flex",alignItems:"center",gap:2}}><button onClick={e=>{e.stopPropagation();toggleExpand(row.B);}} style={{width:16,height:16,borderRadius:3,border:`1px solid ${_isExp3?_cc3.bd:M.inBd}`,background:_isExp3?_cc3.bd:"transparent",color:_isExp3?"#fff":M.tD,fontSize:7,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",transition:"all .12s",transform:_isExp3?"rotate(90deg)":"none",padding:0,flexShrink:0}}>▶</button><span style={{display:"inline-flex",alignItems:"center",justifyContent:"center",width:20,height:20,borderRadius:4,background:A.a,color:"#fff",fontSize:9,fontWeight:900,fontFamily:"monospace"}}>{ri+1}</span></div></td>
                         {(showThumb||isListMode) && (
                           <td style={{padding:"3px 4px",width:(_ts||{rw:26}).rw+12}}>
                             <div onClick={() => {setHoverThumb(null);setGalleryCode(_thumbCode);}}
@@ -2537,7 +2859,7 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                         )}
                         {visCols.map(col=>{const f=allFields.find(x=>x.col===col);const isAuto=f?.auto||["calc","autocode"].includes(f?.type||"");const v=row[col]||"";
                           if(isListMode){
-                            const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";
+                            const isCode=col==="B";const isName=col==="D";const isOnHand=col==="M";const isAlert=col==="P";const isCat=col==="E";const isID=col==="A";const isValue=col==="T";const isLoc=col==="F";const isLocName=col==="G";const isUOM=col==="I";const isMIP=col==="Y";const isAlloc=col==="Z";const isFree=col==="AA";const isProj=col==="AB";const isCF=col==="X";const isUomP=col==="W";
                             if(isCode) return(<td key={col} style={{padding:"5px 6px",textAlign:"center"}}><button onClick={()=>onOpenRecord?.(row)} onMouseEnter={e=>{e.currentTarget.style.transform="translateY(-3px)";e.currentTarget.style.boxShadow="0 6px 18px rgba(0,0,0,.18)";e.currentTarget.style.borderColor="#E8690A";}} onMouseLeave={e=>{e.currentTarget.style.transform="translateY(0)";e.currentTarget.style.boxShadow="0 2px 6px rgba(0,0,0,.08)";e.currentTarget.style.borderColor="#d1d5db";}} style={{background:"#fff",border:"1.5px solid #d1d5db",borderRadius:8,cursor:"pointer",fontFamily:"'IBM Plex Mono',monospace",fontSize:12,fontWeight:800,color:"#111827",padding:"6px 14px",transition:"all .15s ease",display:"block",width:"100%",boxShadow:"0 2px 6px rgba(0,0,0,.08)",whiteSpace:"nowrap"}}>{v}</button></td>);
                             if(isName) return(<td key={col} style={{padding:"4px 8px",fontSize:13,fontWeight:900,color:M.tA,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:220}}>{v||"—"}</td>);
                             if(isOnHand){const numV=parseFloat(v)||0;const alertV=row.P||"";return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:14,fontWeight:900,color:alertV==="CRITICAL"?"#991b1b":A.a,textAlign:"right"}}>{numV.toLocaleString("en-IN")}</td>);}
@@ -2548,11 +2870,25 @@ function RecordsTab({ allFields, mockRecords, M, A, fz, pyV, viewState, setViewS
                             if(isLoc) return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:10,fontWeight:700,color:M.tB}}>{v}</td>);
                             if(isLocName) return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontStyle:"italic",color:"#15803d"}}>{v}</td>);
                             if(isUOM) return(<td key={col} style={{padding:"4px 8px",fontWeight:800,fontSize:10,color:"#854d0e"}}>{v}</td>);
+                            // UOM Purchase → purple
+                            if(isUomP){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,color:"#7C3AED",fontWeight:700}}>{v}{u.hasDualUOM&&<span style={{marginLeft:3,fontSize:8,color:"#9ca3af"}}>→{row.I}</span>}</td>);}
+                            // Conversion Factor
+                            if(isCF){const u=getItemUOM(row.B);return(<td key={col} style={{padding:"4px 8px",fontSize:10,fontFamily:"monospace",color:u.hasDualUOM?"#7C3AED":"#9ca3af"}}>{u.hasDualUOM?`×${v}`:"—"}</td>);}
+                            // MIP → clickable orange badge
+                            if(isMIP){const mipV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{mipV>0?<button onClick={(e)=>{e.stopPropagation();onOpenMIP?.(row.B,row.D);}} style={{background:"#fff7ed",color:"#E8690A",border:"1.5px solid #fed7aa",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s"}} onMouseEnter={e=>{e.currentTarget.style.background="#E8690A";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fff7ed";e.currentTarget.style.color="#E8690A";}}>{mipV.toLocaleString("en-IN")} ⓘ</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Allocated → clickable red badge with lock icon
+                            if(isAlloc){const allocV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 6px"}}>{allocV>0?<button onClick={(e)=>{e.stopPropagation();onOpenAlloc?.(row.B,row.D);}} style={{background:"#fef2f2",color:"#BE123C",border:"1.5px solid #fecdd3",borderRadius:6,padding:"2px 8px",fontSize:11,fontWeight:800,fontFamily:"monospace",cursor:"pointer",transition:"all .15s",boxShadow:"inset 0 0 0 1px rgba(190,18,60,.1)"}} onMouseEnter={e=>{e.currentTarget.style.background="#BE123C";e.currentTarget.style.color="#fff";}} onMouseLeave={e=>{e.currentTarget.style.background="#fef2f2";e.currentTarget.style.color="#BE123C";}}> 🔒 {allocV.toLocaleString("en-IN")}</button>:<span style={{color:"#9ca3af",fontSize:10}}>—</span>}</td>);}
+                            // Free Stock → bold, red if zero/negative
+                            if(isFree){const freeV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:freeV<=0?"#991b1b":freeV<100?"#92400e":"#15803d",textAlign:"right",background:freeV<=0?"#fef2f2":"transparent",borderRadius:freeV<=0?4:0}}>{freeV.toLocaleString("en-IN")}</td>);}
+                            // Projected → bold blue
+                            if(isProj){const projV=parseFloat(v)||0;return(<td key={col} style={{padding:"4px 8px",fontFamily:"monospace",fontSize:13,fontWeight:800,color:"#0078D4",textAlign:"right"}}>{projV.toLocaleString("en-IN")}</td>);}
                             return(<td key={col} style={{padding:"4px 8px",fontSize:fz-2,color:isAuto?A.a:M.tB,fontFamily:["manual","autocode"].includes(f?.type)?"monospace":"inherit",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:colW(col)+40}}>{isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD}}>—</span>}</td>);
                           }
                           return(<td key={col} style={{padding:pyV+"px 10px",fontSize:fz-2,color:col===visCols[0]?A.a:M.tB,fontWeight:col===visCols[0]?700:400,fontFamily:["manual","autocode"].includes(f?.type)?"monospace":"inherit",borderRight:"1px solid "+M.div,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis",maxWidth:colW(col)+40}}>{col===visCols[0]&&onOpenRecord?<button onClick={()=>onOpenRecord(row)} style={{background:"none",border:"none",cursor:"pointer",fontFamily:"monospace",fontSize:fz-2,fontWeight:800,color:A.a,padding:0,borderBottom:`1px dashed ${A.a}60`}}>{v||"—"}</button>:isAuto?<span style={{color:A.a,background:A.al,borderRadius:3,padding:"1px 5px",fontFamily:"monospace",fontSize:fz-3}}>{v||"auto"}</span>:v||<span style={{color:M.tD,fontStyle:"italic"}}>—</span>}</td>);
                         })}
-                      </tr>);
+                      </tr>,
+                      _isExp3 && <tr key={ri+"_exp"}><td colSpan={visCols.length+((showThumb||isListMode)?1:0)+1} style={{padding:0,borderBottom:"1px solid "+M.div}}><CategoryAttributeStrip itemCode={row.B} category={row.C} M={M} A={A}/></td></tr>,
+                      ];
                     })}
                   </React.Fragment>
                 );})}
@@ -3478,6 +3814,10 @@ function ModuleApp({ activeSub: externalSub, onSubChange }) {
   // ── Sidebar resize ──
   const { w:sbW, onMouseDown:onSbDrag } = useDrag(230, 160, 340);
 
+  // ── MIP + Allocation popups (at top level to avoid overflow:hidden clipping) ──
+  const [mipPopup,   setMipPopup]   = useState(null);
+  const [allocPopup, setAllocPopup] = useState(null);
+
   // ── Sub-module switch → reset state ──
   const switchSub = (newSub) => {
     if (dirty) { setGuardModal({action:"sub", payload:newSub, type:"entry"}); return; }
@@ -3675,6 +4015,8 @@ function ModuleApp({ activeSub: externalSub, onSubChange }) {
                   showThumb={true}
                   renderMode={ledgerViewMode}
                   ts={ts}
+                  onOpenMIP={(itemCode,itemName)=>setMipPopup({itemCode,itemName})}
+                  onOpenAlloc={(itemCode,itemName)=>setAllocPopup({itemCode,itemName})}
                 />
                 )}
               </div>
@@ -3750,6 +4092,10 @@ function ModuleApp({ activeSub: externalSub, onSubChange }) {
           </div></>
         );
       })()}
+
+      {/* ── MIP + Allocation Popups (at top level for z-index) ── */}
+      {mipPopup && <MIPPopup itemCode={mipPopup.itemCode} itemName={mipPopup.itemName} onClose={()=>setMipPopup(null)} M={M} A={A} />}
+      {allocPopup && <AllocPopup itemCode={allocPopup.itemCode} itemName={allocPopup.itemName} onClose={()=>setAllocPopup(null)} M={M} A={A} />}
     </div>
   );
 }

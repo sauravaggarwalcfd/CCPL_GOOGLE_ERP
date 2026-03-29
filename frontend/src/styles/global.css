@@ -51,7 +51,7 @@ body {
 .theme-anim { animation: themeSwap .25s ease; }
 .cmd-anim { animation: cmdIn .18s cubic-bezier(.2,.8,.3,1); }
 
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 8px; height: 12px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { border-radius: 3px; }
 
